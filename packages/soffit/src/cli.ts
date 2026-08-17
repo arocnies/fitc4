@@ -8,17 +8,18 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { findConfig, loadConfig } from './config.ts'
+import { findConfig, resolveConfig } from './config.ts'
 import { runPipeline } from './pipeline.ts'
 import { pipelineConfig } from './preset.ts'
 import { exitCodeFor, renderReport } from './report.ts'
 
 const USAGE = `Usage: soffit [options]
 
-  --config <path>  Path to soffit.config.json. Defaults to discovery from the
-                   working directory: ./soffit.config.json, then
-                   ./.soffit/soffit.config.json, then the same two in each
-                   ancestor.
+  --config <path>  Path to a soffit config (.ts, .js, or .json). Defaults to
+                   discovery from the working directory: soffit.config.ts,
+                   soffit.config.js, or soffit.config.json in ./, then in
+                   ./.soffit/, then the same in each ancestor. Two of the
+                   three in one directory is an error.
   --json           Emit the full result as JSON instead of a report.
   --version        Print the version.
   --help           Show this message.
@@ -83,7 +84,7 @@ async function main(): Promise<void> {
     return
   }
 
-  const result = await runPipeline(pipelineConfig(loadConfig(options.configPath)))
+  const result = await runPipeline(pipelineConfig(await resolveConfig(options.configPath)))
 
   if (options.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)

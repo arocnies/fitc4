@@ -1,0 +1,49 @@
+# CI for the soffit monorepo.
+#
+# verify: runs `check` in every workspace — typecheck, build, and unit tests
+#         for packages/soffit, plus format/model validation, typecheck, tests,
+#         and the soffit gate itself for example/.
+# smoke:  packs the soffit tarball, installs it into a throwaway consumer, and
+#         asserts the CLI, library entry point, schema export, and pass/fail
+#         gate behave the way a real npm consumer would see them.
+#
+# `npm ci` runs the package's `prepare` script, which builds dist/ — no
+# separate build step is needed. Node 22 is the matrix floor because the
+# likec4 dependency requires node >=22.22.3.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: node ${{ matrix.node }}
+    # Linux only, deliberately: Windows has no users yet and an unverified red
+    # leg is drag, not signal. Paths are POSIX-normalized throughout and the
+    # known Windows hazards (smoke.sh path conversion, fixture symlinks) are
+    # already handled — add a windows-latest leg when a Windows consumer exists.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 26]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run verify
+
+      - run: npm run smoke

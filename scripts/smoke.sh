@@ -53,7 +53,9 @@ rm "$consumer/src/core/bad.ts"
 
 echo "== --version matches the manifest"
 version="$(cd "$consumer" && npx soffit --version)"
-expected="$(node -p "require('$root/packages/soffit/package.json').version")"
+# Path passed as an argument, not embedded in the expression: Git Bash on
+# Windows converts POSIX paths in bare arguments but not inside strings.
+expected="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).version' "$root/packages/soffit/package.json")"
 if [ "$version" != "$expected" ]; then
   echo "FAIL: soffit --version printed '$version', manifest says '$expected'" >&2
   exit 1

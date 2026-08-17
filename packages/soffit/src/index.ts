@@ -6,12 +6,21 @@
  * inside its own test suite instead of shelling out.
  *
  * Providers are exported individually rather than behind a registry. Composing
- * them is the caller's job (POC-DESIGN-v4 defers configurable providers), and a
+ * them is the caller's job — in code, or in a `soffit.config.ts` — and a
  * caller that wants a different scanner supplies a function.
  */
 
-export { loadConfig, findConfig, CONFIG_FILENAME, CONFIG_DIRECTORY, CONFIG_VERSION } from './config.ts'
-export type { SoffitConfig } from './config.ts'
+export {
+  loadConfig,
+  resolveConfig,
+  defineConfig,
+  findConfig,
+  CONFIG_FILENAME,
+  CONFIG_FILENAMES,
+  CONFIG_DIRECTORY,
+  CONFIG_VERSION,
+} from './config.ts'
+export type { SoffitConfig, SoffitFileConfig, ResolvedConfig } from './config.ts'
 
 export { runPipeline } from './pipeline.ts'
 export type { PipelineConfig, PipelineResult } from './pipeline.ts'
@@ -30,9 +39,18 @@ export {
   type RefKind,
 } from './kinds.ts'
 
-export { architectureRules, EVIDENCE_LIMIT } from './providers/architecture-rules.ts'
-export { sourceRoot, ownerOf } from './providers/source-root.ts'
-export { typescriptImports } from './providers/typescript-imports.ts'
+// The ids the preset composes each provider under, exported so a config file
+// that replaces a phase can rebuild the preset entries verbatim.
+export {
+  architectureRules,
+  EVIDENCE_LIMIT,
+  PROVIDER_ID as ARCHITECTURE_RULES_PROVIDER_ID,
+} from './providers/architecture-rules.ts'
+export { sourceRoot, ownerOf, PROVIDER_ID as SOURCE_ROOT_PROVIDER_ID } from './providers/source-root.ts'
+export {
+  typescriptImports,
+  PROVIDER_ID as TYPESCRIPT_IMPORTS_PROVIDER_ID,
+} from './providers/typescript-imports.ts'
 
 export type {
   Association,

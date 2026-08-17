@@ -1,10 +1,10 @@
 /**
- * `soffit.config.json` — the project-specific inputs.
+ * `soffit.config.{ts,js,json}` — the project-specific inputs.
  *
- * This holds only what differs between repositories: where the code is, where
- * the model is, and which tsconfig describes module resolution. Providers are
- * still composed in code (POC-DESIGN-v4 defers command providers), so there is
- * no provider configuration here yet.
+ * The JSON form holds only what differs between repositories: where the code
+ * is, where the model is, and which tsconfig describes module resolution. The
+ * module forms carry the same fields plus optional provider phase arrays,
+ * which cannot live in JSON because a provider is a function.
  *
  * Every path is resolved relative to the config file, so moving the workspace
  * does not silently repoint the scan.
@@ -12,9 +12,21 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+import type { NamedProvider, ResolveProvider, ScanProvider, ValidateProvider } from './types.ts'
 
 export const CONFIG_FILENAME = 'soffit.config.json'
 export const CONFIG_VERSION = 1
+
+/**
+ * The recognized config filenames, in discovery order.
+ *
+ * Order matters only for the error message: two of these in one directory is
+ * an error, never a precedence rule. A config that loses a silent tiebreak is
+ * a config that is silently ignored — the same fail-open as a config that
+ * quietly falls back to defaults.
+ */
+export const CONFIG_FILENAMES = ['soffit.config.ts', 'soffit.config.js', CONFIG_FILENAME] as const
 
 export interface SoffitConfig {
   /** Absolute repository root. Every reported path is relative to this. */
@@ -28,11 +40,54 @@ export interface SoffitConfig {
 }
 
 /**
- * Read and validate the config.
+ * What a `soffit.config.ts` / `.js` module's default export must be.
  *
- * Validation is deliberately strict and hand-written. A malformed config that
- * quietly falls back to defaults would scan the wrong tree and report a clean
- * pass — the same fail-open the pipeline works hard to avoid everywhere else.
+ * The same fields as the JSON config, plus optional provider phase arrays. A
+ * phase array that is present replaces the preset for that phase entirely —
+ * see `pipelineConfig` — so a config that extends a phase names every provider
+ * it wants, preset entries included.
+ */
+export interface SoffitFileConfig {
+  version: number
+  /** Repository root, relative to the config file. */
+  repositoryRoot: string
+  /** Directory holding the LikeC4 workspace, relative to the config file. */
+  model: string
+  /** Repository-relative directories under architecture control. */
+  scanRoots: string[]
+  /** Path to the tsconfig supplying compiler options, relative to the config file. */
+  tsconfig: string
+  scan?: NamedProvider<ScanProvider>[]
+  resolve?: NamedProvider<ResolveProvider>[]
+  validate?: NamedProvider<ValidateProvider>[]
+}
+
+/** A loaded config plus whichever provider phases the config file supplied. */
+export interface ResolvedConfig extends SoffitConfig {
+  providers?: {
+    scan?: NamedProvider<ScanProvider>[]
+    resolve?: NamedProvider<ResolveProvider>[]
+    validate?: NamedProvider<ValidateProvider>[]
+  }
+}
+
+/**
+ * Identity, for the config author's editor.
+ *
+ * A default export annotated by hand drifts silently when the shape changes;
+ * wrapping it in `defineConfig` makes a stale config a type error in the
+ * project that owns it, before this package ever loads it.
+ */
+export function defineConfig(config: SoffitFileConfig): SoffitFileConfig {
+  return config
+}
+
+/**
+ * Read and validate a JSON config.
+ *
+ * Kept synchronous, and JSON-only, on purpose: it predates `resolveConfig`
+ * and library callers use it inside synchronous setup. The CLI goes through
+ * `resolveConfig`, which handles all three forms.
  */
 export function loadConfig(configPath: string): SoffitConfig {
   let raw: unknown
@@ -45,8 +100,60 @@ export function loadConfig(configPath: string): SoffitConfig {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     throw new Error(`${configPath}: expected a JSON object`)
   }
+
+  return validateFields(configPath, raw as Record<string, unknown>)
+}
+
+/**
+ * Load any of the three config forms.
+ *
+ * A `.json` path behaves exactly like `loadConfig`. A `.ts` or `.js` path is
+ * imported and its default export validated with the same strictness — the
+ * module form does not get a laxer contract just because a compiler already
+ * saw it, since nothing forces a config author to typecheck the file. Node
+ * strips types natively at this package's engines floor, so importing a `.ts`
+ * config needs no loader.
+ */
+export async function resolveConfig(configPath: string): Promise<ResolvedConfig> {
+  const resolved = path.resolve(configPath)
+  if (!resolved.endsWith('.ts') && !resolved.endsWith('.js')) {
+    return loadConfig(resolved)
+  }
+
+  let module: Record<string, unknown>
+  try {
+    module = (await import(pathToFileURL(resolved).href)) as Record<string, unknown>
+  } catch (error) {
+    throw new Error(`Cannot import ${configPath}: ${messageOf(error)}`)
+  }
+
+  const raw = module['default']
+  if (raw === undefined) {
+    throw new Error(`${configPath}: the config must be the module's default export`)
+  }
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error(`${configPath}: the default export must be a config object`)
+  }
   const record = raw as Record<string, unknown>
 
+  const config: ResolvedConfig = validateFields(configPath, record)
+  const scan = requireProviders<ScanProvider>(configPath, record, 'scan')
+  const resolve = requireProviders<ResolveProvider>(configPath, record, 'resolve')
+  const validate = requireProviders<ValidateProvider>(configPath, record, 'validate')
+  if (scan !== undefined || resolve !== undefined || validate !== undefined) {
+    config.providers = { scan, resolve, validate }
+  }
+  return config
+}
+
+/**
+ * The validation shared by every config form.
+ *
+ * Deliberately strict and hand-written. A malformed config that quietly falls
+ * back to defaults would scan the wrong tree and report a clean pass — the
+ * same fail-open the pipeline works hard to avoid everywhere else.
+ */
+function validateFields(configPath: string, record: Record<string, unknown>): SoffitConfig {
   if (record['version'] !== CONFIG_VERSION) {
     throw new Error(
       `${configPath}: unsupported version ${JSON.stringify(record['version'])}; expected ${CONFIG_VERSION}`,
@@ -83,27 +190,35 @@ export function loadConfig(configPath: string): SoffitConfig {
 export const CONFIG_DIRECTORY = '.soffit'
 
 /**
- * Find `soffit.config.json`, starting at a directory and walking up.
+ * Find a soffit config, starting at a directory and walking up.
  *
  * At each level the root-level file wins over the one in `.soffit/`, so a
  * project that hoists its config is never silently overruled by the copy it
- * left behind.
+ * left behind. Within one directory there is no such precedence: two config
+ * files there is an error, because whichever lost a tiebreak would be
+ * silently ignored — and an ignored config is a fail-open.
  */
 export function findConfig(from: string): string {
   let directory = path.resolve(from)
 
   for (;;) {
-    for (const candidate of [
-      path.join(directory, CONFIG_FILENAME),
-      path.join(directory, CONFIG_DIRECTORY, CONFIG_FILENAME),
-    ]) {
-      if (fs.existsSync(candidate)) return candidate
+    for (const location of [directory, path.join(directory, CONFIG_DIRECTORY)]) {
+      const found = CONFIG_FILENAMES.map((name) => path.join(location, name)).filter((candidate) =>
+        fs.existsSync(candidate),
+      )
+      if (found.length > 1) {
+        throw new Error(
+          `Multiple configs in one directory: ${found.join(' and ')}. ` +
+            `All but one would be silently ignored, so keep exactly one.`,
+        )
+      }
+      if (found[0] !== undefined) return found[0]
     }
 
     const parent = path.dirname(directory)
     if (parent === directory) {
       throw new Error(
-        `No ${CONFIG_FILENAME} found in ${path.resolve(from)}, ` +
+        `No ${CONFIG_FILENAMES.join(', ')} found in ${path.resolve(from)}, ` +
           `its ${CONFIG_DIRECTORY}/ directory, or any ancestor.`,
       )
     }
@@ -117,6 +232,41 @@ function requireString(configPath: string, record: Record<string, unknown>, key:
     throw new Error(`${configPath}: '${key}' must be a non-empty string`)
   }
   return value
+}
+
+/**
+ * Validate one provider phase array structurally.
+ *
+ * Structural, not behavioral: `run` is checked to be a function, nothing
+ * more. What it must return is the pipeline's contract, and the pipeline
+ * already contains a misbehaving provider as an error finding. What cannot be
+ * deferred is the shape — an entry with no `run` would only surface once the
+ * pipeline tried to call it, blamed on the wrong layer.
+ */
+function requireProviders<T>(
+  configPath: string,
+  record: Record<string, unknown>,
+  key: string,
+): NamedProvider<T>[] | undefined {
+  const value = record[key]
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) {
+    throw new Error(`${configPath}: '${key}' must be an array of providers`)
+  }
+
+  value.forEach((entry, index) => {
+    const candidate =
+      typeof entry === 'object' && entry !== null ? (entry as Record<string, unknown>) : undefined
+    const id = candidate?.['id']
+    const run = candidate?.['run']
+    if (candidate === undefined || typeof id !== 'string' || id.trim() === '' || typeof run !== 'function') {
+      throw new Error(
+        `${configPath}: '${key}[${index}]' must be a provider with a string 'id' and a function 'run'`,
+      )
+    }
+  })
+
+  return value as NamedProvider<T>[]
 }
 
 function requireStringArray(
