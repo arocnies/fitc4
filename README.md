@@ -78,6 +78,8 @@ error (1)
 
 Exit code 1. `--json` emits the full result instead of the report; `--config <path>` overrides discovery.
 
+The example also carries [`fitc4.ai.config.ts`](example/fitc4.ai.config.ts) — the same gate plus the `fitc4/ai` advisory providers, run on demand with `npm run arch:ai -w example`. A non-discovery filename plus `--config` is the pattern for keeping an AI-assisted variant beside the deterministic one CI runs: an unowned file gets the standard `unmapped-source` warning *and* an AI `ownership-suggestion` naming the element that should own it (or saying the model is missing one), and described elements get their implementations reviewed against their descriptions. Requires a logged-in `claude` CLI; without one the run still passes and reports `ai-unavailable`.
+
 ## Where things live
 
 `fitc4.config.json` goes at your project root, beside `tsconfig.json`. Discovery starts at the working directory and checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — directly, then under `.fitc4/` — repeating up each ancestor, so the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.

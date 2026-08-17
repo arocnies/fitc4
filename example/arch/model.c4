@@ -8,12 +8,14 @@ model {
   example = system 'Example App' {
     app = container 'App' {
       core = component 'Core' {
+        description 'Business logic with no dependencies on other components'
         metadata {
           sources 'src/core/**'
         }
       }
 
       interface = component 'Interface' {
+        description 'The public surface; delegates to Core and adds no business logic'
         metadata {
           sources 'src/interface/**'
         }
