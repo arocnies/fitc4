@@ -10,7 +10,7 @@
  * still passes with a visible `ai-unavailable` note.
  */
 
-import { defineConfig, presetValidate } from 'fitc4'
+import { defineConfig, defaultValidate } from 'fitc4'
 import { aiOwnershipAdvisor, aiSemanticReview, cached, claudeCli } from 'fitc4/ai'
 
 // Cheap model; `cached` makes reruns with unchanged inputs free and identical.
@@ -22,10 +22,10 @@ export default defineConfig({
   model: 'arch',
   scanRoots: ['src'],
   tsconfig: 'tsconfig.json',
-  // Present replaces the preset for the phase, so the standard rules come
+  // Present replaces the defaults for the phase, so the standard rules come
   // back in through the spread. scan and resolve stay default.
   validate: [
-    ...presetValidate,
+    ...defaultValidate,
     // Suggests an owner for any file no element claims. Zero AI calls when
     // the repository is clean. `severity: 'error'` would make either provider
     // part of the gate instead of advisory.

@@ -54,7 +54,7 @@ model {
   fitc4.lib -> likec4 'loads the architecture model through'
   likec4 -> consumer 'parses arch/'
 
-  fitc4.lib.core -> fitc4.lib.providers 'composes and re-exports (preset.ts, index.ts)'
+  fitc4.lib.core -> fitc4.lib.providers 'composes and re-exports (defaults.ts, index.ts)'
   fitc4.lib.providers -> fitc4.lib.core 'reads the shared contracts (types, model, ids, kinds)'
   fitc4.lib.ai -> fitc4.lib.core 'reads the shared contracts; nothing in core imports it back'
 }

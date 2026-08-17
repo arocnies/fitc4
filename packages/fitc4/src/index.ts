@@ -25,7 +25,7 @@ export type { FitC4Config, FitC4FileConfig, ResolvedConfig } from './config.ts'
 export { runPipeline } from './pipeline.ts'
 export type { PhaseProviders, PipelineConfig, PipelineResult } from './pipeline.ts'
 
-export { pipelineConfig, presetResolve, presetValidate } from './preset.ts'
+export { pipelineConfig, defaultResolve, defaultValidate } from './defaults.ts'
 
 export { exitCodeFor, renderReport } from './report.ts'
 
@@ -39,8 +39,8 @@ export {
   type RefKind,
 } from './kinds.ts'
 
-// The ids the preset composes each provider under, exported so a config file
-// that replaces a phase can rebuild the preset entries verbatim.
+// The ids the default composition runs each provider under, exported so a
+// config file that replaces a phase can rebuild the default entries verbatim.
 export {
   architectureRules,
   EVIDENCE_LIMIT,

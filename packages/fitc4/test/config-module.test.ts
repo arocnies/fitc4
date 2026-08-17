@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test } from 'vitest'
 
 import { findConfig, loadConfig, resolveConfig } from '../src/config.ts'
 import { runPipeline } from '../src/pipeline.ts'
-import { pipelineConfig } from '../src/preset.ts'
+import { pipelineConfig } from '../src/defaults.ts'
 import { renderReport } from '../src/report.ts'
 import { fixturePath, ruleIds } from './helpers.ts'
 
@@ -76,7 +76,7 @@ describe('a .ts config module', () => {
 
     expect(result.findings.map((finding) => finding.ruleId)).toEqual(['custom/advice'])
     expect(result.findings[0]?.provider).toBe('custom-advice')
-    // The scan and resolve phases were absent from the config, so the preset
+    // The scan and resolve phases were absent from the config, so the defaults
     // still supplied them.
     expect(result.observations.length).toBeGreaterThan(0)
     expect(result.associations.length).toBeGreaterThan(0)
@@ -84,8 +84,8 @@ describe('a .ts config module', () => {
   })
 
   // The whole semantics in one assertion: the fixture contradicts its model,
-  // and none of that is reported, because a present phase replaces the preset.
-  test('a present phase replaces the preset for that phase entirely', async () => {
+  // and none of that is reported, because a present phase replaces the defaults.
+  test('a present phase replaces the defaults for that phase entirely', async () => {
     const configPath = writeConfigFile(
       'fitc4.config.ts',
       moduleSource('violations', CUSTOM_VALIDATE),

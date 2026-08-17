@@ -3,14 +3,14 @@
  * The `fitc4` command line entry point.
  *
  * This module runs the pipeline on import, so nothing else in the package may
- * import it. The provider composition lives in `preset.ts` for that reason.
+ * import it. The provider composition lives in `defaults.ts` for that reason.
  */
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { findConfig, resolveConfig } from './config.ts'
 import { runPipeline } from './pipeline.ts'
-import { pipelineConfig } from './preset.ts'
+import { pipelineConfig } from './defaults.ts'
 import { exitCodeFor, renderReport } from './report.ts'
 
 const USAGE = `Usage: fitc4 [options]

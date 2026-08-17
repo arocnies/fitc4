@@ -22,29 +22,29 @@ import {
 import type { NamedProvider, ResolveProvider, ValidateProvider } from './types.ts'
 
 /**
- * The preset resolve and validate phases, ready to spread.
+ * The default resolve and validate phases, ready to spread.
  *
  * Exported so a config that extends a phase writes
- * `validate: [...presetValidate, myProvider]` — additive intent as additive
+ * `validate: [...defaultValidate, myProvider]` — additive intent as additive
  * code. Rebuilding the entries by hand works too, but forgetting to is the
  * config-file way to silently drop the standard rules, and a gate with no
- * rules passes everything. The scan preset has no array export because its
- * provider is built from config values; rebuild it with
+ * rules passes everything. Scan has no array export because its provider is
+ * built from config values; rebuild it with
  * `typescriptImports({ tsconfigPath, roots })` under
  * `TYPESCRIPT_IMPORTS_PROVIDER_ID`.
  */
-export const presetResolve: NamedProvider<ResolveProvider>[] = [
+export const defaultResolve: NamedProvider<ResolveProvider>[] = [
   { id: SOURCE_ROOT_ID, run: sourceRoot },
 ]
 
-export const presetValidate: NamedProvider<ValidateProvider>[] = [
+export const defaultValidate: NamedProvider<ValidateProvider>[] = [
   { id: RULES_ID, run: architectureRules },
 ]
 
 /**
  * Compose the providers around a resolved config.
  *
- * A phase array present in the config replaces the preset for that phase
+ * A phase array present in the config replaces the defaults for that phase
  * entirely: present replaces, absent defaults — merge semantics are the
  * user's job, in their config file, where they can see them.
  */
@@ -61,7 +61,7 @@ export function pipelineConfig(config: ResolvedConfig): PipelineConfig {
         }),
       },
     ],
-    resolve: config.providers?.resolve ?? [...presetResolve],
-    validate: config.providers?.validate ?? [...presetValidate],
+    resolve: config.providers?.resolve ?? [...defaultResolve],
+    validate: config.providers?.validate ?? [...defaultValidate],
   }
 }

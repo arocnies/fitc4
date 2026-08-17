@@ -43,9 +43,9 @@ export interface FitC4Config {
  * What a `fitc4.config.ts` / `.js` module's default export must be.
  *
  * The same fields as the JSON config, plus optional provider phase arrays. A
- * phase array that is present replaces the preset for that phase entirely —
+ * phase array that is present replaces the defaults for that phase entirely —
  * see `pipelineConfig` — so a config that extends a phase names every provider
- * it wants, preset entries included.
+ * it wants, default entries included.
  */
 export interface FitC4FileConfig {
   version: number

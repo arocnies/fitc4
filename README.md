@@ -86,7 +86,7 @@ The example also carries [`fitc4.ai.config.ts`](example/fitc4.ai.config.ts) — 
 
 `fitc4.config.json` goes at your project root, beside `tsconfig.json`. Discovery starts at the working directory and checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — directly, then under `.fitc4/` — repeating up each ancestor, so the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.
 
-A `.ts`/`.js` config unlocks custom providers: it default-exports the same fields plus optional `scan`, `resolve`, and `validate` provider arrays. A phase that is present replaces the preset for that phase; absent means the default — merge semantics are yours, in your config file, where you can see them. See [`docs/providers.md`](docs/providers.md) for the provider contract and a worked example.
+A `.ts`/`.js` config unlocks custom providers: it default-exports the same fields plus optional `scan`, `resolve`, and `validate` provider arrays. A phase that is present replaces the defaults for that phase; absent means the default — merge semantics are yours, in your config file, where you can see them. See [`docs/providers.md`](docs/providers.md) for the provider contract and a worked example.
 
 The model itself lives wherever `model` points. It is authored architecture documentation with value independent of this tool — readable, reviewable in a pull request, renderable into diagrams by LikeC4 — so it does not belong in a hidden tool directory. The example keeps it in `arch/`; the name is yours.
 
@@ -129,7 +129,7 @@ expect(exitCodeFor(result)).toBe(0)
 
 Providers are plain functions — `ScanProvider`, `ResolveProvider`, `ValidateProvider` — composed into phase arrays. `pipelineConfig` is the batteries-included default; a caller wanting a different scanner builds its own `PipelineConfig` and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system.
 
-The `fitc4/ai` entry point adds AI-assisted validate providers over locally installed agent CLIs (`claude`, `codex`) — additive only, cached on their inputs, and never imported by the core. Each takes a `severity`: advisory by default, part of the gate when you choose `'error'`. Extending a phase spreads the preset back in — `validate: [...presetValidate, myProvider]` — and every report names the providers that composed each phase. See [`docs/providers.md`](docs/providers.md).
+The `fitc4/ai` entry point adds AI-assisted validate providers over locally installed agent CLIs (`claude`, `codex`) — additive only, cached on their inputs, and never imported by the core. Each takes a `severity`: advisory by default, part of the gate when you choose `'error'`. Extending a phase spreads the defaults back in — `validate: [...defaultValidate, myProvider]` — and every report names the providers that composed each phase. See [`docs/providers.md`](docs/providers.md).
 
 ## The provider vocabulary
 

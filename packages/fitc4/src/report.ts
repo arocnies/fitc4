@@ -51,7 +51,7 @@ export function renderReport(result: PipelineResult): Report {
   }
 
   // Who judged the run is part of the run. A config that replaced a phase —
-  // deliberately or by forgetting to spread the preset back in — is visible
+  // deliberately or by forgetting to spread the defaults back in — is visible
   // here, not only in the file that did it.
   lines.push(
     `scan ${result.providers.scan.join(', ')} · ` +

@@ -46,10 +46,10 @@ The property the whole tool exists for: a check that silently reports nothing is
 
 ## A complete `fitc4.config.ts`
 
-A phase array present in the config replaces the preset for that phase entirely — present replaces, absent defaults. There are no merge semantics; a config that extends a phase rebuilds the preset entries explicitly, using the exported providers and their exported ids, so the composition is visible in the file that owns it.
+A phase array present in the config replaces the defaults for that phase entirely — present replaces, absent defaults. There are no merge semantics; a config that extends a phase spreads the default entries back in explicitly, using the exported providers and their exported ids, so the composition is visible in the file that owns it.
 
 ```ts
-import { defineConfig, presetValidate, type Finding, type ValidateContext } from 'fitc4'
+import { defineConfig, defaultValidate, type Finding, type ValidateContext } from 'fitc4'
 
 const PROVIDER_ID = 'import-budget'
 const BUDGET = 20
@@ -81,22 +81,22 @@ export default defineConfig({
   model: 'arch',
   scanRoots: ['src'],
   tsconfig: 'tsconfig.json',
-  // Present replaces: this array is the whole validate phase, so the preset
+  // Present replaces: this array is the whole validate phase, so the default
   // rules come back in through the spread. Dropping the spread is how the
   // standard rules are deliberately replaced — the report's provider line
   // shows either way. scan and resolve are absent and keep their defaults.
-  validate: [...presetValidate, { id: PROVIDER_ID, run: importBudget }],
+  validate: [...defaultValidate, { id: PROVIDER_ID, run: importBudget }],
 })
 ```
 
-Discovery checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — in the working directory and its `.fitc4/`, then each ancestor. Two of the three in one directory is an error, because whichever lost a tiebreak would be a silently ignored config. `presetResolve` is exported the same way. The scan preset has no array export because its provider is built from config values; rebuild it with `typescriptImports({ tsconfigPath, roots })` under `TYPESCRIPT_IMPORTS_PROVIDER_ID`. Every report names the providers that composed each phase, so a replaced phase is visible in the output, not only in the config.
+Discovery checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — in the working directory and its `.fitc4/`, then each ancestor. Two of the three in one directory is an error, because whichever lost a tiebreak would be a silently ignored config. `defaultResolve` is exported the same way. Scan has no array export because its provider is built from config values; rebuild it with `typescriptImports({ tsconfigPath, roots })` under `TYPESCRIPT_IMPORTS_PROVIDER_ID`. Every report names the providers that composed each phase, so a replaced phase is visible in the output, not only in the config.
 
 ## AI-assisted providers (`fitc4/ai`)
 
 A separate entry point on purpose: nothing in `fitc4` imports it, the core gate stays deterministic, and composing an AI provider into a phase is an explicit act in your config file. The adapters shell out to **locally installed agent CLIs** — your own `claude` or `codex` install, login, and billing. FitC4 never holds an API key.
 
 ```ts
-import { defineConfig, presetValidate } from 'fitc4'
+import { defineConfig, defaultValidate } from 'fitc4'
 import { cached, claudeCli, aiOwnershipAdvisor, aiSemanticReview } from 'fitc4/ai'
 
 const cheap = cached(claudeCli({ model: 'haiku' }))
@@ -109,7 +109,7 @@ export default defineConfig({
   scanRoots: ['src'],
   tsconfig: 'tsconfig.json',
   validate: [
-    ...presetValidate,
+    ...defaultValidate,
     aiOwnershipAdvisor({ exec: cheap }),
     aiSemanticReview({ exec: strong }),
   ],
