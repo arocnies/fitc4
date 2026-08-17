@@ -22,6 +22,8 @@ export {
 } from './config.ts'
 export type { FitC4Config, FitC4FileConfig, ResolvedConfig } from './config.ts'
 
+export { init, MODEL_DIR, MODEL_FILENAME, type InitResult } from './init.ts'
+
 export { runPipeline } from './pipeline.ts'
 export type { PhaseProviders, PipelineConfig, PipelineResult } from './pipeline.ts'
 

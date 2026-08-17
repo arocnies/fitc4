@@ -86,9 +86,9 @@ Agents get the same treatment as humans: the CLI is the interface, failing repor
 
 ## Where things live
 
-`fitc4.config.json` goes at your project root, beside `tsconfig.json`. Discovery starts at the working directory and checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — directly, then under `.fitc4/` — repeating up each ancestor, so the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.
+`fitc4.config.json` goes at your project root, beside `tsconfig.json` — `npx fitc4 init` scaffolds it along with a starter model. Discovery starts at the working directory and checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json` — directly, then under `.fitc4/` — repeating up each ancestor, so the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.
 
-A `.ts`/`.js` config unlocks custom providers: it default-exports the same fields plus optional `scan`, `resolve`, and `validate` provider arrays. A phase that is present replaces the defaults for that phase; absent means the default — merge semantics are yours, in your config file, where you can see them. See [`docs/providers.md`](docs/providers.md) for the provider contract and a worked example.
+A module-form config unlocks custom providers: it default-exports the same fields plus optional `scan`, `resolve`, and `validate` provider arrays. A phase that is present replaces the defaults for that phase; absent means the default — merge semantics are yours, in your config file, where you can see them. Module configs load as ES modules, so a CommonJS package names its config `fitc4.config.mts`. See [`docs/providers.md`](docs/providers.md) for the provider contract and a worked example.
 
 The model itself lives wherever `model` points. It is authored architecture documentation with value independent of this tool — readable, reviewable in a pull request, renderable into diagrams by LikeC4 — so it does not belong in a hidden tool directory. The example keeps it in `arch/`; the name is yours.
 
@@ -110,11 +110,13 @@ The model itself lives wherever `model` points. It is authored architecture docu
 
 The last six exist so the gate cannot fail open. A typo in `sources` used to make every prefix stop matching, which turned architecture errors into a clean exit 0.
 
-The severities are defaults, not policy: in a `.ts` config, `architectureRules({ severity: { 'unmapped-source': 'error' } })` rebuilds the rules provider with new unowned code failing the gate — worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. Every rule id in the table accepts an override.
+The severities are defaults, not policy: in a `.ts` config, `validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]` makes new unowned code fail the gate — worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. Every rule id in the table accepts an override.
 
 ## The model
 
 `sources` is a repository-relative directory prefix, optionally ending in `/**`. A leading `./` or `/` and Windows separators are tolerated; anything the prefix matcher cannot honour — a mid-path wildcard, a filename — is rejected rather than silently matching nothing.
+
+One trap sits outside the gate's reach: `sources` is a metadata key, and LikeC4 metadata is freeform, so a typo like `source` is silently valid — the element just owns nothing and its files surface as `unmapped-source` warnings. Promoting that rule to `error` is what turns the typo loud.
 
 An element with no `sources` is legal: a grouping element, or a component implemented elsewhere. **An unowned file is a finding; an unowned element is not.** A relationship declared between two parents covers traffic between their descendants, and an element never "crosses a boundary" into its own parent or child — LikeC4 refuses to declare parent-child relationships, so reporting those would leave no fix available.
 

@@ -34,7 +34,7 @@ export function fixtureConfig(
       },
     ],
     resolve: [{ id: SOURCE_ROOT_ID, run: sourceRoot }],
-    validate: [{ id: RULES_ID, run: architectureRules() }],
+    validate: [architectureRules()],
     ...overrides,
   }
 }

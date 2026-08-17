@@ -64,15 +64,36 @@ describe('loading the config', () => {
 // report a clean pass — the same fail-open the pipeline avoids everywhere else.
 describe('rejecting a malformed config', () => {
   test.each([
-    ['a missing version', { ...VALID, version: undefined }, 'unsupported version'],
+    ['a missing version', { ...VALID, version: undefined }, "missing required field 'version'"],
     ['a future version', { ...VALID, version: 2 }, 'unsupported version'],
     ['an empty scanRoots', { ...VALID, scanRoots: [] }, 'at least one directory'],
     ['a non-array scanRoots', { ...VALID, scanRoots: 'src' }, 'array of strings'],
     ['a non-string entry', { ...VALID, scanRoots: ['src', 3] }, 'array of strings'],
+    // A blank scan root is not a harmless no-op: as a prefix it matches
+    // everything, silently putting the whole repository under scan.
+    ['a blank scanRoots entry', { ...VALID, scanRoots: ['src', ' '] }, "'scanRoots[1]'"],
     ['a blank path', { ...VALID, model: '  ' }, "'model' must be a non-empty string"],
     ['a missing tsconfig', { ...VALID, tsconfig: undefined }, "'tsconfig' must be"],
   ])('%s is an error', (_label, contents, expected) => {
     expect(() => loadConfig(writeConfig(contents))).toThrow(expected)
+  })
+
+  // A typo'd key that is silently ignored is the wrong tree scanned with
+  // extra confidence — the schema says additionalProperties: false, and the
+  // runtime must not be laxer than the editor.
+  test('an unknown field is an error with a suggestion', () => {
+    expect(() => loadConfig(writeConfig({ ...VALID, scanRoot: ['src'] }))).toThrow(
+      "unknown field 'scanRoot' — did you mean 'scanRoots'?",
+    )
+    expect(() => loadConfig(writeConfig({ ...VALID, banana: true }))).toThrow(
+      "unknown field 'banana'",
+    )
+  })
+
+  test('provider arrays in JSON are named as a module-form feature', () => {
+    expect(() => loadConfig(writeConfig({ ...VALID, validate: [] }))).toThrow(
+      'only available in the fitc4.config.ts/.js forms',
+    )
   })
 
   test('malformed JSON names the file', () => {

@@ -155,6 +155,20 @@ describe('rejecting a malformed config module', () => {
     await expect(resolveConfig(configPath)).rejects.toThrow("'resolve' must be an array")
   })
 
+  // The .mts form exists for CommonJS packages: a plain .ts config loads as
+  // an ES module, and Node's own error for that case recommends exactly this
+  // extension — which must therefore be discoverable, not a dead end.
+  test('a .mts config is discovered and loads', async () => {
+    const directory = tempDir()
+    fs.writeFileSync(path.join(directory, 'fitc4.config.mts'), moduleSource('ok'))
+
+    const found = findConfig(directory)
+    expect(path.basename(found)).toBe('fitc4.config.mts')
+
+    const config = await resolveConfig(found)
+    expect(config.scanRoots).toEqual(['src'])
+  })
+
   // The module form gets the same strictness as JSON: a compiler may have
   // seen the file, but nothing forces the author to run one.
   test('the shared fields are validated as strictly as JSON', async () => {

@@ -13,7 +13,7 @@
 
 import type { ResolvedConfig } from './config.ts'
 import type { PipelineConfig } from './pipeline.ts'
-import { architectureRules, PROVIDER_ID as RULES_ID } from './providers/architecture-rules.ts'
+import { architectureRules } from './providers/architecture-rules.ts'
 import { sourceRoot, PROVIDER_ID as SOURCE_ROOT_ID } from './providers/source-root.ts'
 import {
   typescriptImports,
@@ -37,9 +37,7 @@ export const defaultResolve: NamedProvider<ResolveProvider>[] = [
   { id: SOURCE_ROOT_ID, run: sourceRoot },
 ]
 
-export const defaultValidate: NamedProvider<ValidateProvider>[] = [
-  { id: RULES_ID, run: architectureRules() },
-]
+export const defaultValidate: NamedProvider<ValidateProvider>[] = [architectureRules()]
 
 /**
  * Compose the providers around a resolved config.

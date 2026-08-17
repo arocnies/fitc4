@@ -9,22 +9,30 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { findConfig, resolveConfig } from './config.ts'
+import { init } from './init.ts'
 import { runPipeline } from './pipeline.ts'
 import { pipelineConfig } from './defaults.ts'
 import { exitCodeFor, renderReport } from './report.ts'
 
-const USAGE = `Usage: fitc4 [options]
+const USAGE = `Usage: fitc4 [command] [options]
 
-  --config <path>  Path to a fitc4 config (.ts, .js, or .json). Defaults to
-                   discovery from the working directory: fitc4.config.ts,
-                   fitc4.config.js, or fitc4.config.json in ./, then in
-                   ./.fitc4/, then the same in each ancestor. Two of the
-                   three in one directory is an error.
+Commands:
+  (none)           Check the code against the LikeC4 architecture model.
+  init             Scaffold fitc4.config.json and a starter arch/model.c4 in
+                   the current directory. Never overwrites existing files.
+
+Options:
+  --config <path>  Path to a fitc4 config (.ts, .mts, .js, .mjs, or .json).
+                   Defaults to discovery from the working directory: each of
+                   those names in ./, then in ./.fitc4/, then the same in
+                   each ancestor. Two configs in one directory is an error.
   --json           Emit the full result as JSON instead of a report.
   --version        Print the version.
   --help           Show this message.
 
-Exits non-zero when any finding has severity 'error'.`
+A .ts/.js config loads as an ES module; in a CommonJS package name it
+fitc4.config.mts or set "type": "module". Exits non-zero when any finding
+has severity 'error'.`
 
 /**
  * Read the version from this package's own manifest.
@@ -71,10 +79,28 @@ function parseArguments(argv: string[]): Options | undefined {
   return { configPath: findConfig(process.cwd()), json: argv.includes('--json') }
 }
 
+function runInit(): void {
+  const result = init(process.cwd())
+  const lines = [
+    ...result.created.map((file) => `created ${file}`),
+    ...result.skipped.map((file) => `kept ${file} (already exists)`),
+    ...result.notes.map((note) => `note: ${note}`),
+    '',
+    `Next: put your elements in arch/model.c4 — 'sources' says what each owns,`,
+    `'->' declares a permitted dependency — then run: npx fitc4`,
+  ]
+  process.stdout.write(`${lines.join('\n')}\n`)
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2)
   if (argv.includes('--version')) {
     process.stdout.write(`${version()}\n`)
+    return
+  }
+
+  if (argv[0] === 'init') {
+    runInit()
     return
   }
 
@@ -97,4 +123,13 @@ async function main(): Promise<void> {
   process.exitCode = report.exitCode
 }
 
-await main()
+// A config mistake is the author's error to fix, not this tool's crash: the
+// message is the whole story, and a stack trace through validateFields reads
+// as a fitc4 bug while burying it.
+try {
+  await main()
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error)
+  process.stderr.write(`fitc4: ${message}\n`)
+  process.exitCode = 1
+}

@@ -430,9 +430,10 @@ function declaredPackageLookup(repositoryRoot: string): DeclaredPackageLookup {
 function readCompilerOptions(tsconfigPath: string): ts.CompilerOptions {
   const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile)
   if (configFile.error !== undefined) {
-    throw new Error(
-      `Cannot read ${tsconfigPath}: ${ts.flattenDiagnosticMessageText(configFile.error.messageText, ' ')}`,
-    )
+    // TypeScript's own message usually names the path already; prefixing it
+    // again reads as "Cannot read X: Cannot read file 'X'".
+    const detail = ts.flattenDiagnosticMessageText(configFile.error.messageText, ' ')
+    throw new Error(detail.includes(tsconfigPath) ? detail : `Cannot read ${tsconfigPath}: ${detail}`)
   }
 
   const parsed = ts.parseJsonConfigFileContent(

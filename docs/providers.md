@@ -89,21 +89,16 @@ export default defineConfig({
 })
 ```
 
-Discovery checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — in the working directory and its `.fitc4/`, then each ancestor. Two of the three in one directory is an error, because whichever lost a tiebreak would be a silently ignored config. `defaultResolve` is exported the same way. Scan has no array export because its provider is built from config values; rebuild it with `typescriptImports({ tsconfigPath, roots })` under `TYPESCRIPT_IMPORTS_PROVIDER_ID`. Every report names the providers that composed each phase, so a replaced phase is visible in the output, not only in the config.
+Discovery checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json` — in the working directory and its `.fitc4/`, then each ancestor. Two configs in one directory is an error, because whichever lost a tiebreak would be a silently ignored config. The module forms load as ES modules; a CommonJS package names its config `fitc4.config.mts`. `defaultResolve` is exported the same way. Scan has no array export because its provider is built from config values; rebuild it with `typescriptImports({ tsconfigPath, roots })` under `TYPESCRIPT_IMPORTS_PROVIDER_ID`. Every report names the providers that composed each phase, so a replaced phase is visible in the output, not only in the config.
 
-The standard rules take per-rule severity overrides. `architectureRules()` with no options is what `defaultValidate` carries; rebuilding the entry tunes it:
+The standard rules take per-rule severity overrides. `architectureRules()` with no options is what `defaultValidate` carries; it returns a ready `NamedProvider`, so tuning it is one line:
 
 ```ts
-import { architectureRules, ARCHITECTURE_RULES_PROVIDER_ID } from 'fitc4'
+import { architectureRules } from 'fitc4'
 
-validate: [
-  {
-    id: ARCHITECTURE_RULES_PROVIDER_ID,
-    // Once adoption is done, new unowned code should fail the gate — its
-    // dependencies are never boundary-checked while it stays unowned.
-    run: architectureRules({ severity: { 'unmapped-source': 'error' } }),
-  },
-]
+// Once adoption is done, new unowned code should fail the gate — its
+// dependencies are never boundary-checked while it stays unowned.
+validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
 ```
 
 Any rule id from the rules table can be promoted or softened; the standard severities apply where no override is given.

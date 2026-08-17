@@ -8,11 +8,12 @@ A [LikeC4](https://likec4.dev) model says which components exist and which may d
 
 ```sh
 npm install --save-dev fitc4
+npx fitc4 init
 ```
 
-Requires Node >= 22.22.3 (the CLI loads `.ts` configs with Node's native type stripping).
+`init` scaffolds `fitc4.config.json` and a starter `arch/model.c4` whose single element owns `src/**`, so the very first check is green — split the placeholder into real components from there. It never overwrites existing files. Requires Node >= 22.22.3 (the CLI loads `.ts` configs with Node's native type stripping) and a `tsconfig.json`, whose module resolution the scanner uses.
 
-Three pieces: a model, a config, and the command.
+The pieces, whether scaffolded or written by hand:
 
 **A LikeC4 model** — `sources` says which files an element owns; `->` declares a permitted dependency.
 
@@ -75,7 +76,9 @@ error (1)
     src/core/bad.ts:1  ../interface/index.ts
 ```
 
-`--json` emits the full result instead of the report. `--config <path>` overrides discovery, which otherwise checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — in the working directory, then under `.fitc4/`, repeating up each ancestor. Two configs in one directory is an error rather than a silent choice. The `.ts`/`.js` forms default-export the same fields (wrap them in `defineConfig` for editor types) plus optional provider arrays — which is how the AI providers below are composed in.
+`--json` emits the full result instead of the report. `--config <path>` overrides discovery, which otherwise checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json` — in the working directory, then under `.fitc4/`, repeating up each ancestor. Two configs in one directory is an error rather than a silent choice.
+
+The module forms default-export the same fields (wrap them in `defineConfig` for editor types) plus optional provider arrays — which is how the AI providers below are composed in. They load as ES modules: in a CommonJS package (no `"type": "module"`), name the config `fitc4.config.mts`. If your tsconfig typechecks the config file, keep `skipLibCheck: true` — LikeC4's own declarations do not pass a strict lib check.
 
 ## Rules
 
@@ -95,7 +98,13 @@ error (1)
 
 An element with no `sources` is legal — a grouping element, or a component implemented elsewhere. An unowned *file* is a finding; an unowned *element* is not. A relationship declared between two parents covers traffic between their descendants. Test files are excluded from the scan, by filename and by directory.
 
-The severities above are defaults, not policy. In a `.ts` config, `architectureRules({ severity: { 'unmapped-source': 'error' } })` promotes new unowned code from a nudge to a gate failure — worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked.
+The severities above are defaults, not policy. In a `.ts` config:
+
+```ts
+validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
+```
+
+promotes new unowned code from a nudge to a gate failure — worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. It also turns a typo'd `sources` metadata key loud: LikeC4 metadata is freeform, so `source` is silently valid and just leaves the element owning nothing.
 
 ## As a library
 

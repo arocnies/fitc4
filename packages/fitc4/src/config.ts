@@ -25,8 +25,21 @@ export const CONFIG_VERSION = 1
  * an error, never a precedence rule. A config that loses a silent tiebreak is
  * a config that is silently ignored — the same fail-open as a config that
  * quietly falls back to defaults.
+ *
+ * The `.mts`/`.mjs` forms exist for CommonJS packages: a `.ts`/`.js` config
+ * loads as an ES module, which a `"type": "module"`-less project cannot
+ * satisfy in-band any other way — and Node's own error for that case tells
+ * the author to use exactly these extensions.
  */
-export const CONFIG_FILENAMES = ['fitc4.config.ts', 'fitc4.config.js', CONFIG_FILENAME] as const
+export const CONFIG_FILENAMES = [
+  'fitc4.config.ts',
+  'fitc4.config.mts',
+  'fitc4.config.js',
+  'fitc4.config.mjs',
+  CONFIG_FILENAME,
+] as const
+
+const MODULE_EXTENSIONS = ['.ts', '.mts', '.js', '.mjs']
 
 export interface FitC4Config {
   /** Absolute repository root. Every reported path is relative to this. */
@@ -48,7 +61,8 @@ export interface FitC4Config {
  * it wants, default entries included.
  */
 export interface FitC4FileConfig {
-  version: number
+  /** Config format version. Always `1`; an unknown version is an error, not a silent default. */
+  version: typeof CONFIG_VERSION
   /** Repository root, relative to the config file. */
   repositoryRoot: string
   /** Directory holding the LikeC4 workspace, relative to the config file. */
@@ -57,8 +71,16 @@ export interface FitC4FileConfig {
   scanRoots: string[]
   /** Path to the tsconfig supplying compiler options, relative to the config file. */
   tsconfig: string
+  /**
+   * Replaces the default scan phase entirely. The default scanner is built
+   * from `tsconfig` and `scanRoots` — rebuild it with
+   * `typescriptImports({ tsconfigPath, roots })` if you still want import
+   * scanning alongside your own provider.
+   */
   scan?: NamedProvider<ScanProvider>[]
+  /** Replaces the default resolve phase; spread `defaultResolve` to keep it. */
   resolve?: NamedProvider<ResolveProvider>[]
+  /** Replaces the default validate phase; spread `defaultValidate` to keep the standard rules. */
   validate?: NamedProvider<ValidateProvider>[]
 }
 
@@ -101,7 +123,7 @@ export function loadConfig(configPath: string): FitC4Config {
     throw new Error(`${configPath}: expected a JSON object`)
   }
 
-  return validateFields(configPath, raw as Record<string, unknown>)
+  return validateFields(configPath, raw as Record<string, unknown>, 'json')
 }
 
 /**
@@ -116,7 +138,7 @@ export function loadConfig(configPath: string): FitC4Config {
  */
 export async function resolveConfig(configPath: string): Promise<ResolvedConfig> {
   const resolved = path.resolve(configPath)
-  if (!resolved.endsWith('.ts') && !resolved.endsWith('.js')) {
+  if (!MODULE_EXTENSIONS.some((extension) => resolved.endsWith(extension))) {
     return loadConfig(resolved)
   }
 
@@ -136,7 +158,7 @@ export async function resolveConfig(configPath: string): Promise<ResolvedConfig>
   }
   const record = raw as Record<string, unknown>
 
-  const config: ResolvedConfig = validateFields(configPath, record)
+  const config: ResolvedConfig = validateFields(configPath, record, 'module')
   const scan = requireProviders<ScanProvider>(configPath, record, 'scan')
   const resolve = requireProviders<ResolveProvider>(configPath, record, 'resolve')
   const validate = requireProviders<ValidateProvider>(configPath, record, 'validate')
@@ -146,14 +168,31 @@ export async function resolveConfig(configPath: string): Promise<ResolvedConfig>
   return config
 }
 
+/** The fields every config form carries. `$schema` is the JSON editor hook. */
+const SHARED_KEYS = ['version', 'repositoryRoot', 'model', 'scanRoots', 'tsconfig', '$schema']
+
+/** The provider arrays, legal only where a function can live. */
+const MODULE_KEYS = ['scan', 'resolve', 'validate']
+
 /**
  * The validation shared by every config form.
  *
  * Deliberately strict and hand-written. A malformed config that quietly falls
  * back to defaults would scan the wrong tree and report a clean pass — the
- * same fail-open the pipeline works hard to avoid everywhere else.
+ * same fail-open the pipeline works hard to avoid everywhere else. Unknown
+ * keys are rejected for the same reason: a typo'd `scanRoot` that is silently
+ * ignored is a scan of the wrong tree with extra confidence.
  */
-function validateFields(configPath: string, record: Record<string, unknown>): FitC4Config {
+function validateFields(
+  configPath: string,
+  record: Record<string, unknown>,
+  form: 'json' | 'module',
+): FitC4Config {
+  rejectUnknownKeys(configPath, record, form)
+
+  if (record['version'] === undefined) {
+    throw new Error(`${configPath}: missing required field 'version' (add "version": ${CONFIG_VERSION})`)
+  }
   if (record['version'] !== CONFIG_VERSION) {
     throw new Error(
       `${configPath}: unsupported version ${JSON.stringify(record['version'])}; expected ${CONFIG_VERSION}`,
@@ -175,6 +214,60 @@ function validateFields(configPath: string, record: Record<string, unknown>): Fi
     scanRoots,
     tsconfigPath: resolve('tsconfig'),
   }
+}
+
+function rejectUnknownKeys(
+  configPath: string,
+  record: Record<string, unknown>,
+  form: 'json' | 'module',
+): void {
+  const known = form === 'module' ? [...SHARED_KEYS, ...MODULE_KEYS] : SHARED_KEYS
+
+  for (const key of Object.keys(record)) {
+    if (known.includes(key)) continue
+    if (form === 'json' && MODULE_KEYS.includes(key)) {
+      throw new Error(
+        `${configPath}: '${key}' is only available in the fitc4.config.ts/.js forms — ` +
+          `a provider is a function, which JSON cannot carry`,
+      )
+    }
+    const candidates = known.filter((name) => name !== '$schema')
+    const suggestion = closestName(key, candidates)
+    throw new Error(
+      `${configPath}: unknown field '${key}'` +
+        (suggestion === undefined ? '' : ` — did you mean '${suggestion}'?`),
+    )
+  }
+}
+
+/** The known name within edit distance 2, if any — enough for the typo case. */
+function closestName(key: string, candidates: string[]): string | undefined {
+  let best: { name: string; distance: number } | undefined
+  for (const name of candidates) {
+    const distance = editDistance(key.toLowerCase(), name.toLowerCase())
+    if (distance <= 2 && (best === undefined || distance < best.distance)) {
+      best = { name, distance }
+    }
+  }
+  return best?.name
+}
+
+function editDistance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, index) => index)
+  for (let i = 1; i <= a.length; i += 1) {
+    let previous = row[0] ?? 0
+    row[0] = i
+    for (let j = 1; j <= b.length; j += 1) {
+      const current = row[j] ?? 0
+      row[j] = Math.min(
+        current + 1,
+        (row[j - 1] ?? 0) + 1,
+        previous + (a[i - 1] === b[j - 1] ? 0 : 1),
+      )
+      previous = current
+    }
+  }
+  return row[b.length] ?? 0
 }
 
 /**
@@ -277,6 +370,15 @@ function requireStringArray(
   const value = record[key]
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) {
     throw new Error(`${configPath}: '${key}' must be an array of strings`)
+  }
+  // A blank entry is not a harmless no-op: as a path prefix it matches
+  // everything, silently putting the whole repository under scan.
+  const blank = value.findIndex((entry) => (entry as string).trim() === '')
+  if (blank !== -1) {
+    throw new Error(
+      `${configPath}: '${key}[${blank}]' must be a non-empty string — ` +
+        `an empty entry would put the entire repository under scan`,
+    )
   }
   return value as string[]
 }

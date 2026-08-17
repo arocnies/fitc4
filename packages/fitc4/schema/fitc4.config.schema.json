@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "fitc4 configuration",
-  "description": "Paths are resolved relative to this file. Providers are still composed in code; there is no command-provider configuration yet.",
+  "description": "Paths are resolved relative to this file. Provider arrays are available in the fitc4.config.ts/.js module forms; the JSON form carries only these fields.",
   "type": "object",
   "required": ["version", "repositoryRoot", "model", "scanRoots", "tsconfig"],
   "additionalProperties": false,
@@ -13,21 +13,24 @@
     },
     "repositoryRoot": {
       "type": "string",
+      "minLength": 1,
       "description": "Repository root, relative to this file. Every reported path is relative to it."
     },
     "model": {
       "type": "string",
+      "minLength": 1,
       "description": "Directory holding the LikeC4 workspace."
     },
     "scanRoots": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string" },
-      "description": "Repository-relative directories under architecture control. A missing, misspelled, or source-free root is an error rather than an empty pass."
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Repository-relative directories under architecture control. A missing, misspelled, or source-free root is an error rather than an empty pass; an empty string would put the entire repository under scan and is rejected."
     },
     "tsconfig": {
       "type": "string",
-      "description": "tsconfig supplying compiler options (paths, baseUrl) for module resolution."
+      "minLength": 1,
+      "description": "tsconfig supplying compiler options (paths, baseUrl) for module resolution. The file must exist — point this at your project's real tsconfig."
     }
   }
 }

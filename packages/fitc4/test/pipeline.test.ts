@@ -105,9 +105,7 @@ describe('a model whose implementation contradicts the contract', () => {
   // boundary-checked — fails the gate instead of slipping past it.
   test('a severity override promotes unmapped-source to a gate failure', async () => {
     const result = await runFixture('violations', {
-      validate: [
-        { id: RULES_ID, run: architectureRules({ severity: { 'unmapped-source': 'error' } }) },
-      ],
+      validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })],
     })
 
     const unmapped = findingFor(result.findings, 'unmapped-source')

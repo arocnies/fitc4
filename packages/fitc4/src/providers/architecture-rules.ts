@@ -22,6 +22,7 @@ import type {
   Association,
   Evidence,
   Finding,
+  NamedProvider,
   Observation,
   Severity,
   ValidateContext,
@@ -64,10 +65,17 @@ export interface ArchitectureRulesOptions {
 /** How load-bearing each rule is: the configured override, or the standard severity. */
 type SeverityOf = (rule: ArchitectureRuleId, standard: Severity) => Severity
 
-export function architectureRules(options: ArchitectureRulesOptions = {}): ValidateProvider {
+/**
+ * Returns a `NamedProvider`, ready to drop into a config's `validate` array —
+ * the same shape the AI providers return, so
+ * `validate: [architectureRules({ ... })]` works without a hand-built wrapper.
+ */
+export function architectureRules(
+  options: ArchitectureRulesOptions = {},
+): NamedProvider<ValidateProvider> {
   const severityOf: SeverityOf = (rule, standard) => options.severity?.[rule] ?? standard
 
-  return async (context: ValidateContext): Promise<Finding[]> => {
+  const run: ValidateProvider = async (context: ValidateContext): Promise<Finding[]> => {
     const observations = new Map(context.observations.map((item) => [item.id, item]))
     const declared = declaredRelationships(context.model)
     const collector = new FindingCollector()
@@ -92,6 +100,8 @@ export function architectureRules(options: ArchitectureRulesOptions = {}): Valid
       ...vocabularyRules(context, severityOf),
     ]
   }
+
+  return { id: PROVIDER_ID, run }
 }
 
 /**

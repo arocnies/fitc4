@@ -58,6 +58,28 @@ if (cd "$consumer" && npx fitc4); then
 fi
 rm "$consumer/src/core/bad.ts"
 
+echo "== init scaffolds a green first run"
+fresh="$work/fresh"
+mkdir -p "$fresh/src"
+printf 'export const started = true\n' > "$fresh/src/index.ts"
+printf '{ "compilerOptions": { "module": "NodeNext", "moduleResolution": "NodeNext" } }\n' \
+  > "$fresh/tsconfig.json"
+(cd "$fresh" && npm init -y >/dev/null && npm install --no-audit --no-fund "$tarball" >/dev/null)
+(cd "$fresh" && npx fitc4 init && npx fitc4)
+
+echo "== init refuses to overwrite, without a stack trace"
+if init_err="$(cd "$fresh" && npx fitc4 init 2>&1)"; then
+  echo "FAIL: expected a non-zero exit from a second init" >&2
+  exit 1
+fi
+case "$init_err" in
+  *"already configured"*) ;;
+  *) echo "FAIL: second init did not explain itself: $init_err" >&2; exit 1 ;;
+esac
+case "$init_err" in
+  *"    at "*) echo "FAIL: config error printed a stack trace" >&2; exit 1 ;;
+esac
+
 echo "== --version matches the manifest"
 version="$(cd "$consumer" && npx fitc4 --version)"
 # Path passed as an argument, not embedded in the expression: Git Bash on
