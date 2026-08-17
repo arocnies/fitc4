@@ -80,7 +80,9 @@ Exit code 1. `--json` emits the full result instead of the report; `--config <pa
 
 ## Where things live
 
-`soffit.config.json` goes at your project root, beside `tsconfig.json`. Discovery starts at the working directory, checks `./soffit.config.json` then `./.soffit/soffit.config.json`, and repeats up each ancestor — so the command works from the project root or from anywhere inside it. The root-level file wins, so hoisting a config out of `.soffit/` is never silently overruled by the copy left behind.
+`soffit.config.json` goes at your project root, beside `tsconfig.json`. Discovery starts at the working directory and checks `soffit.config.ts`, `soffit.config.js`, then `soffit.config.json` — directly, then under `.soffit/` — repeating up each ancestor, so the command works from the project root or anywhere inside it. The root-level file wins over `.soffit/`, and two config files in one directory is an error rather than a silent choice.
+
+A `.ts`/`.js` config unlocks custom providers: it default-exports the same fields plus optional `scan`, `resolve`, and `validate` provider arrays. A phase that is present replaces the preset for that phase; absent means the default — merge semantics are yours, in your config file, where you can see them. See [`docs/providers.md`](docs/providers.md) for the provider contract and a worked example.
 
 The model itself lives wherever `model` points. It is authored architecture documentation with value independent of this tool — readable, reviewable in a pull request, renderable into diagrams by LikeC4 — so it does not belong in a hidden tool directory. The example keeps it in `arch/`; the name is yours.
 
@@ -169,6 +171,8 @@ npm run smoke               # pack the tarball, install it into a fresh consumer
 `example` depends on `soffit` as a workspace package and invokes it through `node_modules/.bin`, so the checked-in example exercises the same path a consumer would rather than a shortcut. That still is not the whole path: workspace symlinks ignore the `files` allowlist and parts of the `exports` map, so a packaging mistake is invisible to every workspace test. `npm run smoke` closes that gap — it packs the real tarball, installs it into a throwaway project, and asserts the CLI, the library entry point, the shipped schema, and both gate directions. Run it before publishing.
 
 `soffit` tests its own pipeline against fixture repositories in `packages/soffit/test/fixtures/`, each a miniature project with its own `model.c4` and `tsconfig.json`. It assumes nothing about how a host project tests itself.
+
+soffit is also self-hosting: [`packages/soffit/arch/model.c4`](packages/soffit/arch/model.c4) models its own source, and `check` runs the built CLI against it. CI runs `verify` and `smoke` on Linux, node 22 and 26. Windows is untested — paths are POSIX-normalized throughout, but no Windows leg runs until there's a Windows consumer to justify it.
 
 ## Toolchain notes
 
