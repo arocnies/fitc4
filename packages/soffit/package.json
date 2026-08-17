@@ -1,9 +1,27 @@
 {
   "name": "soffit",
   "version": "0.1.0",
-  "private": true,
   "description": "Check an implementation against a LikeC4 architecture contract",
+  "license": "MIT",
+  "author": "Aaron Nies",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arocnies/soffit.git"
+  },
+  "homepage": "https://github.com/arocnies/soffit#readme",
+  "bugs": "https://github.com/arocnies/soffit/issues",
+  "keywords": [
+    "architecture",
+    "likec4",
+    "c4",
+    "dependency-rules",
+    "lint",
+    "boundaries"
+  ],
   "type": "module",
+  "engines": {
+    "node": ">=22.22.3"
+  },
   "bin": {
     "soffit": "dist/cli.js"
   },
@@ -35,23 +53,5 @@
   "devDependencies": {
     "@types/node": "^26.2.0",
     "vitest": "^4.1.10"
-  },
-  "engines": {
-    "node": ">=22.22.3"
-  },
-  "keywords": [
-    "architecture",
-    "likec4",
-    "c4",
-    "dependency-rules",
-    "lint",
-    "boundaries"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/arocnies/soffit.git"
-  },
-  "homepage": "https://github.com/arocnies/soffit#readme",
-  "bugs": "https://github.com/arocnies/soffit/issues",
-  "author": "Aaron Nies"
+  }
 }
