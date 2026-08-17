@@ -25,14 +25,18 @@ import type {
   ValidateProvider,
 } from '../types.ts'
 import type { AiExec } from './exec.ts'
-import { aiTruncated, aiUnavailable, clampSeverity, fileExcerpts } from './findings.ts'
+import { aiTruncated, aiUnavailable, fileExcerpts } from './findings.ts'
 
 export const PROVIDER_ID = 'ai-semantic-review'
 
 export interface SemanticReviewOptions {
   exec: AiExec
-  /** Ceiling on every finding this provider emits. Default: 'warning'. */
-  maxSeverity?: Severity
+  /**
+   * The severity of a drift finding — how load-bearing this review is.
+   * Default 'warning' (advisory); 'error' makes it part of the gate, and an
+   * unavailable CLI or truncated input then fails the build.
+   */
+  severity?: Severity
   /** Elements reviewed per run; the rest are reported as truncated. */
   maxElements?: number
   /** Owned files shown per element, in path order. */
@@ -53,7 +57,7 @@ const REPLY_SCHEMA: JsonObject = {
 const ISSUE_LIMIT = 5
 
 export function aiSemanticReview(options: SemanticReviewOptions): NamedProvider<ValidateProvider> {
-  const maxSeverity = options.maxSeverity ?? 'warning'
+  const severity = options.severity ?? 'warning'
   const maxElements = options.maxElements ?? 10
   const maxFilesPerElement = options.maxFilesPerElement ?? 8
   const excerptChars = options.excerptChars ?? 1_500
@@ -66,7 +70,7 @@ export function aiSemanticReview(options: SemanticReviewOptions): NamedProvider<
     const reviewed = reviewable.slice(0, maxElements)
     if (reviewable.length > reviewed.length) {
       findings.push(
-        aiTruncated(PROVIDER_ID, reviewable.length - reviewed.length, 'described elements', maxSeverity),
+        aiTruncated(PROVIDER_ID, reviewable.length - reviewed.length, 'described elements', severity),
       )
     }
 
@@ -84,7 +88,7 @@ export function aiSemanticReview(options: SemanticReviewOptions): NamedProvider<
       })
 
       if (!reply.ok) {
-        findings.push(aiUnavailable(PROVIDER_ID, options.exec.id, reply.error, maxSeverity))
+        findings.push(aiUnavailable(PROVIDER_ID, options.exec.id, reply.error, severity))
         break
       }
 
@@ -98,7 +102,7 @@ export function aiSemanticReview(options: SemanticReviewOptions): NamedProvider<
       findings.push({
         id: findingId(PROVIDER_ID, 'description-drift', element.id),
         ruleId: 'description-drift',
-        severity: clampSeverity('warning', maxSeverity),
+        severity,
         description:
           `${element.id} may no longer match its description` +
           (issues.length > 0 ? `: ${issues[0]}` : '.'),

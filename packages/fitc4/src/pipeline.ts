@@ -37,8 +37,21 @@ export interface PipelineConfig {
   validate: NamedProvider<ValidateProvider>[]
 }
 
+/** The provider ids that composed each phase, in run order. */
+export interface PhaseProviders {
+  scan: string[]
+  resolve: string[]
+  validate: string[]
+}
+
 export interface PipelineResult {
   modelErrors: string[]
+  /**
+   * Always present, even when the model fails validation: what would have
+   * judged the run is part of the result, so a replaced phase — deliberate or
+   * accidental — is visible in every report rather than only in the config.
+   */
+  providers: PhaseProviders
   observations: Observation[]
   associations: Association[]
   findings: Finding[]
@@ -51,9 +64,15 @@ export interface PipelineResult {
  * the run before scanning, because nothing downstream would be trustworthy.
  */
 export async function runPipeline(config: PipelineConfig): Promise<PipelineResult> {
+  const providers: PhaseProviders = {
+    scan: config.scan.map((provider) => provider.id),
+    resolve: config.resolve.map((provider) => provider.id),
+    validate: config.validate.map((provider) => provider.id),
+  }
+
   const { model, errors } = await loadModel(config.modelDir)
   if (errors.length > 0) {
-    return { modelErrors: errors, observations: [], associations: [], findings: [] }
+    return { modelErrors: errors, providers, observations: [], associations: [], findings: [] }
   }
 
   const sources = declaredSources(model)
@@ -79,7 +98,13 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   )
   findings.push(...produced)
 
-  return { modelErrors: [], observations, associations, findings: findings.map(withKnownSeverity) }
+  return {
+    modelErrors: [],
+    providers,
+    observations,
+    associations,
+    findings: findings.map(withKnownSeverity),
+  }
 }
 
 /** Every `sources` prefix declared anywhere in the model. */

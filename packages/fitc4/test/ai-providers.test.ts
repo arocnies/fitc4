@@ -10,6 +10,7 @@ import { describe, expect, test } from 'vitest'
 import type { AiExec, AiReply, AiRequest } from '../src/ai/exec.ts'
 import { aiOwnershipAdvisor, PROVIDER_ID as ADVISOR_ID } from '../src/ai/ownership-advisor.ts'
 import { aiSemanticReview, PROVIDER_ID as REVIEW_ID } from '../src/ai/semantic-review.ts'
+import { renderReport } from '../src/report.ts'
 import { findingFor, ruleIds, runFixture } from './helpers.ts'
 
 function stubExec(replies: AiReply[]): AiExec & { requests: AiRequest[] } {
@@ -84,25 +85,48 @@ describe('aiOwnershipAdvisor', () => {
     )
   })
 
-  test('an unavailable exec is one capped finding, not a failed build', async () => {
+  test('an unavailable exec behind an advisory provider is a warning, not a failed build', async () => {
     const exec = stubExec([{ ok: false, error: 'not logged in' }])
 
     const result = await runFixture('violations', { validate: [aiOwnershipAdvisor({ exec })] })
 
     const finding = findingFor(result.findings, 'ai-unavailable')
-    expect(finding?.severity).toBe('info')
+    expect(finding?.severity).toBe('warning')
     expect(finding?.description).toContain('not logged in')
+    expect(renderReport(result).exitCode).toBe(0)
   })
 
-  test('maxSeverity raises the ceiling without touching the base severity', async () => {
+  test("severity: 'error' makes the provider gate, and its absence fails the build", async () => {
     const exec = stubExec([{ ok: false, error: 'down' }])
 
     const result = await runFixture('violations', {
-      validate: [aiOwnershipAdvisor({ exec, maxSeverity: 'error' })],
+      validate: [aiOwnershipAdvisor({ exec, severity: 'error' })],
     })
 
-    // 'warning' is within an 'error' ceiling, so it stays a warning.
-    expect(findingFor(result.findings, 'ai-unavailable')?.severity).toBe('warning')
+    // A gating provider whose CLI is down is a hole in the gate, not a nudge.
+    expect(findingFor(result.findings, 'ai-unavailable')?.severity).toBe('error')
+  })
+
+  test("severity: 'error' escalates truncation too — unjudged inputs bypassed the gate", async () => {
+    const exec = stubExec([])
+
+    const result = await runFixture('violations', {
+      validate: [aiOwnershipAdvisor({ exec, severity: 'error', maxFiles: 0 })],
+    })
+
+    expect(findingFor(result.findings, 'ai-truncated')?.severity).toBe('error')
+  })
+
+  test('a chosen severity is what suggestions report at', async () => {
+    const exec = stubExec([
+      ok({ files: [{ path: 'src/orphan/thing.ts', element: 'fixture.app.core', rationale: 'r' }] }),
+    ])
+
+    const result = await runFixture('violations', {
+      validate: [aiOwnershipAdvisor({ exec, severity: 'warning' })],
+    })
+
+    expect(findingFor(result.findings, 'ownership-suggestion')?.severity).toBe('warning')
   })
 
   test('files beyond maxFiles are reported, and zero budget means zero calls', async () => {
@@ -179,4 +203,23 @@ describe('aiSemanticReview', () => {
 test('provider ids are stable', () => {
   expect(ADVISOR_ID).toBe('ai-ownership-advisor')
   expect(REVIEW_ID).toBe('ai-semantic-review')
+})
+
+describe('provider composition visibility', () => {
+  test('the result and report name who judged the run', async () => {
+    const exec = stubExec([ok({ files: [] })])
+
+    const result = await runFixture('violations', { validate: [aiOwnershipAdvisor({ exec })] })
+
+    expect(result.providers).toEqual({
+      scan: ['typescript-imports'],
+      resolve: ['source-root'],
+      validate: ['ai-ownership-advisor'],
+    })
+    // The report shows a replaced phase — this run has no architecture-rules,
+    // and the line says so.
+    expect(renderReport(result).text).toContain(
+      'scan typescript-imports · resolve source-root · validate ai-ownership-advisor',
+    )
+  })
 })

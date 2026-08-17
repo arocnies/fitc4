@@ -18,7 +18,6 @@ export { claudeCli, DEFAULT_CLAUDE_MODEL, type ClaudeCliOptions } from './claude
 export { codexCli, type CodexCliOptions } from './codex-cli.ts'
 export { cached, type CacheOptions } from './cache.ts'
 
-export { clampSeverity } from './findings.ts'
 export {
   aiOwnershipAdvisor,
   PROVIDER_ID as AI_OWNERSHIP_ADVISOR_PROVIDER_ID,

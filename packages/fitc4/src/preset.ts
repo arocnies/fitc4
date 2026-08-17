@@ -19,6 +19,27 @@ import {
   typescriptImports,
   PROVIDER_ID as TYPESCRIPT_IMPORTS_ID,
 } from './providers/typescript-imports.ts'
+import type { NamedProvider, ResolveProvider, ValidateProvider } from './types.ts'
+
+/**
+ * The preset resolve and validate phases, ready to spread.
+ *
+ * Exported so a config that extends a phase writes
+ * `validate: [...presetValidate, myProvider]` — additive intent as additive
+ * code. Rebuilding the entries by hand works too, but forgetting to is the
+ * config-file way to silently drop the standard rules, and a gate with no
+ * rules passes everything. The scan preset has no array export because its
+ * provider is built from config values; rebuild it with
+ * `typescriptImports({ tsconfigPath, roots })` under
+ * `TYPESCRIPT_IMPORTS_PROVIDER_ID`.
+ */
+export const presetResolve: NamedProvider<ResolveProvider>[] = [
+  { id: SOURCE_ROOT_ID, run: sourceRoot },
+]
+
+export const presetValidate: NamedProvider<ValidateProvider>[] = [
+  { id: RULES_ID, run: architectureRules },
+]
 
 /**
  * Compose the providers around a resolved config.
@@ -40,7 +61,7 @@ export function pipelineConfig(config: ResolvedConfig): PipelineConfig {
         }),
       },
     ],
-    resolve: config.providers?.resolve ?? [{ id: SOURCE_ROOT_ID, run: sourceRoot }],
-    validate: config.providers?.validate ?? [{ id: RULES_ID, run: architectureRules }],
+    resolve: config.providers?.resolve ?? [...presetResolve],
+    validate: config.providers?.validate ?? [...presetValidate],
   }
 }

@@ -60,6 +60,7 @@ npx fitc4
 ```
 
 ```text
+scan typescript-imports · resolve source-root · validate architecture-rules
 4 observations · 3 associations · 0 errors, 0 warnings, 0 info
 ```
 
@@ -73,6 +74,7 @@ error (1)
     architecture-rules · architecture-rules/relationship-direction/example.app.core->example.app.interface
     src/core/bad.ts:1  ../interface/index.ts
 
+scan typescript-imports · resolve source-root · validate architecture-rules
 6 observations · 5 associations · 1 errors, 0 warnings, 0 info
 ```
 
@@ -127,7 +129,7 @@ expect(exitCodeFor(result)).toBe(0)
 
 Providers are plain functions — `ScanProvider`, `ResolveProvider`, `ValidateProvider` — composed into phase arrays. `pipelineConfig` is the batteries-included default; a caller wanting a different scanner builds its own `PipelineConfig` and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system.
 
-The `fitc4/ai` entry point adds AI-assisted validate providers over locally installed agent CLIs (`claude`, `codex`) — advisory by default, severity-capped, additive only, cached on their inputs, and never imported by the core. See [`docs/providers.md`](docs/providers.md).
+The `fitc4/ai` entry point adds AI-assisted validate providers over locally installed agent CLIs (`claude`, `codex`) — additive only, cached on their inputs, and never imported by the core. Each takes a `severity`: advisory by default, part of the gate when you choose `'error'`. Extending a phase spreads the preset back in — `validate: [...presetValidate, myProvider]` — and every report names the providers that composed each phase. See [`docs/providers.md`](docs/providers.md).
 
 ## The provider vocabulary
 

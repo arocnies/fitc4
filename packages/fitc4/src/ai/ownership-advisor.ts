@@ -21,14 +21,18 @@ import type {
   ValidateProvider,
 } from '../types.ts'
 import type { AiExec } from './exec.ts'
-import { aiTruncated, aiUnavailable, clampSeverity, elementCatalog, fileExcerpts } from './findings.ts'
+import { aiTruncated, aiUnavailable, elementCatalog, fileExcerpts } from './findings.ts'
 
 export const PROVIDER_ID = 'ai-ownership-advisor'
 
 export interface OwnershipAdvisorOptions {
   exec: AiExec
-  /** Ceiling on every finding this provider emits. Default: 'info'. */
-  maxSeverity?: Severity
+  /**
+   * The severity of this provider's suggestions — how load-bearing its
+   * judgment is. Default 'info' (advisory); 'error' makes it part of the
+   * gate, and an unavailable CLI or truncated input then fails the build.
+   */
+  severity?: Severity
   /** Unowned files reviewed per run; the rest are reported as truncated. */
   maxFiles?: number
   /** Characters of each file shown to the model. */
@@ -62,7 +66,7 @@ const PROMPT =
 export function aiOwnershipAdvisor(
   options: OwnershipAdvisorOptions,
 ): NamedProvider<ValidateProvider> {
-  const maxSeverity = options.maxSeverity ?? 'info'
+  const severity = options.severity ?? 'info'
   const maxFiles = options.maxFiles ?? 20
   const excerptChars = options.excerptChars ?? 2_000
 
@@ -73,7 +77,7 @@ export function aiOwnershipAdvisor(
     const findings: Finding[] = []
     const sent = files.slice(0, maxFiles)
     if (files.length > sent.length) {
-      findings.push(aiTruncated(PROVIDER_ID, files.length - sent.length, 'unowned files', maxSeverity))
+      findings.push(aiTruncated(PROVIDER_ID, files.length - sent.length, 'unowned files', severity))
     }
     if (sent.length === 0) return findings
 
@@ -84,14 +88,13 @@ export function aiOwnershipAdvisor(
       cwd: context.repositoryRoot,
     })
     if (!reply.ok) {
-      findings.push(aiUnavailable(PROVIDER_ID, options.exec.id, reply.error, maxSeverity))
+      findings.push(aiUnavailable(PROVIDER_ID, options.exec.id, reply.error, severity))
       return findings
     }
 
     const askedFor = new Set(sent)
     const answered = new Set<string>()
     const knownElements = new Set<string>([...context.model.elements()].map((element) => element.id))
-    const severity = clampSeverity('info', maxSeverity)
 
     for (const entry of suggestions(reply.value)) {
       // Only files that were actually asked about, once each — the reply is

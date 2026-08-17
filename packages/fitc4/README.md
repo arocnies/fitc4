@@ -102,11 +102,12 @@ Providers are plain functions — `ScanProvider`, `ResolveProvider`, `ValidatePr
 
 ## AI-assisted providers
 
-`fitc4/ai` adds advisory providers that shell out to your locally installed agent CLIs (`claude`, `codex`) — your login, your billing, no API keys in fitc4. `aiOwnershipAdvisor` suggests an owner for every file the model leaves unowned; `aiSemanticReview` judges whether an element's implementation still matches its declared description. AI findings are additive and severity-capped (advisory by default), a missing or logged-out CLI is one visible `ai-unavailable` finding rather than a failed build, and `cached()` makes reruns with unchanged inputs free and identical.
+`fitc4/ai` adds providers that shell out to your locally installed agent CLIs (`claude`, `codex`) — your login, your billing, no API keys in fitc4. `aiOwnershipAdvisor` suggests an owner for every file the model leaves unowned; `aiSemanticReview` judges whether an element's implementation still matches its declared description. AI findings are additive, and each provider takes a `severity`: advisory by default, part of the gate when you choose `'error'` — at which point a missing or logged-out CLI fails the build instead of being a `warning` nudge. `cached()` makes reruns with unchanged inputs free and identical.
 
 ```ts
+import { presetValidate } from 'fitc4'
 import { cached, claudeCli, aiOwnershipAdvisor } from 'fitc4/ai'
 
-// in fitc4.config.ts, alongside the preset validate entry:
-aiOwnershipAdvisor({ exec: cached(claudeCli({ model: 'haiku' })) })
+// in fitc4.config.ts:
+validate: [...presetValidate, aiOwnershipAdvisor({ exec: cached(claudeCli({ model: 'haiku' })) })]
 ```

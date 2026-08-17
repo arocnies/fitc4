@@ -9,7 +9,7 @@ Run `npm run verify` before handing off a change. It builds the package, runs it
 - Nothing in `packages/fitc4` may assume it lives in the repository it checks. Paths come from the config or the working directory, never from `import.meta.url`.
 - `src/cli.ts` runs the pipeline on import, so nothing else may import it. Anything the CLI can do must also be reachable from `src/index.ts`.
 - Providers are plain functions composed into phase arrays in `src/preset.ts`. Consumers extend via a `fitc4.config.ts` whose phase arrays replace the preset per phase (`docs/providers.md`). There is no registry, lifecycle, or discovery system, and adding one is a design change rather than a refactor.
-- `src/ai/` is the `fitc4/ai` entry point and nothing in core may import it — the self-check enforces the boundary. AI findings are additive and severity-capped; an unavailable CLI is an `ai-unavailable` finding, never a thrown error or a silent skip.
+- `src/ai/` is the `fitc4/ai` entry point and nothing in core may import it — the self-check enforces the boundary. AI findings are additive; each provider's `severity` option says whether it is advisory (default) or part of the gate (`'error'`, which also escalates `ai-unavailable` and `ai-truncated` — a gate whose judge is absent must not pass).
 - The LikeC4 model is the only architecture-model representation. Do not build a snapshot type that duplicates elements or relationships.
 
 ## The gate must never fail open

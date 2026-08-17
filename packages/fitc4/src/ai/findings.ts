@@ -1,11 +1,17 @@
 /**
  * Shared pieces of the AI validate providers.
  *
- * The contract that keeps a nondeterministic model compatible with a
- * deterministic gate: AI findings are additive and severity-capped. Nothing
- * here can suppress or rewrite a deterministic finding, and a provider's
- * `maxSeverity` bounds how loud its judgment may get — advisory unless the
- * user explicitly opts a provider into gating.
+ * The contract that reconciles a nondeterministic model with a deterministic
+ * gate: AI findings are additive — nothing here can suppress or rewrite a
+ * deterministic finding — and each provider's `severity` option says how
+ * load-bearing its judgment is. The defaults are advisory; `'error'` is the
+ * user's explicit act of making the AI part of the gate.
+ *
+ * Choosing `'error'` changes the failure semantics on purpose: a gating
+ * provider whose CLI is missing, or whose inputs were truncated, must fail the
+ * build — otherwise the gate passes exactly when its judge is absent, the
+ * fail-open this tool exists to prevent. Advisory providers degrade to a
+ * visible nudge instead.
  */
 
 import fs from 'node:fs'
@@ -13,49 +19,46 @@ import path from 'node:path'
 
 import { findingId } from '../ids.ts'
 import { normalizeSources, SOURCES_KEY } from '../model.ts'
-import { SEVERITIES } from '../types.ts'
 import type { Finding, LikeC4Model, Severity } from '../types.ts'
-
-/** Cap a severity: an AI finding may be at most as severe as `max`. */
-export function clampSeverity(severity: Severity, max: Severity): Severity {
-  return SEVERITIES.indexOf(severity) < SEVERITIES.indexOf(max) ? max : severity
-}
 
 /**
  * The one finding an AI provider emits when its exec fails.
  *
- * A finding rather than a throw, because `provider-failure` is an `error` and
- * a missing or logged-out CLI must not fail the build on behalf of an advisory
- * provider. A finding rather than silence, because an enrichment that quietly
- * stopped running looks identical to a clean report.
+ * Advisory providers report a `warning` — a logged-out CLI must not fail the
+ * build on behalf of a suggestion, but an enrichment that quietly stopped
+ * running would look identical to a clean report. A gating provider escalates
+ * to `error`: its absence is a hole in the gate, not a missing nicety.
  */
 export function aiUnavailable(
   provider: string,
   execId: string,
   error: string,
-  maxSeverity: Severity,
+  severity: Severity,
 ): Finding {
   return {
     id: findingId(provider, 'ai-unavailable', execId),
     ruleId: 'ai-unavailable',
-    severity: clampSeverity('warning', maxSeverity),
+    severity: severity === 'error' ? 'error' : 'warning',
     description: `AI assistance was unavailable (${execId}): ${error}`,
     subject: { kind: 'provider', id: provider },
     provider,
   }
 }
 
-/** Reported truncation — a silent cap would read as full coverage. */
+/**
+ * Reported truncation — a silent cap would read as full coverage. Escalates
+ * for a gating provider: inputs it never judged are inputs that bypassed it.
+ */
 export function aiTruncated(
   provider: string,
   dropped: number,
   what: string,
-  maxSeverity: Severity,
+  severity: Severity,
 ): Finding {
   return {
     id: findingId(provider, 'ai-truncated', what),
     ruleId: 'ai-truncated',
-    severity: clampSeverity('info', maxSeverity),
+    severity: severity === 'error' ? 'error' : 'info',
     description: `${dropped} ${what} beyond the configured limit were not reviewed.`,
     subject: { kind: 'provider', id: provider },
     provider,

@@ -23,9 +23,9 @@ export {
 export type { FitC4Config, FitC4FileConfig, ResolvedConfig } from './config.ts'
 
 export { runPipeline } from './pipeline.ts'
-export type { PipelineConfig, PipelineResult } from './pipeline.ts'
+export type { PhaseProviders, PipelineConfig, PipelineResult } from './pipeline.ts'
 
-export { pipelineConfig } from './preset.ts'
+export { pipelineConfig, presetResolve, presetValidate } from './preset.ts'
 
 export { exitCodeFor, renderReport } from './report.ts'
 
