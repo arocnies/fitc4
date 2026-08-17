@@ -1,10 +1,29 @@
 specification {
+  element person {
+    style {
+      shape person
+    }
+  }
   element system
   element container
   element component
 }
 
 model {
+  // Context elements carry no `sources`, so the gate ignores them: they are
+  // documentation. Only elements with `sources` are enforced against the code.
+  developer = person 'Developer' {
+    description 'Runs soffit locally or in CI'
+  }
+
+  consumer = system 'Consumer project' {
+    description 'A repository that adopted soffit: source code, an arch/ model, and a soffit.config'
+  }
+
+  likec4 = system 'LikeC4' {
+    description 'Parses the arch/ model, validates it, and computes the element graph'
+  }
+
   soffit = system 'soffit' {
     lib = container 'Library & CLI' {
       core = component 'Core' {
@@ -23,18 +42,44 @@ model {
     }
   }
 
+  developer -> soffit.lib 'runs npx soffit'
+  soffit.lib -> consumer 'discovers soffit.config, scans source files'
+  soffit.lib -> likec4 'loads the architecture model through'
+  likec4 -> consumer 'parses arch/'
+
   soffit.lib.core -> soffit.lib.providers 'composes and re-exports (preset.ts, index.ts)'
   soffit.lib.providers -> soffit.lib.core 'reads the shared contracts (types, model, ids, kinds)'
 }
 
 views {
-  view index of soffit {
+  // Landing view: soffit in context.
+  view index {
+    title 'soffit landscape'
+    include developer, soffit, consumer, likec4
+    autoLayout TopBottom
+  }
+
+  view soffit of soffit {
     include *
     autoLayout TopBottom
   }
 
   view lib of soffit.lib {
     include *
+    autoLayout TopBottom
+  }
+
+  // Behavioral: the four-phase check run, in order. Steps here are narrative
+  // and need no declared relationships.
+  dynamic view check {
+    title 'How a check runs'
+    developer -> soffit.lib.core 'runs npx soffit'
+    soffit.lib.core -> consumer 'discovers soffit.config, walking up from cwd'
+    soffit.lib.core -> likec4 'validates arch/ and computes the model (fails fast on model errors)'
+    soffit.lib.core -> soffit.lib.providers 'scan: emit file and dependency observations'
+    soffit.lib.core -> soffit.lib.providers 'resolve: map observations onto model elements via sources'
+    soffit.lib.core -> soffit.lib.providers 'validate: judge crossings against declared relationships'
+    soffit.lib.core -> developer 'report findings; exit non-zero on errors'
     autoLayout TopBottom
   }
 }
