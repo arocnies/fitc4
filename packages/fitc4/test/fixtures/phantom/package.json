@@ -1,0 +1,7 @@
+{
+  "name": "phantom-fixture",
+  "private": true,
+  "dependencies": {
+    "untyped-pkg": "^1.0.0"
+  }
+}

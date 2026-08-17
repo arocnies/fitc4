@@ -16,6 +16,7 @@
  */
 
 import fs from 'node:fs'
+import { isBuiltin } from 'node:module'
 import path from 'node:path'
 import ts from 'typescript'
 import type { Observation, ScanContext } from '../types.ts'
@@ -51,6 +52,7 @@ export interface TypeScriptImportsOptions {
 export function typescriptImports(options: TypeScriptImportsOptions) {
   return async (context: ScanContext): Promise<Observation[]> => {
     const compilerOptions = readCompilerOptions(options.tsconfigPath)
+    const declaredPackages = declaredPackageLookup(context.repositoryRoot)
     const observations: Observation[] = []
 
     // A scan root that does not exist, or holds no source, silently reduces
@@ -111,7 +113,15 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
         seen.set(key, ordinal + 1)
 
         observations.push(
-          dependencyObservation(context, compilerOptions, absolute, relative, reference, ordinal),
+          dependencyObservation(
+            context,
+            compilerOptions,
+            declaredPackages,
+            absolute,
+            relative,
+            reference,
+            ordinal,
+          ),
         )
       }
     }
@@ -221,6 +231,7 @@ function isImportMetaResolve(expression: ts.Expression): boolean {
 function dependencyObservation(
   context: ScanContext,
   compilerOptions: ts.CompilerOptions,
+  declaredPackages: DeclaredPackageLookup,
   containingFile: string,
   from: string,
   reference: ModuleReference,
@@ -247,19 +258,29 @@ function dependencyObservation(
   } as const
 
   if (resolved === undefined) {
-    // A relative specifier that resolves to nothing is a broken import, not a
-    // package. Classifying it as external would silently drop the dependency
-    // from the architecture check.
-    const relative = reference.specifier.startsWith('.')
+    // A specifier that resolves to nothing is only safely "external" when it
+    // is demonstrably not our code: a Node builtin, or a package this
+    // repository declares. A broken relative path, a tsconfig alias whose
+    // mapping is wrong, and an undeclared package all get flagged instead —
+    // classifying them as external would silently drop the dependency from
+    // the architecture check.
+    const external = isKnownExternal(
+      reference.specifier,
+      compilerOptions,
+      declaredPackages,
+      path.dirname(containingFile),
+    )
     return {
       ...base,
-      kind: relative ? 'unresolved-dependency' : 'dependency',
+      kind: external ? 'dependency' : 'unresolved-dependency',
       target: { kind: 'module', id: reference.specifier },
-      description: `${from} references ${reference.specifier}, which does not resolve`,
+      description: external
+        ? `${from} depends on external module ${reference.specifier}`
+        : `${from} references ${reference.specifier}, which does not resolve`,
       data: {
         specifier: reference.specifier,
         dependencyKind: reference.dependencyKind,
-        external: !relative,
+        external,
         resolved: false,
       },
     }
@@ -293,6 +314,115 @@ function dependencyObservation(
       dependencyKind: reference.dependencyKind,
       external: false,
       resolved: true,
+    },
+  }
+}
+
+/**
+ * Whether an unresolvable non-relative specifier is demonstrably not our code.
+ *
+ * TypeScript resolution only finds packages that ship types, so a plain-JS
+ * package legitimately fails to resolve here. The tell that separates it from
+ * a broken alias or a phantom dependency: builtins are always external, a
+ * specifier matching a tsconfig `paths` pattern was meant to map into this
+ * repository, and anything else must be declared in a `package.json` between
+ * the importing file and the repository root.
+ */
+function isKnownExternal(
+  specifier: string,
+  compilerOptions: ts.CompilerOptions,
+  declaredPackages: DeclaredPackageLookup,
+  fromDirectory: string,
+): boolean {
+  if (specifier.startsWith('.')) return false
+  if (isBuiltin(specifier)) return true
+  if (matchesPathsAlias(specifier, compilerOptions.paths)) return false
+  return declaredPackages.isDeclared(fromDirectory, packageNameOf(specifier))
+}
+
+/** Whether a specifier matches any tsconfig `paths` pattern (`@app/*`, exact names). */
+function matchesPathsAlias(
+  specifier: string,
+  paths: ts.MapLike<string[]> | undefined,
+): boolean {
+  if (paths === undefined) return false
+  for (const pattern of Object.keys(paths)) {
+    const star = pattern.indexOf('*')
+    if (star === -1) {
+      if (pattern === specifier) return true
+      continue
+    }
+    const prefix = pattern.slice(0, star)
+    const suffix = pattern.slice(star + 1)
+    if (
+      specifier.length >= prefix.length + suffix.length &&
+      specifier.startsWith(prefix) &&
+      specifier.endsWith(suffix)
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+/** The package a specifier names: `@scope/name/deep` → `@scope/name`, `name/deep` → `name`. */
+function packageNameOf(specifier: string): string {
+  const segments = specifier.split('/')
+  if (specifier.startsWith('@') && segments.length >= 2) return `${segments[0]}/${segments[1]}`
+  return segments[0] ?? specifier
+}
+
+interface DeclaredPackageLookup {
+  /** Whether any package.json from `fromDirectory` up to the repository root declares `name`. */
+  isDeclared(fromDirectory: string, name: string): boolean
+}
+
+/**
+ * Declared dependencies per directory, read lazily and cached for the run.
+ *
+ * Walks manifests rather than probing node_modules: a phantom dependency —
+ * present on disk through hoisting but declared nowhere — is exactly what must
+ * not pass as external.
+ */
+function declaredPackageLookup(repositoryRoot: string): DeclaredPackageLookup {
+  const byDirectory = new Map<string, Set<string>>()
+
+  const declaredIn = (directory: string): Set<string> => {
+    const cached = byDirectory.get(directory)
+    if (cached !== undefined) return cached
+
+    const names = new Set<string>()
+    const manifest = path.join(directory, 'package.json')
+    if (fs.existsSync(manifest)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(manifest, 'utf8')) as Record<string, unknown>
+        const fields = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
+        for (const field of fields) {
+          const block = parsed[field]
+          if (block !== null && typeof block === 'object') {
+            for (const name of Object.keys(block)) names.add(name)
+          }
+        }
+      } catch {
+        // An unreadable manifest declares nothing; resolution failures against
+        // it will surface as unresolved-dependency observations.
+      }
+    }
+    byDirectory.set(directory, names)
+    return names
+  }
+
+  const root = path.resolve(repositoryRoot)
+  return {
+    isDeclared(fromDirectory: string, name: string): boolean {
+      let current = path.resolve(fromDirectory)
+      for (;;) {
+        if (declaredIn(current).has(name)) return true
+        if (current === root) return false
+        const parent = path.dirname(current)
+        if (parent === current) return false
+        current = parent
+      }
     },
   }
 }

@@ -18,7 +18,15 @@ import {
   isSameOrNested,
   ownershipPrefixes,
 } from '../model.ts'
-import type { Association, Evidence, Finding, Observation, ValidateContext } from '../types.ts'
+import type {
+  Association,
+  Evidence,
+  Finding,
+  Observation,
+  Severity,
+  ValidateContext,
+  ValidateProvider,
+} from '../types.ts'
 
 export const PROVIDER_ID = 'architecture-rules'
 
@@ -28,30 +36,62 @@ export const PROVIDER_ID = 'architecture-rules'
  */
 export const EVIDENCE_LIMIT = 10
 
-export async function architectureRules(context: ValidateContext): Promise<Finding[]> {
-  const observations = new Map(context.observations.map((item) => [item.id, item]))
-  const declared = declaredRelationships(context.model)
-  const collector = new FindingCollector()
+/** Every rule these checks can emit, in the standard-severity order of the docs. */
+export type ArchitectureRuleId =
+  | 'missing-relationship'
+  | 'relationship-direction'
+  | 'ambiguous-source'
+  | 'invalid-sources'
+  | 'unmatched-sources'
+  | 'unmapped-source'
+  | 'unresolved-import'
+  | 'duplicate-relationship'
+  | 'unknown-observation-kind'
 
-  for (const association of context.associations) {
-    const observation = observations.get(association.observationId)
-    if (observation === undefined) continue
+export interface ArchitectureRulesOptions {
+  /**
+   * Per-rule severity overrides.
+   *
+   * The standard severities assume adoption: new unowned code is a `warning`
+   * nudge, not a broken build. A team done adopting promotes it —
+   * `{ 'unmapped-source': 'error' }` — and unowned code then fails the gate
+   * instead of slipping past it, since dependencies from unowned files are
+   * never boundary-checked. Softening works the same way during a migration.
+   */
+  severity?: Partial<Record<ArchitectureRuleId, Severity>>
+}
 
-    if (observation.kind === 'file') {
-      collector.add(fileRule(association, observation))
-    } else if (observation.kind === 'dependency') {
-      collector.add(dependencyRule(association, observation, declared))
-    } else if (observation.kind === 'unresolved-dependency') {
-      collector.add(unresolvedImportRule(association, observation))
+/** How load-bearing each rule is: the configured override, or the standard severity. */
+type SeverityOf = (rule: ArchitectureRuleId, standard: Severity) => Severity
+
+export function architectureRules(options: ArchitectureRulesOptions = {}): ValidateProvider {
+  const severityOf: SeverityOf = (rule, standard) => options.severity?.[rule] ?? standard
+
+  return async (context: ValidateContext): Promise<Finding[]> => {
+    const observations = new Map(context.observations.map((item) => [item.id, item]))
+    const declared = declaredRelationships(context.model)
+    const collector = new FindingCollector()
+
+    for (const association of context.associations) {
+      const observation = observations.get(association.observationId)
+      if (observation === undefined) continue
+
+      if (observation.kind === 'file') {
+        collector.add(fileRule(association, observation, severityOf))
+      } else if (observation.kind === 'dependency') {
+        collector.add(dependencyRule(association, observation, declared, severityOf))
+      } else if (observation.kind === 'unresolved-dependency') {
+        collector.add(unresolvedImportRule(association, observation, severityOf))
+      }
     }
-  }
 
-  return [
-    ...collector.findings(),
-    ...coverageRules(context, observations),
-    ...modelHygieneRules(context),
-    ...vocabularyRules(context),
-  ]
+    return [
+      ...collector.findings(),
+      ...coverageRules(context, observations, severityOf),
+      ...modelHygieneRules(context, severityOf),
+      ...vocabularyRules(context, severityOf),
+    ]
+  }
 }
 
 /**
@@ -100,7 +140,11 @@ class FindingCollector {
   }
 }
 
-function fileRule(association: Association, observation: Observation): Finding | undefined {
+function fileRule(
+  association: Association,
+  observation: Observation,
+  severityOf: SeverityOf,
+): Finding | undefined {
   const filePath = observation.subject?.id
   if (filePath === undefined) return undefined
   const evidence: Evidence[] = [{ path: filePath }]
@@ -109,7 +153,7 @@ function fileRule(association: Association, observation: Observation): Finding |
     return {
       id: findingId(PROVIDER_ID, 'unmapped-source', filePath),
       ruleId: 'unmapped-source',
-      severity: 'warning',
+      severity: severityOf('unmapped-source', 'warning'),
       description: `${filePath} is not owned by any model element.`,
       subject: { kind: 'file', id: filePath },
       evidence,
@@ -122,7 +166,7 @@ function fileRule(association: Association, observation: Observation): Finding |
     return {
       id: findingId(PROVIDER_ID, 'ambiguous-source', filePath),
       ruleId: 'ambiguous-source',
-      severity: 'error',
+      severity: severityOf('ambiguous-source', 'error'),
       description: `${filePath} is claimed by ${candidates.map((ref) => ref.id).join(' and ')}.`,
       subject: { kind: 'file', id: filePath },
       related: candidates,
@@ -138,6 +182,7 @@ function dependencyRule(
   association: Association,
   observation: Observation,
   declared: ReturnType<typeof declaredRelationships>,
+  severityOf: SeverityOf,
 ): Finding | undefined {
   if (association.status !== 'resolved') return undefined
 
@@ -161,7 +206,7 @@ function dependencyRule(
     return {
       id: findingId(PROVIDER_ID, 'relationship-direction', `${sourceId}->${targetId}`),
       ruleId: 'relationship-direction',
-      severity: 'error',
+      severity: severityOf('relationship-direction', 'error'),
       description:
         `${sourceId} depends on ${targetId}, but the model declares only ` +
         `${targetId} → ${sourceId}. Declare the dependency that the code actually has.`,
@@ -178,7 +223,7 @@ function dependencyRule(
   return {
     id: findingId(PROVIDER_ID, 'missing-relationship', `${sourceId}->${targetId}`),
     ruleId: 'missing-relationship',
-    severity: 'error',
+    severity: severityOf('missing-relationship', 'error'),
     description: `${sourceId} depends on ${targetId}, but the model declares no such relationship.`,
     subject: { kind: 'element', id: sourceId },
     related: [{ kind: 'element', id: targetId }],
@@ -197,6 +242,7 @@ function dependencyRule(
 function unresolvedImportRule(
   association: Association,
   observation: Observation,
+  severityOf: SeverityOf,
 ): Finding | undefined {
   if (observation.target === undefined) return undefined
   const fromPath = observation.subject?.id ?? association.observationId
@@ -204,7 +250,7 @@ function unresolvedImportRule(
   return {
     id: findingId(PROVIDER_ID, 'unresolved-import', `${fromPath}->${observation.target.id}`),
     ruleId: 'unresolved-import',
-    severity: 'warning',
+    severity: severityOf('unresolved-import', 'warning'),
     description: `${fromPath} imports ${observation.target.id}, which does not resolve; the dependency cannot be checked.`,
     subject: { kind: 'file', id: fromPath },
     evidence: observation.evidence,
@@ -223,6 +269,7 @@ function unresolvedImportRule(
 function coverageRules(
   context: ValidateContext,
   observations: Map<string, Observation>,
+  severityOf: SeverityOf,
 ): Finding[] {
   const { prefixes, rejected } = ownershipPrefixes(context.model)
   const findings: Finding[] = []
@@ -231,7 +278,7 @@ function coverageRules(
     findings.push({
       id: findingId(PROVIDER_ID, 'invalid-sources', `${entry.elementId}/${entry.declared}`),
       ruleId: 'invalid-sources',
-      severity: 'error',
+      severity: severityOf('invalid-sources', 'error'),
       description: `${entry.elementId} declares sources '${entry.declared}', which ${entry.reason}.`,
       subject: { kind: 'element', id: entry.elementId },
       provider: PROVIDER_ID,
@@ -267,7 +314,7 @@ function coverageRules(
     findings.push({
       id: findingId(PROVIDER_ID, 'unmatched-sources', `${entry.elementId}/${entry.declared}`),
       ruleId: 'unmatched-sources',
-      severity: 'error',
+      severity: severityOf('unmatched-sources', 'error'),
       description: `${entry.elementId} declares sources '${entry.declared}', which matches no scanned file.`,
       subject: { kind: 'element', id: entry.elementId },
       provider: PROVIDER_ID,
@@ -284,13 +331,13 @@ function coverageRules(
  * source/kind/target triples rather than design an ordinal up front. It does,
  * so the collision is surfaced instead of silently dropped.
  */
-function modelHygieneRules(context: ValidateContext): Finding[] {
+function modelHygieneRules(context: ValidateContext, severityOf: SeverityOf): Finding[] {
   const { duplicates } = declaredRelationships(context.model)
 
   return [...duplicates].map(([id, count]) => ({
     id: findingId(PROVIDER_ID, 'duplicate-relationship', id),
     ruleId: 'duplicate-relationship',
-    severity: 'info' as const,
+    severity: severityOf('duplicate-relationship', 'info'),
     description: `${count} relationships share the identity ${id}; only the first is referenced by findings.`,
     subject: { kind: 'relationship', id },
     provider: PROVIDER_ID,
@@ -307,7 +354,7 @@ function modelHygieneRules(context: ValidateContext): Finding[] {
  * provider makes the mismatch visible without punishing providers that
  * legitimately speak to each other in private terms.
  */
-function vocabularyRules(context: ValidateContext): Finding[] {
+function vocabularyRules(context: ValidateContext, severityOf: SeverityOf): Finding[] {
   const counts = new Map<string, { provider: string; kind: string; count: number }>()
 
   for (const observation of context.observations) {
@@ -324,7 +371,7 @@ function vocabularyRules(context: ValidateContext): Finding[] {
   return [...counts.values()].map((entry) => ({
     id: findingId(PROVIDER_ID, 'unknown-observation-kind', `${entry.provider}/${entry.kind}`),
     ruleId: 'unknown-observation-kind',
-    severity: 'info' as const,
+    severity: severityOf('unknown-observation-kind', 'info'),
     description:
       `${entry.provider} emitted ${entry.count} observation(s) of kind '${entry.kind}', ` +
       `which these rules do not interpret.`,

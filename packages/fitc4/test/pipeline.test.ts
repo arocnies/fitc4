@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import { runPipeline } from '../src/pipeline.ts'
 import { exitCodeFor, renderReport } from '../src/report.ts'
-import { EVIDENCE_LIMIT } from '../src/providers/architecture-rules.ts'
+import { architectureRules, EVIDENCE_LIMIT } from '../src/providers/architecture-rules.ts'
 import { typescriptImports } from '../src/providers/typescript-imports.ts'
 import type { Association, Finding, Observation, ResolveProvider, ValidateProvider } from '../src/types.ts'
 import {
@@ -98,6 +98,21 @@ describe('a model whose implementation contradicts the contract', () => {
 
   test('fails the gate', async () => {
     expect(renderReport(await runFixture('violations')).exitCode).toBe(1)
+  })
+
+  // The standard severities assume adoption; a team done adopting promotes
+  // unmapped-source so new unowned code — whose dependencies are never
+  // boundary-checked — fails the gate instead of slipping past it.
+  test('a severity override promotes unmapped-source to a gate failure', async () => {
+    const result = await runFixture('violations', {
+      validate: [
+        { id: RULES_ID, run: architectureRules({ severity: { 'unmapped-source': 'error' } }) },
+      ],
+    })
+
+    const unmapped = findingFor(result.findings, 'unmapped-source')
+    expect(unmapped?.severity).toBe('error')
+    expect(unmapped?.subject?.id).toBe('src/orphan/thing.ts')
   })
 })
 
@@ -235,6 +250,57 @@ describe('module reference forms', () => {
     const finding = findingFor(findings, 'unresolved-import')
     expect(finding?.severity).toBe('warning')
     expect(finding?.subject?.id).toBe('src/interface/broken.ts')
+  })
+})
+
+// A specifier that fails to resolve is only "external" when it is demonstrably
+// not our code: a Node builtin, or a package a manifest declares. Anything
+// else classified external silently drops a dependency from the check — a
+// wrong tsconfig `paths` map must not turn every alias import green.
+describe('unresolvable non-relative specifiers', () => {
+  test('a tsconfig paths alias that no longer maps is reported', async () => {
+    const { observations, findings } = await runFixture('phantom')
+
+    const aliased = observations.find((item) => item.target?.id === '@app/missing.js')
+    expect(aliased?.kind).toBe('unresolved-dependency')
+
+    const finding = findings.find(
+      (item) =>
+        item.ruleId === 'unresolved-import' && item.description.includes('@app/missing.js'),
+    )
+    expect(finding?.severity).toBe('warning')
+  })
+
+  test('a working paths alias still resolves into the repository', async () => {
+    const { observations } = await runFixture('phantom')
+
+    const real = observations.find((item) => item.data?.['specifier'] === '@app/real.js')
+    expect(real?.kind).toBe('dependency')
+    expect(real?.target).toEqual({ kind: 'file', id: 'src/app/real.ts' })
+  })
+
+  test('an undeclared package that does not resolve is reported', async () => {
+    const { observations } = await runFixture('phantom')
+
+    const phantom = observations.find((item) => item.target?.id === 'phantom-pkg')
+    expect(phantom?.kind).toBe('unresolved-dependency')
+  })
+
+  test('a declared package without type declarations stays external', async () => {
+    const { observations, findings } = await runFixture('phantom')
+
+    const untyped = observations.find((item) => item.target?.id === 'untyped-pkg')
+    expect(untyped?.kind).toBe('dependency')
+    expect(untyped?.data?.['external']).toBe(true)
+    expect(findings.filter((item) => item.description.includes('untyped-pkg'))).toEqual([])
+  })
+
+  test('node builtins stay external and unreported', async () => {
+    const { observations, findings } = await runFixture('phantom')
+
+    const builtin = observations.find((item) => item.data?.['specifier'] === 'node:path')
+    expect(builtin?.kind).toBe('dependency')
+    expect(findings.filter((item) => item.description.includes('node:path'))).toEqual([])
   })
 })
 

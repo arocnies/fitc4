@@ -38,7 +38,7 @@ export const defaultResolve: NamedProvider<ResolveProvider>[] = [
 ]
 
 export const defaultValidate: NamedProvider<ValidateProvider>[] = [
-  { id: RULES_ID, run: architectureRules },
+  { id: RULES_ID, run: architectureRules() },
 ]
 
 /**

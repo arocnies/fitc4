@@ -13,7 +13,7 @@ import { afterAll, afterEach, describe, expect, test } from 'vitest'
 
 import { claudeCli } from '../src/ai/claude-cli.ts'
 import { codexCli } from '../src/ai/codex-cli.ts'
-import { extractJson } from '../src/ai/exec.ts'
+import { extractJson, finishReply, schemaMismatch } from '../src/ai/exec.ts'
 
 const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-fake-ai-'))
 afterAll(() => fs.rmSync(workDir, { recursive: true, force: true }))
@@ -228,5 +228,56 @@ describe('extractJson', () => {
     expect(extractJson('```json\n[1, 2]\n```')).toEqual([1, 2])
     expect(extractJson('Sure! Here it is: {"a": {"b": 2}} — hope that helps')).toEqual({ a: { b: 2 } })
     expect(extractJson('no json here')).toBeUndefined()
+  })
+})
+
+// Parsing is not conforming: a reply that is JSON but not the requested shape
+// must be a visible failure, not a value a gating provider misreads as
+// absence-of-problem.
+describe('schema conformance', () => {
+  test('a JSON reply missing a required field is a failure, not a value', () => {
+    const reply = finishReply(
+      {
+        prompt: 'judge',
+        schema: {
+          type: 'object',
+          required: ['matches'],
+          properties: { matches: { type: 'boolean' } },
+        },
+      },
+      '{}',
+    )
+
+    expect(reply.ok).toBe(false)
+    if (!reply.ok) expect(reply.error).toContain("missing 'matches'")
+  })
+
+  test('nested items, union types, and required keys are all checked', () => {
+    const schema = {
+      type: 'object',
+      required: ['files'],
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['path', 'element'],
+            properties: { path: { type: 'string' }, element: { type: ['string', 'null'] } },
+          },
+        },
+      },
+    }
+
+    expect(schemaMismatch({ files: [{ path: 'a.ts', element: null }] }, schema)).toBeUndefined()
+    expect(schemaMismatch({ files: [{ path: 'a.ts', element: 5 }] }, schema)).toContain(
+      '$.files[0].element',
+    )
+    expect(schemaMismatch({ files: [{ path: 'a.ts' }] }, schema)).toContain("missing 'element'")
+    expect(schemaMismatch({ files: 'a.ts' }, schema)).toContain('$.files')
+  })
+
+  test('enums are honoured; keywords outside the subset degrade laxly, never reject', () => {
+    expect(schemaMismatch('maybe', { enum: ['yes', 'no'] })).toContain('must be one of')
+    expect(schemaMismatch({ anything: 1 }, { type: 'object', minProperties: 5 })).toBeUndefined()
   })
 })

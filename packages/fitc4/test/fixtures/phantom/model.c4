@@ -1,0 +1,20 @@
+specification {
+  element system
+  element component
+}
+
+model {
+  fixture = system 'Fixture' {
+    app = component 'App' {
+      metadata {
+        sources 'src/**'
+      }
+    }
+  }
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

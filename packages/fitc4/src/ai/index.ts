@@ -5,10 +5,10 @@
  * dependency-free, and nothing in `fitc4` imports this module. Composing an AI
  * provider into a phase is the user's explicit act, in their config file.
  *
- * The standing contract: AI findings are additive and severity-capped
- * (advisory by default), an unavailable CLI is a visible finding rather than a
- * failed build or a silent skip, and `cached` makes reruns with unchanged
- * inputs free and identical.
+ * The standing contract: AI findings are additive and carry the severity the
+ * user chose (advisory by default), an unavailable CLI is a visible finding
+ * rather than a failed build or a silent skip, and `cached` makes reruns with
+ * unchanged inputs free and identical.
  */
 
 export type { AiExec, AiReply, AiRequest } from './exec.ts'

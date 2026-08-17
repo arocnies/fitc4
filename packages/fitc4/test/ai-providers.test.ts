@@ -117,6 +117,29 @@ describe('aiOwnershipAdvisor', () => {
     expect(findingFor(result.findings, 'ai-truncated')?.severity).toBe('error')
   })
 
+  test("severity: 'error' fails the build when the reply omits asked files", async () => {
+    const exec = stubExec([ok({ files: [] })])
+
+    const result = await runFixture('violations', {
+      validate: [aiOwnershipAdvisor({ exec, severity: 'error' })],
+    })
+
+    // A file the judge never ruled on is a file that bypassed the gate.
+    const finding = findingFor(result.findings, 'ai-unavailable')
+    expect(finding?.severity).toBe('error')
+    expect(finding?.description).toContain('omitted 1 of 1')
+  })
+
+  test('an advisory run shrugs off a lazy reply — unmapped-source still stands', async () => {
+    const exec = stubExec([ok({ files: [] })])
+
+    const result = await runFixture('violations', {
+      validate: [aiOwnershipAdvisor({ exec })],
+    })
+
+    expect(findingFor(result.findings, 'ai-unavailable')).toBeUndefined()
+  })
+
   test('a chosen severity is what suggestions report at', async () => {
     const exec = stubExec([
       ok({ files: [{ path: 'src/orphan/thing.ts', element: 'fixture.app.core', rationale: 'r' }] }),

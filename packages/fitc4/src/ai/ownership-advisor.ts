@@ -116,6 +116,21 @@ export function aiOwnershipAdvisor(
       })
     }
 
+    // Advisory runs shrug off a lazy reply — the deterministic unmapped-source
+    // warning still stands for every file. A gating run must not: a file the
+    // judge never ruled on is a file that bypassed the gate.
+    const unanswered = sent.filter((filePath) => !answered.has(filePath))
+    if (unanswered.length > 0 && severity === 'error') {
+      findings.push(
+        aiUnavailable(
+          PROVIDER_ID,
+          options.exec.id,
+          `the reply omitted ${unanswered.length} of ${sent.length} requested files`,
+          severity,
+        ),
+      )
+    }
+
     return findings
   }
 

@@ -103,7 +103,91 @@ export function finishReply(request: AiRequest, text: string): AiReply {
   if (value === undefined) {
     return { ok: false, error: `reply was not the requested JSON: ${truncate(text, 200)}` }
   }
+
+  // Parsing is not conforming. A reply that is JSON but not the requested
+  // shape — `{}` where `matches` was required — would otherwise flow into a
+  // provider as a value, and a gating provider reading a missing field as
+  // absence-of-problem is the gate passing exactly when its judge mumbled.
+  const mismatch = schemaMismatch(value, request.schema)
+  if (mismatch !== undefined) {
+    return { ok: false, error: `reply did not match the requested schema: ${mismatch}` }
+  }
   return { ok: true, value, raw: text }
+}
+
+/**
+ * First structural mismatch between a value and a JSON Schema, or undefined.
+ *
+ * Deliberately a small hand-rolled subset — `type`, `properties`, `required`,
+ * `items`, `enum` — matching what provider reply schemas actually use, rather
+ * than a schema-validator dependency. Keywords outside the subset are ignored,
+ * so an exotic schema degrades to a laxer check, never a false rejection.
+ */
+export function schemaMismatch(value: JsonValue, schema: JsonObject, at = '$'): string | undefined {
+  const allowed = schema['enum']
+  if (Array.isArray(allowed) && !allowed.some((entry) => entry === value)) {
+    return `${at} must be one of ${JSON.stringify(allowed)}`
+  }
+
+  const type = schema['type']
+  if (type !== undefined) {
+    const types = Array.isArray(type) ? type : [type]
+    if (!types.some((entry) => typeof entry === 'string' && matchesType(value, entry))) {
+      return `${at} must have type ${types.join(' | ')}, got ${typeNameOf(value)}`
+    }
+  }
+
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const required = schema['required']
+    if (Array.isArray(required)) {
+      for (const key of required) {
+        if (typeof key === 'string' && !(key in value)) return `${at} is missing '${key}'`
+      }
+    }
+    const properties = schema['properties']
+    if (properties !== null && typeof properties === 'object' && !Array.isArray(properties)) {
+      for (const [key, propertySchema] of Object.entries(properties)) {
+        const child = value[key]
+        if (child === undefined) continue
+        if (propertySchema === null || typeof propertySchema !== 'object') continue
+        const mismatch = schemaMismatch(child, propertySchema as JsonObject, `${at}.${key}`)
+        if (mismatch !== undefined) return mismatch
+      }
+    }
+  }
+
+  if (Array.isArray(value)) {
+    const items = schema['items']
+    if (items !== null && typeof items === 'object' && !Array.isArray(items)) {
+      for (const [index, entry] of value.entries()) {
+        const mismatch = schemaMismatch(entry, items as JsonObject, `${at}[${index}]`)
+        if (mismatch !== undefined) return mismatch
+      }
+    }
+  }
+
+  return undefined
+}
+
+function matchesType(value: JsonValue, type: string): boolean {
+  switch (type) {
+    case 'null':
+      return value === null
+    case 'array':
+      return Array.isArray(value)
+    case 'object':
+      return value !== null && typeof value === 'object' && !Array.isArray(value)
+    case 'integer':
+      return typeof value === 'number' && Number.isInteger(value)
+    default:
+      return typeof value === type
+  }
+}
+
+function typeNameOf(value: JsonValue): string {
+  if (value === null) return 'null'
+  if (Array.isArray(value)) return 'array'
+  return typeof value
 }
 
 export function truncate(text: string, limit: number): string {

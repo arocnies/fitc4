@@ -46,6 +46,10 @@ export {
   EVIDENCE_LIMIT,
   PROVIDER_ID as ARCHITECTURE_RULES_PROVIDER_ID,
 } from './providers/architecture-rules.ts'
+export type {
+  ArchitectureRuleId,
+  ArchitectureRulesOptions,
+} from './providers/architecture-rules.ts'
 export { sourceRoot, ownerOf, PROVIDER_ID as SOURCE_ROOT_PROVIDER_ID } from './providers/source-root.ts'
 export {
   typescriptImports,
