@@ -46,5 +46,12 @@
     "dependency-rules",
     "lint",
     "boundaries"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arocnies/soffit.git"
+  },
+  "homepage": "https://github.com/arocnies/soffit#readme",
+  "bugs": "https://github.com/arocnies/soffit/issues",
+  "author": "Aaron Nies"
 }
