@@ -1,0 +1,49 @@
+specification {
+  element system
+  element container
+  element component
+}
+
+model {
+  fixture = system 'Fixture' {
+    app = container 'App' {
+      core = component 'Core' {
+        metadata {
+          sources 'src/core/**'
+        }
+      }
+
+      interface = component 'Interface' {
+        metadata {
+          sources 'src/interface/**'
+        }
+      }
+
+      extra = component 'Extra' {
+        metadata {
+          sources 'src/extra/**'
+        }
+      }
+
+      sharedA = component 'Shared A' {
+        metadata {
+          sources 'src/shared/**'
+        }
+      }
+
+      sharedB = component 'Shared B' {
+        metadata {
+          sources 'src/shared/**'
+        }
+      }
+    }
+  }
+
+  fixture.app.interface -> fixture.app.core
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

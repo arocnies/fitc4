@@ -1,0 +1,17 @@
+{
+  "name": "soffit-repo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "example"
+  ],
+  "scripts": {
+    "verify": "npm run check --workspaces",
+    "smoke": "bash scripts/smoke.sh"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

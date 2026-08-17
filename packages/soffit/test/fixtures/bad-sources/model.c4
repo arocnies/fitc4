@@ -1,0 +1,32 @@
+specification {
+  element system
+  element component
+}
+
+model {
+  fixture = system 'Fixture' {
+    core = component 'Core' {
+      metadata {
+        sources './src/core/**'
+      }
+    }
+
+    ghost = component 'Ghost' {
+      metadata {
+        sources 'src/nowhere/**'
+      }
+    }
+
+    wild = component 'Wild' {
+      metadata {
+        sources 'src/*/thing/**'
+      }
+    }
+  }
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

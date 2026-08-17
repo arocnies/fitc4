@@ -1,0 +1,28 @@
+specification {
+  element system
+  element component
+}
+
+model {
+  fixture = system 'Fixture' {
+    core = component 'Core' {
+      metadata {
+        sources 'src/core/**'
+      }
+    }
+
+    interface = component 'Interface' {
+      metadata {
+        sources 'src/interface/**'
+      }
+    }
+  }
+
+  fixture.interface -> fixture.core
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

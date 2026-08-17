@@ -1,0 +1,41 @@
+specification {
+  element system
+  element container
+  element component
+}
+
+model {
+  fixture = system 'Fixture' {
+    app = container 'App' {
+      metadata {
+        sources 'src/app/**'
+      }
+
+      core = component 'Core' {
+        metadata {
+          sources 'src/app/core/**'
+        }
+      }
+    }
+
+    web = container 'Web' {
+      metadata {
+        sources 'src/web/**'
+      }
+
+      ui = component 'Ui' {
+        metadata {
+          sources 'src/web/ui/**'
+        }
+      }
+    }
+  }
+
+  fixture.web -> fixture.app
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "name": "soffit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Check an implementation against a LikeC4 architecture contract",
+  "type": "module",
+  "bin": {
+    "soffit": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema/soffit.config.schema.json": "./schema/soffit.config.schema.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "schema"
+  ],
+  "scripts": {
+    "check": "npm run typecheck && npm run build && npm run test",
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "likec4": "1.59.2",
+    "typescript": "^6.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=22.22.3"
+  },
+  "keywords": [
+    "architecture",
+    "likec4",
+    "c4",
+    "dependency-rules",
+    "lint",
+    "boundaries"
+  ]
+}

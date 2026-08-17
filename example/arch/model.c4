@@ -1,0 +1,36 @@
+specification {
+  element system
+  element container
+  element component
+}
+
+model {
+  example = system 'Example App' {
+    app = container 'App' {
+      core = component 'Core' {
+        metadata {
+          sources 'src/core/**'
+        }
+      }
+
+      interface = component 'Interface' {
+        metadata {
+          sources 'src/interface/**'
+        }
+      }
+    }
+  }
+
+  example.app.interface -> example.app.core 'uses' {
+    metadata {
+      owner 'architecture'
+    }
+  }
+}
+
+views {
+  view index of example {
+    include *
+    autoLayout TopBottom
+  }
+}

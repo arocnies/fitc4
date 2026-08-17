@@ -1,0 +1,211 @@
+import { describe, expect, test } from 'vitest'
+
+import { findingId, namespaced, relationshipId } from '../src/ids.ts'
+import {
+  declaredRelationships,
+  hasRelationship,
+  isAncestorOf,
+  isSameOrNested,
+  loadModel,
+  normalizeSources,
+  ownershipPrefixes,
+  toPrefix,
+} from '../src/model.ts'
+import { ownerOf } from '../src/providers/source-root.ts'
+import { fixturePath } from './helpers.ts'
+
+describe('sources normalization', () => {
+  // LikeC4 stores metadata as `string | NonEmptyArray<string>` and collapses a
+  // single-element list back to a bare string, so both shapes reach the reader.
+  test('accepts a bare string', () => {
+    expect(normalizeSources('src/core/**')).toEqual(['src/core/**'])
+  })
+
+  test('accepts a list', () => {
+    expect(normalizeSources(['src/api/**', 'src/api2/**'])).toEqual(['src/api/**', 'src/api2/**'])
+  })
+
+  test('treats missing metadata as no ownership', () => {
+    expect(normalizeSources(undefined)).toEqual([])
+    expect(normalizeSources(null)).toEqual([])
+  })
+
+  test('ignores non-string entries', () => {
+    expect(normalizeSources(['src/core/**', 7])).toEqual(['src/core/**'])
+  })
+})
+
+describe('toPrefix', () => {
+  test.each([
+    ['src/core/**', 'src/core/'],
+    ['src/core', 'src/core/'],
+    ['src/core/', 'src/core/'],
+    ['./src/core/**', 'src/core/'],
+    ['/src/core/**', 'src/core/'],
+    ['src\\core\\**', 'src/core/'],
+    ['  src/core/**  ', 'src/core/'],
+  ])('normalizes %j to %j', (declared, prefix) => {
+    expect(toPrefix(declared)).toEqual({ prefix })
+  })
+
+  // A prefix the matcher cannot honour must be rejected loudly. Silently
+  // producing a prefix that matches nothing is what makes the gate fail open.
+  test.each([
+    ['src/core/*', 'wildcard'],
+    ['src/**/*.ts', 'wildcard'],
+    ['src/*/core/**', 'wildcard'],
+    ['src/core/health.ts', 'file'],
+    ['**', 'whole repository'],
+    ['/**', 'whole repository'],
+    ['', 'empty'],
+  ])('rejects %j', (declared, hint) => {
+    const result = toPrefix(declared)
+    expect(result).toHaveProperty('reason')
+    expect('reason' in result ? result.reason : '').toContain(hint)
+  })
+})
+
+describe('ownership prefixes', () => {
+  test('strips the glob suffix and normalizes to a directory prefix', async () => {
+    const { model } = await loadModel(fixturePath('ok'))
+    const { prefixes } = ownershipPrefixes(model)
+
+    expect(prefixes).toContainEqual({
+      elementId: 'fixture.app.core',
+      prefix: 'src/core/',
+      declared: 'src/core/**',
+    })
+  })
+
+  test('an element with no sources contributes no prefix', async () => {
+    const { model } = await loadModel(fixturePath('ok'))
+    const { prefixes } = ownershipPrefixes(model)
+
+    // The system and container elements are deliberately unowned.
+    expect(prefixes.map((entry) => entry.elementId)).toEqual([
+      'fixture.app.core',
+      'fixture.app.interface',
+    ])
+  })
+
+  test('an unsupported source is rejected rather than silently ignored', async () => {
+    const { model } = await loadModel(fixturePath('bad-sources'))
+    const { rejected } = ownershipPrefixes(model)
+
+    expect(rejected.map((entry) => entry.elementId)).toEqual(['fixture.wild'])
+  })
+})
+
+describe('ownerOf', () => {
+  const prefixes = [
+    { elementId: 'app.core', prefix: 'src/core/', declared: 'src/core/**' },
+    { elementId: 'app.core.inner', prefix: 'src/core/inner/', declared: 'src/core/inner/**' },
+    { elementId: 'app.a', prefix: 'src/shared/', declared: 'src/shared/**' },
+    { elementId: 'app.b', prefix: 'src/shared/', declared: 'src/shared/**' },
+  ]
+
+  test('resolves a file to its owning element', () => {
+    expect(ownerOf('src/core/health.ts', prefixes)).toEqual({
+      status: 'resolved',
+      elementId: 'app.core',
+    })
+  })
+
+  test('longest prefix wins, so a nested element beats its parent', () => {
+    expect(ownerOf('src/core/inner/deep.ts', prefixes)).toEqual({
+      status: 'resolved',
+      elementId: 'app.core.inner',
+    })
+  })
+
+  test('an equal-length tie is ambiguous', () => {
+    expect(ownerOf('src/shared/util.ts', prefixes)).toEqual({
+      status: 'ambiguous',
+      candidates: ['app.a', 'app.b'],
+    })
+  })
+
+  test('a file under no prefix is unresolved', () => {
+    expect(ownerOf('src/orphan/thing.ts', prefixes)).toEqual({ status: 'unresolved' })
+  })
+
+  // The trailing slash on every prefix is what stops `src/` claiming
+  // `src-legacy/`. Locked in so a future simplification cannot drop it.
+  test('a sibling directory sharing a name prefix is not claimed', () => {
+    expect(ownerOf('src-legacy/old.ts', [prefixes[0] as (typeof prefixes)[number]])).toEqual({
+      status: 'unresolved',
+    })
+  })
+})
+
+describe('containment', () => {
+  test('recognizes ancestry from the FQN', () => {
+    expect(isAncestorOf('app', 'app.core')).toBe(true)
+    expect(isAncestorOf('app.core', 'app')).toBe(false)
+    expect(isAncestorOf('app', 'apple.core')).toBe(false)
+  })
+
+  test('same-or-nested is symmetric', () => {
+    expect(isSameOrNested('app.core', 'app.core')).toBe(true)
+    expect(isSameOrNested('app', 'app.core')).toBe(true)
+    expect(isSameOrNested('app.core', 'app')).toBe(true)
+    expect(isSameOrNested('app.core', 'web.ui')).toBe(false)
+  })
+
+  test('a relationship between parents covers traffic between their descendants', async () => {
+    const { model } = await loadModel(fixturePath('nested'))
+    const declared = declaredRelationships(model)
+
+    expect(hasRelationship(declared, 'fixture.web.ui', 'fixture.app.core')?.id).toBe(
+      'fixture.web::_::fixture.app',
+    )
+    // Still directional.
+    expect(hasRelationship(declared, 'fixture.app.core', 'fixture.web.ui')).toBeUndefined()
+  })
+})
+
+describe('stable identifiers', () => {
+  // A typed relationship still embeds its kind, so a model that later adopts
+  // relationship kinds keeps distinct identities per kind.
+  test('a relationship id is derived from author-controlled names', () => {
+    expect(relationshipId('app.iface', 'app.core', 'imports')).toBe('app.iface::imports::app.core')
+  })
+
+  // Plain `a -> b` is the idiomatic LikeC4 default and carries no kind.
+  test('an untyped relationship still gets a stable id', () => {
+    expect(relationshipId('app.iface', 'app.core', null)).toBe('app.iface::_::app.core')
+  })
+
+  test('the model never surfaces a LikeC4 hash as a relationship id', async () => {
+    const { model } = await loadModel(fixturePath('ok'))
+    const { byId } = declaredRelationships(model)
+
+    expect([...byId.keys()]).toEqual(['fixture.app.interface::_::fixture.app.core'])
+  })
+
+  test('finding ids carry provider, rule, and subject', () => {
+    expect(findingId('architecture-rules', 'unmapped-source', 'src/x.ts')).toBe(
+      'architecture-rules/unmapped-source/src/x.ts',
+    )
+  })
+
+  test('namespacing is idempotent', () => {
+    expect(namespaced('p', 'file:x')).toBe('p/file:x')
+    expect(namespaced('p', 'p/file:x')).toBe('p/file:x')
+  })
+})
+
+describe('native model validation', () => {
+  test('a valid workspace reports no errors', async () => {
+    const { errors } = await loadModel(fixturePath('ok'))
+    expect(errors).toEqual([])
+  })
+
+  // A deleted model.c4, a wrong path, or an over-broad exclude would otherwise
+  // yield zero ownership prefixes, no errors, and a green build.
+  test('a workspace with no model is an error, not an empty pass', async () => {
+    const { errors } = await loadModel(fixturePath('no-model'))
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toContain('no LikeC4 elements')
+  })
+})
