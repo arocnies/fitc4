@@ -98,7 +98,7 @@ The model itself lives wherever `model` points. It is authored architecture docu
 | `ambiguous-source` | error | Two elements claim the same source file |
 | `missing-relationship` | error | Code crosses a boundary the model does not declare |
 | `relationship-direction` | error | The model declares only the opposite direction |
-| `unresolved-import` | warning | A relative import resolves to nothing, so it cannot be checked |
+| `unresolved-import` | warning | An import resolves to nothing — a broken path, a dead tsconfig alias, an undeclared package — so it cannot be checked |
 | `invalid-sources` | error | Ownership metadata the prefix matcher cannot honour |
 | `unmatched-sources` | error | Ownership metadata that matches no scanned file |
 | `duplicate-relationship` | info | Two relationships share one stable identity |
@@ -107,6 +107,8 @@ The model itself lives wherever `model` points. It is authored architecture docu
 | `provider-failure` | error | A provider threw; other providers still ran |
 
 The last six exist so the gate cannot fail open. A typo in `sources` used to make every prefix stop matching, which turned architecture errors into a clean exit 0.
+
+The severities are defaults, not policy: in a `.ts` config, `architectureRules({ severity: { 'unmapped-source': 'error' } })` rebuilds the rules provider with new unowned code failing the gate — worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. Every rule id in the table accepts an override.
 
 ## The model
 
@@ -121,11 +123,13 @@ The scanner walks `scanRoots` on disk rather than a TypeScript `Program`'s file 
 Everything the CLI does is reachable from the package entry point, so a host project can assert on architecture inside its own test suite instead of shelling out.
 
 ```ts
-import { findConfig, loadConfig, pipelineConfig, runPipeline, exitCodeFor } from 'fitc4'
+import { findConfig, resolveConfig, pipelineConfig, runPipeline, exitCodeFor } from 'fitc4'
 
-const result = await runPipeline(pipelineConfig(loadConfig(findConfig(process.cwd()))))
+const result = await runPipeline(pipelineConfig(await resolveConfig(findConfig(process.cwd()))))
 expect(exitCodeFor(result)).toBe(0)
 ```
+
+`resolveConfig` loads all three config forms — a `.ts` or `.js` config would make the JSON-only `loadConfig` throw.
 
 Providers are plain functions — `ScanProvider`, `ResolveProvider`, `ValidateProvider` — composed into phase arrays. `pipelineConfig` is the batteries-included default; a caller wanting a different scanner builds its own `PipelineConfig` and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system.
 
@@ -184,7 +188,7 @@ FitC4 is also self-hosting: [`packages/fitc4/arch/model.c4`](packages/fitc4/arch
 
 `fitc4` depends on TypeScript 6 at runtime, because 7.0.2 does not expose the classic compiler API the import scanner needs; the example typechecks with TypeScript 7. TypeScript 6 also no longer auto-includes `@types/*`, so [`packages/fitc4/tsconfig.json`](packages/fitc4/tsconfig.json) lists them explicitly.
 
-`npm run build -w fitc4` emits `dist/` — JavaScript, declarations, and source maps — from [`tsconfig.build.json`](packages/fitc4/tsconfig.build.json). Node strips types natively, so `node src/cli.ts` runs here, but a published package cannot assume its consumers are on Node 26. The sources import each other with `.ts` extensions, which `rewriteRelativeImportExtensions` converts on emit. `build` runs as part of `check` so the emit path cannot rot unnoticed, and as `prepare` so a fresh `npm install` produces `dist/` — npm links a `bin` only when its target exists, so without it a clean clone leaves `example` unable to find the `fitc4` command.
+`npm run build -w fitc4` cleans and re-emits `dist/` — JavaScript and declarations, no source maps since `src/` does not ship — from [`tsconfig.build.json`](packages/fitc4/tsconfig.build.json). Node strips types natively, so `node src/cli.ts` runs here, but a published package cannot assume its consumers are on Node 26. The sources import each other with `.ts` extensions, which `rewriteRelativeImportExtensions` converts on emit. `build` runs as part of `check` so the emit path cannot rot unnoticed, and as `prepare` so a fresh `npm install` produces `dist/` — npm links a `bin` only when its target exists, so without it a clean clone leaves `example` unable to find the `fitc4` command.
 
 The package is ready to publish but unpublished; `fitc4` is currently unregistered on npm.
 

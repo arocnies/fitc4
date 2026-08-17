@@ -31,6 +31,9 @@ export default defineConfig({
     // part of the gate instead of advisory.
     aiOwnershipAdvisor({ exec: ai }),
     // Judges each described element's implementation against its description.
+    // Unlike the advisor, this calls the CLI once per described element even
+    // when the repository is clean (two calls here); `cached` makes every
+    // rerun with unchanged files free.
     aiSemanticReview({ exec: ai }),
   ],
 })

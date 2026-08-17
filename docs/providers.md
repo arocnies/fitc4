@@ -91,6 +91,23 @@ export default defineConfig({
 
 Discovery checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — in the working directory and its `.fitc4/`, then each ancestor. Two of the three in one directory is an error, because whichever lost a tiebreak would be a silently ignored config. `defaultResolve` is exported the same way. Scan has no array export because its provider is built from config values; rebuild it with `typescriptImports({ tsconfigPath, roots })` under `TYPESCRIPT_IMPORTS_PROVIDER_ID`. Every report names the providers that composed each phase, so a replaced phase is visible in the output, not only in the config.
 
+The standard rules take per-rule severity overrides. `architectureRules()` with no options is what `defaultValidate` carries; rebuilding the entry tunes it:
+
+```ts
+import { architectureRules, ARCHITECTURE_RULES_PROVIDER_ID } from 'fitc4'
+
+validate: [
+  {
+    id: ARCHITECTURE_RULES_PROVIDER_ID,
+    // Once adoption is done, new unowned code should fail the gate — its
+    // dependencies are never boundary-checked while it stays unowned.
+    run: architectureRules({ severity: { 'unmapped-source': 'error' } }),
+  },
+]
+```
+
+Any rule id from the rules table can be promoted or softened; the standard severities apply where no override is given.
+
 ## AI-assisted providers (`fitc4/ai`)
 
 A separate entry point on purpose: nothing in `fitc4` imports it, the core gate stays deterministic, and composing an AI provider into a phase is an explicit act in your config file. The adapters shell out to **locally installed agent CLIs** — your own `claude` or `codex` install, login, and billing. FitC4 never holds an API key.
@@ -116,7 +133,7 @@ export default defineConfig({
 })
 ```
 
-**The standing contract.** AI findings are additive — nothing an AI says can suppress or rewrite a deterministic finding — and each provider's `severity` option says how load-bearing its judgment is (`info` for the advisor, `warning` for the review; advisory either way). Setting `severity: 'error'` is the explicit act of making that provider part of the gate. Nondeterminism is fine when it is chosen. An unavailable or logged-out CLI is one visible `ai-unavailable` finding — a `warning` behind an advisory provider, but an `error` behind a gating one, because a gate whose judge is absent must not pass. Truncated inputs escalate the same way.
+**The standing contract.** AI findings are additive — nothing an AI says can suppress or rewrite a deterministic finding — and each provider's `severity` option says how load-bearing its judgment is (`info` for the advisor, `warning` for the review; advisory either way). Setting `severity: 'error'` is the explicit act of making that provider part of the gate. Nondeterminism is fine when it is chosen. An unavailable or logged-out CLI is one visible `ai-unavailable` finding — a `warning` behind an advisory provider, but an `error` behind a gating one, because a gate whose judge is absent must not pass. Truncated inputs escalate the same way, and so do mumbled verdicts: a reply that parses as JSON but does not match the requested schema is a failure, not a value, and a gating advisor whose reply skips files it was asked about fails rather than letting them pass unjudged.
 
 **The exec layer.** `AiExec` is the one interface: `claudeCli()` runs `claude --print` isolated (no user settings, no MCP servers, and — by default — no tools, so the reply can only come from the prefilled context); `codexCli()` runs `codex exec` ephemeral with a read-only sandbox and schema-enforced JSON output. `agentic: true` on a request permits read-only exploration. A custom adapter is ~40 lines: implement `id` and `run`, return `{ ok, value }`.
 
@@ -126,5 +143,5 @@ export default defineConfig({
 |---|---|---|
 | `ownership-suggestion` | the provider's `severity` (default info) | An unowned file, with the element the AI thinks should own it |
 | `description-drift` | the provider's `severity` (default warning) | An element's implementation may not match its declared description |
-| `ai-unavailable` | warning; error when the provider gates | The CLI failed, was missing, or was logged out; the provider did not run |
+| `ai-unavailable` | warning; error when the provider gates | The CLI failed, was missing or logged out, or replied off-schema; the provider's judgment is absent |
 | `ai-truncated` | info; error when the provider gates | Inputs beyond a configured limit were not reviewed |
