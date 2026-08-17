@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "soffit configuration",
+  "title": "fitc4 configuration",
   "description": "Paths are resolved relative to this file. Providers are still composed in code; there is no command-provider configuration yet.",
   "type": "object",
   "required": ["version", "repositoryRoot", "model", "scanRoots", "tsconfig"],

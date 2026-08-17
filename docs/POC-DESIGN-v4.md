@@ -117,11 +117,11 @@ Build exactly this:
 | `architecture-rules` | `unmapped-source`, `ambiguous-source`, `missing-relationship`, `relationship-direction` |
 | Two fixtures | One advisory finding; one that throws, to pin down failure semantics |
 
-Deferred: command providers and `soffit.config.json`, advisory-versus-blocking gating, git and `changedPaths`, Code-Graph-RAG, and the stability provider.
+Deferred: command providers and `fitc4.config.json`, advisory-versus-blocking gating, git and `changedPaths`, Code-Graph-RAG, and the stability provider.
 
 Stability is deferred despite being cheap. It is model-only, exercises no boundary the four rules do not already cover, and computes 0/1 against the current two-element model.
 
-Version 3's gate policy — "external command providers are advisory by default" — has no mechanism to attach to once commands are deferred. It is inert until `soffit.config.json` exists.
+Version 3's gate policy — "external command providers are advisory by default" — has no mechanism to attach to once commands are deferred. It is inert until `fitc4.config.json` exists.
 
 ## Questions the Prototype Must Answer
 
@@ -225,7 +225,7 @@ Untyped relationships come back from the model API with `kind: null`, so their s
 
 ### Configuration exists, providers are still code
 
-`soffit.config.json` now holds the project-specific inputs — `repositoryRoot`, `model`, `scanRoots`, `tsconfig` — with a `$schema` alongside it. Paths resolve relative to the config file, so moving the workspace cannot silently repoint the scan.
+`fitc4.config.json` now holds the project-specific inputs — `repositoryRoot`, `model`, `scanRoots`, `tsconfig` — with a `$schema` alongside it. Paths resolve relative to the config file, so moving the workspace cannot silently repoint the scan.
 
 Validation is strict and hand-written: an unknown `version`, an empty `scanRoots`, a blank path, or malformed JSON is an error. A config that quietly fell back to defaults would scan the wrong tree and report a clean pass — the same fail-open this document keeps closing.
 
@@ -250,20 +250,20 @@ Three changes came out of writing the set down:
 The prototype was one `arch` workspace holding both the engine and the model it checked. That conflation hid two defects that only exist once the tool is installed rather than colocated, so the split is now real:
 
 ```text
-packages/soffit/   the library and CLI
+packages/fitc4/   the library and CLI
 example/           a project it checks, standing in for a consumer
-  soffit.config.json
+  fitc4.config.json
   arch/            model.c4, likec4.config.json
 docs/              this file
 ```
 
-`example` depends on `soffit` as a workspace package and invokes it through `node_modules/.bin`, so the checked-in example exercises the consumer's path rather than a shortcut.
+`example` depends on `fitc4` as a workspace package and invokes it through `node_modules/.bin`, so the checked-in example exercises the consumer's path rather than a shortcut.
 
-**The name.** `arch` is taken on npm and, worse, means CPU architecture in Node (`process.arch`). `soffit` — the underside of an arch — is unregistered. The package stays `private: true` until the name is claimed.
+**The name.** `arch` is taken on npm and, worse, means CPU architecture in Node (`process.arch`). `fitc4` — the underside of an arch — is unregistered. The package stays `private: true` until the name is claimed.
 
-**Config discovery was anchored to the wrong thing, twice.** It started from `import.meta.url`, which resolves inside `node_modules` once installed; it now starts from `process.cwd()`. Then walking *up* from the working directory turned out to find a config nested in a subdirectory only from inside that subdirectory, which is not where anyone stands — discovery now checks `./soffit.config.json` and `./.soffit/soffit.config.json` at each level, root-adjacent winning so a project that hoists its config is never silently overruled by the copy it left behind. `--config` overrides discovery entirely, because a tool that quietly checked a different repository than the one named would report the wrong result confidently.
+**Config discovery was anchored to the wrong thing, twice.** It started from `import.meta.url`, which resolves inside `node_modules` once installed; it now starts from `process.cwd()`. Then walking *up* from the working directory turned out to find a config nested in a subdirectory only from inside that subdirectory, which is not where anyone stands — discovery now checks `./fitc4.config.json` and `./.fitc4/fitc4.config.json` at each level, root-adjacent winning so a project that hoists its config is never silently overruled by the copy it left behind. `--config` overrides discovery entirely, because a tool that quietly checked a different repository than the one named would report the wrong result confidently.
 
-**The tool owns a config file, not a directory.** `soffit.config.json` goes at the project root, beside `tsconfig.json`, and `.soffit/` exists only as a fallback for projects that would rather not add a root-level file. The model is deliberately not in either: `model.c4` is authored architecture documentation with value independent of this tool — reviewable in a pull request, renderable by LikeC4 — and a hidden tool directory is where machine state goes, not where a design contract goes. The `model` setting points wherever the team wants it. The JSON schema ships from the package (`schema/`) rather than being copied into each consumer.
+**The tool owns a config file, not a directory.** `fitc4.config.json` goes at the project root, beside `tsconfig.json`, and `.fitc4/` exists only as a fallback for projects that would rather not add a root-level file. The model is deliberately not in either: `model.c4` is authored architecture documentation with value independent of this tool — reviewable in a pull request, renderable by LikeC4 — and a hidden tool directory is where machine state goes, not where a design contract goes. The `model` setting points wherever the team wants it. The JSON schema ships from the package (`schema/`) rather than being copied into each consumer.
 
 **`dist/` is what ships.** Node strips types natively, so `node src/cli.ts` runs here, but a published package cannot assume its consumers are on Node 26. The sources import each other with `.ts` extensions; `rewriteRelativeImportExtensions` converts them on emit. `build` runs inside `check` so the emit path cannot rot unnoticed.
 
@@ -273,7 +273,7 @@ TypeScript 6 and LikeC4 became runtime `dependencies` rather than devDependencie
 
 ### Still unanswered
 
-Questions 3, 5, and 6 remain open, and will stay near-vacuous until the prototype runs against something larger than a two-component model. The cheapest fix is to make `soffit` self-hosting: give `packages/soffit` its own `arch/` directory and scan `packages/soffit/src`.
+Questions 3, 5, and 6 remain open, and will stay near-vacuous until the prototype runs against something larger than a two-component model. The cheapest fix is to make `fitc4` self-hosting: give `packages/fitc4` its own `arch/` directory and scan `packages/fitc4/src`.
 
 ## Unchanged from Version 3
 

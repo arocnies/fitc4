@@ -1,9 +1,9 @@
-# CI for the soffit monorepo.
+# CI for the fitc4 monorepo.
 #
 # verify: runs `check` in every workspace — typecheck, build, and unit tests
-#         for packages/soffit, plus format/model validation, typecheck, tests,
-#         and the soffit gate itself for example/.
-# smoke:  packs the soffit tarball, installs it into a throwaway consumer, and
+#         for packages/fitc4, plus format/model validation, typecheck, tests,
+#         and the fitc4 gate itself for example/.
+# smoke:  packs the fitc4 tarball, installs it into a throwaway consumer, and
 #         asserts the CLI, library entry point, schema export, and pass/fail
 #         gate behave the way a real npm consumer would see them.
 #

@@ -1,5 +1,5 @@
 {
   "$schema": "https://likec4.dev/schemas/config.json",
-  "name": "soffit-architecture",
+  "name": "fitc4-architecture",
   "exclude": ["**/node_modules/**"]
 }

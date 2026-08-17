@@ -1,15 +1,15 @@
 {
-  "name": "soffit",
+  "name": "fitc4",
   "version": "0.1.0",
   "description": "Check an implementation against a LikeC4 architecture contract",
   "license": "MIT",
   "author": "Aaron Nies",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/arocnies/soffit.git"
+    "url": "git+https://github.com/arocnies/fitc4.git"
   },
-  "homepage": "https://github.com/arocnies/soffit#readme",
-  "bugs": "https://github.com/arocnies/soffit/issues",
+  "homepage": "https://github.com/arocnies/fitc4#readme",
+  "bugs": "https://github.com/arocnies/fitc4/issues",
   "keywords": [
     "architecture",
     "likec4",
@@ -23,7 +23,7 @@
     "node": ">=22.22.3"
   },
   "bin": {
-    "soffit": "dist/cli.js"
+    "fitc4": "dist/cli.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,7 +32,7 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./schema/soffit.config.schema.json": "./schema/soffit.config.schema.json",
+    "./schema/fitc4.config.schema.json": "./schema/fitc4.config.schema.json",
     "./package.json": "./package.json"
   },
   "files": [

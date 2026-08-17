@@ -1,8 +1,8 @@
-# soffit
+# FitC4
 
 Check an implementation against a LikeC4 architecture contract.
 
-A LikeC4 model says which components exist and which may depend on which. `soffit` scans the code, maps every file and import onto that model, and fails the build where the two disagree. The model is the source of truth; the code is the thing being checked.
+A LikeC4 model says which components exist and which may depend on which. `fitc4` scans the code, maps every file and import onto that model, and fails the build where the two disagree. The model is the source of truth; the code is the thing being checked.
 
 ## A complete example
 
@@ -38,11 +38,11 @@ model {
 }
 ```
 
-**`example/soffit.config.json`** — where things are. Paths resolve relative to this file.
+**`example/fitc4.config.json`** — where things are. Paths resolve relative to this file.
 
 ```json
 {
-  "$schema": "../packages/soffit/schema/soffit.config.schema.json",
+  "$schema": "../packages/fitc4/schema/fitc4.config.schema.json",
   "version": 1,
   "repositoryRoot": ".",
   "model": "arch",
@@ -51,12 +51,12 @@ model {
 }
 ```
 
-The `$schema` points into this workspace because the example lives beside the package. Installed from npm it is `./node_modules/soffit/schema/soffit.config.schema.json` — the schema ships with the package rather than being copied into your repository.
+The `$schema` points into this workspace because the example lives beside the package. Installed from npm it is `./node_modules/fitc4/schema/fitc4.config.schema.json` — the schema ships with the package rather than being copied into your repository.
 
 **Run it.**
 
 ```bash
-npx soffit
+npx fitc4
 ```
 
 ```text
@@ -80,7 +80,7 @@ Exit code 1. `--json` emits the full result instead of the report; `--config <pa
 
 ## Where things live
 
-`soffit.config.json` goes at your project root, beside `tsconfig.json`. Discovery starts at the working directory and checks `soffit.config.ts`, `soffit.config.js`, then `soffit.config.json` — directly, then under `.soffit/` — repeating up each ancestor, so the command works from the project root or anywhere inside it. The root-level file wins over `.soffit/`, and two config files in one directory is an error rather than a silent choice.
+`fitc4.config.json` goes at your project root, beside `tsconfig.json`. Discovery starts at the working directory and checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — directly, then under `.fitc4/` — repeating up each ancestor, so the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.
 
 A `.ts`/`.js` config unlocks custom providers: it default-exports the same fields plus optional `scan`, `resolve`, and `validate` provider arrays. A phase that is present replaces the preset for that phase; absent means the default — merge semantics are yours, in your config file, where you can see them. See [`docs/providers.md`](docs/providers.md) for the provider contract and a worked example.
 
@@ -117,7 +117,7 @@ The scanner walks `scanRoots` on disk rather than a TypeScript `Program`'s file 
 Everything the CLI does is reachable from the package entry point, so a host project can assert on architecture inside its own test suite instead of shelling out.
 
 ```ts
-import { findConfig, loadConfig, pipelineConfig, runPipeline, exitCodeFor } from 'soffit'
+import { findConfig, loadConfig, pipelineConfig, runPipeline, exitCodeFor } from 'fitc4'
 
 const result = await runPipeline(pipelineConfig(loadConfig(findConfig(process.cwd()))))
 expect(exitCodeFor(result)).toBe(0)
@@ -127,7 +127,7 @@ Providers are plain functions — `ScanProvider`, `ResolveProvider`, `ValidatePr
 
 ## The provider vocabulary
 
-The one contract that crosses provider boundaries is the `kind` on an `Observation` or a `Ref`. A scanner emitting `import` where the rules read `dependency` produces no findings and a clean exit — indistinguishable from a healthy repository. So the standard set is named in [`kinds.ts`](packages/soffit/src/kinds.ts) rather than left as string literals in two files.
+The one contract that crosses provider boundaries is the `kind` on an `Observation` or a `Ref`. A scanner emitting `import` where the rules read `dependency` produces no findings and a clean exit — indistinguishable from a healthy repository. So the standard set is named in [`kinds.ts`](packages/fitc4/src/kinds.ts) rather than left as string literals in two files.
 
 | `Observation.kind` | Meaning |
 |---|---|
@@ -154,7 +154,7 @@ Kinds stay open: a provider may emit its own, and two that understand each other
 ## Developing
 
 ```text
-packages/soffit/   the library and CLI
+packages/fitc4/   the library and CLI
 example/           a project it checks
 docs/              design history
 ```
@@ -162,24 +162,24 @@ docs/              design history
 ```bash
 npm install
 npm run verify              # everything below
-npm run check -w soffit     # typecheck, build, tests
-npm run check -w example    # model validation, typecheck, tests, soffit
+npm run check -w fitc4     # typecheck, build, tests
+npm run check -w example    # model validation, typecheck, tests, fitc4
 npm run view -w example     # live LikeC4 viewer
 npm run smoke               # pack the tarball, install it into a fresh consumer, run it
 ```
 
-`example` depends on `soffit` as a workspace package and invokes it through `node_modules/.bin`, so the checked-in example exercises the same path a consumer would rather than a shortcut. That still is not the whole path: workspace symlinks ignore the `files` allowlist and parts of the `exports` map, so a packaging mistake is invisible to every workspace test. `npm run smoke` closes that gap — it packs the real tarball, installs it into a throwaway project, and asserts the CLI, the library entry point, the shipped schema, and both gate directions. Run it before publishing.
+`example` depends on `fitc4` as a workspace package and invokes it through `node_modules/.bin`, so the checked-in example exercises the same path a consumer would rather than a shortcut. That still is not the whole path: workspace symlinks ignore the `files` allowlist and parts of the `exports` map, so a packaging mistake is invisible to every workspace test. `npm run smoke` closes that gap — it packs the real tarball, installs it into a throwaway project, and asserts the CLI, the library entry point, the shipped schema, and both gate directions. Run it before publishing.
 
-`soffit` tests its own pipeline against fixture repositories in `packages/soffit/test/fixtures/`, each a miniature project with its own `model.c4` and `tsconfig.json`. It assumes nothing about how a host project tests itself.
+`fitc4` tests its own pipeline against fixture repositories in `packages/fitc4/test/fixtures/`, each a miniature project with its own `model.c4` and `tsconfig.json`. It assumes nothing about how a host project tests itself.
 
-soffit is also self-hosting: [`packages/soffit/arch/model.c4`](packages/soffit/arch/model.c4) models its own source, and `check` runs the built CLI against it. CI runs `verify` and `smoke` on Linux, node 22 and 26. Windows is untested — paths are POSIX-normalized throughout, but no Windows leg runs until there's a Windows consumer to justify it.
+FitC4 is also self-hosting: [`packages/fitc4/arch/model.c4`](packages/fitc4/arch/model.c4) models its own source, and `check` runs the built CLI against it. CI runs `verify` and `smoke` on Linux, node 22 and 26. Windows is untested — paths are POSIX-normalized throughout, but no Windows leg runs until there's a Windows consumer to justify it.
 
 ## Toolchain notes
 
-`soffit` depends on TypeScript 6 at runtime, because 7.0.2 does not expose the classic compiler API the import scanner needs; the example typechecks with TypeScript 7. TypeScript 6 also no longer auto-includes `@types/*`, so [`packages/soffit/tsconfig.json`](packages/soffit/tsconfig.json) lists them explicitly.
+`fitc4` depends on TypeScript 6 at runtime, because 7.0.2 does not expose the classic compiler API the import scanner needs; the example typechecks with TypeScript 7. TypeScript 6 also no longer auto-includes `@types/*`, so [`packages/fitc4/tsconfig.json`](packages/fitc4/tsconfig.json) lists them explicitly.
 
-`npm run build -w soffit` emits `dist/` — JavaScript, declarations, and source maps — from [`tsconfig.build.json`](packages/soffit/tsconfig.build.json). Node strips types natively, so `node src/cli.ts` runs here, but a published package cannot assume its consumers are on Node 26. The sources import each other with `.ts` extensions, which `rewriteRelativeImportExtensions` converts on emit. `build` runs as part of `check` so the emit path cannot rot unnoticed, and as `prepare` so a fresh `npm install` produces `dist/` — npm links a `bin` only when its target exists, so without it a clean clone leaves `example` unable to find the `soffit` command.
+`npm run build -w fitc4` emits `dist/` — JavaScript, declarations, and source maps — from [`tsconfig.build.json`](packages/fitc4/tsconfig.build.json). Node strips types natively, so `node src/cli.ts` runs here, but a published package cannot assume its consumers are on Node 26. The sources import each other with `.ts` extensions, which `rewriteRelativeImportExtensions` converts on emit. `build` runs as part of `check` so the emit path cannot rot unnoticed, and as `prepare` so a fresh `npm install` produces `dist/` — npm links a `bin` only when its target exists, so without it a clean clone leaves `example` unable to find the `fitc4` command.
 
-The package is `private: true` until the name is claimed on npm, where `soffit` is currently unregistered.
+The package is ready to publish but unpublished; `fitc4` is currently unregistered on npm.
 
 The design history is in [`docs/`](docs); [`POC-DESIGN-v4.md`](docs/POC-DESIGN-v4.md) is the design of record.

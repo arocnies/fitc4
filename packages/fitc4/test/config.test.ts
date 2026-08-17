@@ -14,7 +14,7 @@ afterEach(() => {
 })
 
 function writeConfig(contents: unknown): string {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'soffit-config-'))
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-config-'))
   created.push(directory)
   const configPath = path.join(directory, CONFIG_FILENAME)
   fs.writeFileSync(
@@ -121,7 +121,7 @@ describe('finding the config', () => {
   })
 
   test('reports where it looked when there is none', () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'soffit-noconfig-'))
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-noconfig-'))
     created.push(directory)
 
     // Only meaningful if no ancestor of the temp dir happens to hold one.

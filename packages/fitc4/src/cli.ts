@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The `soffit` command line entry point.
+ * The `fitc4` command line entry point.
  *
  * This module runs the pipeline on import, so nothing else in the package may
  * import it. The provider composition lives in `preset.ts` for that reason.
@@ -13,12 +13,12 @@ import { runPipeline } from './pipeline.ts'
 import { pipelineConfig } from './preset.ts'
 import { exitCodeFor, renderReport } from './report.ts'
 
-const USAGE = `Usage: soffit [options]
+const USAGE = `Usage: fitc4 [options]
 
-  --config <path>  Path to a soffit config (.ts, .js, or .json). Defaults to
-                   discovery from the working directory: soffit.config.ts,
-                   soffit.config.js, or soffit.config.json in ./, then in
-                   ./.soffit/, then the same in each ancestor. Two of the
+  --config <path>  Path to a fitc4 config (.ts, .js, or .json). Defaults to
+                   discovery from the working directory: fitc4.config.ts,
+                   fitc4.config.js, or fitc4.config.json in ./, then in
+                   ./.fitc4/, then the same in each ancestor. Two of the
                    three in one directory is an error.
   --json           Emit the full result as JSON instead of a report.
   --version        Print the version.

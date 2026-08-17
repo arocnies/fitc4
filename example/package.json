@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "npm run format:check && npm run model:validate && npm run typecheck && npm run test && npm run arch",
-    "arch": "soffit",
+    "arch": "fitc4",
     "format:check": "likec4 format --check arch",
     "model:validate": "likec4 validate arch",
     "typecheck": "tsc --noEmit",
@@ -13,6 +13,6 @@
   },
   "devDependencies": {
     "likec4": "1.59.2",
-    "soffit": "*"
+    "fitc4": "*"
   }
 }

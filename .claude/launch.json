@@ -12,12 +12,12 @@
       "port": 5173
     },
     {
-      "name": "soffit-arch",
+      "name": "fitc4-arch",
       "runtimeExecutable": "env",
       "runtimeArgs": [
         "-u", "OPENAI_API_KEY", "-u", "OPENROUTER_API_KEY", "-u", "ANTHROPIC_API_KEY",
         "-u", "GEMINI_API_KEY", "-u", "OLLAMA_HOST",
-        "npx", "likec4", "start", "packages/soffit/arch", "--port", "5174"
+        "npx", "likec4", "start", "packages/fitc4/arch", "--port", "5174"
       ],
       "port": 5174
     }

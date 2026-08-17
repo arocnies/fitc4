@@ -1,5 +1,5 @@
 /**
- * `soffit.config.{ts,js,json}` — the project-specific inputs.
+ * `fitc4.config.{ts,js,json}` — the project-specific inputs.
  *
  * The JSON form holds only what differs between repositories: where the code
  * is, where the model is, and which tsconfig describes module resolution. The
@@ -15,7 +15,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { NamedProvider, ResolveProvider, ScanProvider, ValidateProvider } from './types.ts'
 
-export const CONFIG_FILENAME = 'soffit.config.json'
+export const CONFIG_FILENAME = 'fitc4.config.json'
 export const CONFIG_VERSION = 1
 
 /**
@@ -26,9 +26,9 @@ export const CONFIG_VERSION = 1
  * a config that is silently ignored — the same fail-open as a config that
  * quietly falls back to defaults.
  */
-export const CONFIG_FILENAMES = ['soffit.config.ts', 'soffit.config.js', CONFIG_FILENAME] as const
+export const CONFIG_FILENAMES = ['fitc4.config.ts', 'fitc4.config.js', CONFIG_FILENAME] as const
 
-export interface SoffitConfig {
+export interface FitC4Config {
   /** Absolute repository root. Every reported path is relative to this. */
   repositoryRoot: string
   /** Absolute directory holding the LikeC4 workspace. */
@@ -40,14 +40,14 @@ export interface SoffitConfig {
 }
 
 /**
- * What a `soffit.config.ts` / `.js` module's default export must be.
+ * What a `fitc4.config.ts` / `.js` module's default export must be.
  *
  * The same fields as the JSON config, plus optional provider phase arrays. A
  * phase array that is present replaces the preset for that phase entirely —
  * see `pipelineConfig` — so a config that extends a phase names every provider
  * it wants, preset entries included.
  */
-export interface SoffitFileConfig {
+export interface FitC4FileConfig {
   version: number
   /** Repository root, relative to the config file. */
   repositoryRoot: string
@@ -63,7 +63,7 @@ export interface SoffitFileConfig {
 }
 
 /** A loaded config plus whichever provider phases the config file supplied. */
-export interface ResolvedConfig extends SoffitConfig {
+export interface ResolvedConfig extends FitC4Config {
   providers?: {
     scan?: NamedProvider<ScanProvider>[]
     resolve?: NamedProvider<ResolveProvider>[]
@@ -78,7 +78,7 @@ export interface ResolvedConfig extends SoffitConfig {
  * wrapping it in `defineConfig` makes a stale config a type error in the
  * project that owns it, before this package ever loads it.
  */
-export function defineConfig(config: SoffitFileConfig): SoffitFileConfig {
+export function defineConfig(config: FitC4FileConfig): FitC4FileConfig {
   return config
 }
 
@@ -89,7 +89,7 @@ export function defineConfig(config: SoffitFileConfig): SoffitFileConfig {
  * and library callers use it inside synchronous setup. The CLI goes through
  * `resolveConfig`, which handles all three forms.
  */
-export function loadConfig(configPath: string): SoffitConfig {
+export function loadConfig(configPath: string): FitC4Config {
   let raw: unknown
   try {
     raw = JSON.parse(fs.readFileSync(configPath, 'utf8'))
@@ -153,7 +153,7 @@ export async function resolveConfig(configPath: string): Promise<ResolvedConfig>
  * back to defaults would scan the wrong tree and report a clean pass — the
  * same fail-open the pipeline works hard to avoid everywhere else.
  */
-function validateFields(configPath: string, record: Record<string, unknown>): SoffitConfig {
+function validateFields(configPath: string, record: Record<string, unknown>): FitC4Config {
   if (record['version'] !== CONFIG_VERSION) {
     throw new Error(
       `${configPath}: unsupported version ${JSON.stringify(record['version'])}; expected ${CONFIG_VERSION}`,
@@ -187,12 +187,12 @@ function validateFields(configPath: string, record: Record<string, unknown>): So
  * architecture documentation with value independent of this tool, so it lives
  * wherever the `model` setting points and stays visible.
  */
-export const CONFIG_DIRECTORY = '.soffit'
+export const CONFIG_DIRECTORY = '.fitc4'
 
 /**
- * Find a soffit config, starting at a directory and walking up.
+ * Find a fitc4 config, starting at a directory and walking up.
  *
- * At each level the root-level file wins over the one in `.soffit/`, so a
+ * At each level the root-level file wins over the one in `.fitc4/`, so a
  * project that hoists its config is never silently overruled by the copy it
  * left behind. Within one directory there is no such precedence: two config
  * files there is an error, because whichever lost a tiebreak would be

@@ -13,18 +13,18 @@ model {
   // Context elements carry no `sources`, so the gate ignores them: they are
   // documentation. Only elements with `sources` are enforced against the code.
   developer = person 'Developer' {
-    description 'Runs soffit locally or in CI'
+    description 'Runs fitc4 locally or in CI'
   }
 
   consumer = system 'Consumer project' {
-    description 'A repository that adopted soffit: source code, an arch/ model, and a soffit.config'
+    description 'A repository that adopted fitc4: source code, an arch/ model, and a fitc4.config'
   }
 
   likec4 = system 'LikeC4' {
     description 'Parses the arch/ model, validates it, and computes the element graph'
   }
 
-  soffit = system 'soffit' {
+  fitc4 = system 'FitC4' {
     lib = container 'Library & CLI' {
       core = component 'Core' {
         description 'Config, pipeline, model access, reporting, provider composition, and the CLI'
@@ -42,29 +42,29 @@ model {
     }
   }
 
-  developer -> soffit.lib 'runs npx soffit'
-  soffit.lib -> consumer 'discovers soffit.config, scans source files'
-  soffit.lib -> likec4 'loads the architecture model through'
+  developer -> fitc4.lib 'runs npx fitc4'
+  fitc4.lib -> consumer 'discovers fitc4.config, scans source files'
+  fitc4.lib -> likec4 'loads the architecture model through'
   likec4 -> consumer 'parses arch/'
 
-  soffit.lib.core -> soffit.lib.providers 'composes and re-exports (preset.ts, index.ts)'
-  soffit.lib.providers -> soffit.lib.core 'reads the shared contracts (types, model, ids, kinds)'
+  fitc4.lib.core -> fitc4.lib.providers 'composes and re-exports (preset.ts, index.ts)'
+  fitc4.lib.providers -> fitc4.lib.core 'reads the shared contracts (types, model, ids, kinds)'
 }
 
 views {
-  // Landing view: soffit in context.
+  // Landing view: fitc4 in context.
   view index {
-    title 'soffit landscape'
-    include developer, soffit, consumer, likec4
+    title 'FitC4 landscape'
+    include developer, fitc4, consumer, likec4
     autoLayout TopBottom
   }
 
-  view soffit of soffit {
+  view fitc4 of fitc4 {
     include *
     autoLayout TopBottom
   }
 
-  view lib of soffit.lib {
+  view lib of fitc4.lib {
     include *
     autoLayout TopBottom
   }
@@ -73,13 +73,13 @@ views {
   // and need no declared relationships.
   dynamic view check {
     title 'How a check runs'
-    developer -> soffit.lib.core 'runs npx soffit'
-    soffit.lib.core -> consumer 'discovers soffit.config, walking up from cwd'
-    soffit.lib.core -> likec4 'validates arch/ and computes the model (fails fast on model errors)'
-    soffit.lib.core -> soffit.lib.providers 'scan: emit file and dependency observations'
-    soffit.lib.core -> soffit.lib.providers 'resolve: map observations onto model elements via sources'
-    soffit.lib.core -> soffit.lib.providers 'validate: judge crossings against declared relationships'
-    soffit.lib.core -> developer 'report findings; exit non-zero on errors'
+    developer -> fitc4.lib.core 'runs npx fitc4'
+    fitc4.lib.core -> consumer 'discovers fitc4.config, walking up from cwd'
+    fitc4.lib.core -> likec4 'validates arch/ and computes the model (fails fast on model errors)'
+    fitc4.lib.core -> fitc4.lib.providers 'scan: emit file and dependency observations'
+    fitc4.lib.core -> fitc4.lib.providers 'resolve: map observations onto model elements via sources'
+    fitc4.lib.core -> fitc4.lib.providers 'validate: judge crossings against declared relationships'
+    fitc4.lib.core -> developer 'report findings; exit non-zero on errors'
     autoLayout TopBottom
   }
 }

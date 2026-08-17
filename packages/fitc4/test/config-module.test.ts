@@ -18,7 +18,7 @@ afterEach(() => {
 })
 
 function tempDir(): string {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'soffit-config-module-'))
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-config-module-'))
   created.push(directory)
   return directory
 }
@@ -68,7 +68,7 @@ const CUSTOM_VALIDATE = `  validate: [
 
 describe('a .ts config module', () => {
   test('is discovered and its custom validate provider runs', async () => {
-    const configPath = writeConfigFile('soffit.config.ts', moduleSource('ok', CUSTOM_VALIDATE))
+    const configPath = writeConfigFile('fitc4.config.ts', moduleSource('ok', CUSTOM_VALIDATE))
 
     expect(findConfig(path.dirname(configPath))).toBe(configPath)
 
@@ -87,7 +87,7 @@ describe('a .ts config module', () => {
   // and none of that is reported, because a present phase replaces the preset.
   test('a present phase replaces the preset for that phase entirely', async () => {
     const configPath = writeConfigFile(
-      'soffit.config.ts',
+      'fitc4.config.ts',
       moduleSource('violations', CUSTOM_VALIDATE),
     )
 
@@ -100,7 +100,7 @@ describe('a .ts config module', () => {
 describe('a .js config module', () => {
   test('loads and its provider runs', async () => {
     const source = moduleSource('ok', CUSTOM_VALIDATE).replace(': string', '')
-    const configPath = writeConfigFile('soffit.config.js', source)
+    const configPath = writeConfigFile('fitc4.config.js', source)
 
     const result = await runPipeline(pipelineConfig(await resolveConfig(configPath)))
 
@@ -112,8 +112,8 @@ describe('a .js config module', () => {
 // indistinguishable from a config that is honored.
 describe('two configs in one directory', () => {
   test('is an error naming both files', () => {
-    const tsPath = writeConfigFile('soffit.config.ts', moduleSource('ok'))
-    const jsonPath = path.join(path.dirname(tsPath), 'soffit.config.json')
+    const tsPath = writeConfigFile('fitc4.config.ts', moduleSource('ok'))
+    const jsonPath = path.join(path.dirname(tsPath), 'fitc4.config.json')
     fs.writeFileSync(jsonPath, '{}')
 
     expect(() => findConfig(path.dirname(tsPath))).toThrow(tsPath)
@@ -123,14 +123,14 @@ describe('two configs in one directory', () => {
 
 describe('rejecting a malformed config module', () => {
   test('a missing default export is an error', async () => {
-    const configPath = writeConfigFile('soffit.config.js', 'export const config = {}\n')
+    const configPath = writeConfigFile('fitc4.config.js', 'export const config = {}\n')
 
     await expect(resolveConfig(configPath)).rejects.toThrow('default export')
   })
 
   test('a provider entry without a run function is an error naming the entry', async () => {
     const configPath = writeConfigFile(
-      'soffit.config.js',
+      'fitc4.config.js',
       moduleSource('ok', "  validate: [{ id: 'no-run' }],\n"),
     )
 
@@ -139,7 +139,7 @@ describe('rejecting a malformed config module', () => {
 
   test('a provider entry without an id is an error naming the entry', async () => {
     const configPath = writeConfigFile(
-      'soffit.config.js',
+      'fitc4.config.js',
       moduleSource('ok', '  scan: [{ run: async () => [] }],\n'),
     )
 
@@ -148,7 +148,7 @@ describe('rejecting a malformed config module', () => {
 
   test('a non-array phase is an error', async () => {
     const configPath = writeConfigFile(
-      'soffit.config.js',
+      'fitc4.config.js',
       moduleSource('ok', '  resolve: {},\n'),
     )
 
@@ -159,7 +159,7 @@ describe('rejecting a malformed config module', () => {
   // seen the file, but nothing forces the author to run one.
   test('the shared fields are validated as strictly as JSON', async () => {
     const configPath = writeConfigFile(
-      'soffit.config.js',
+      'fitc4.config.js',
       moduleSource('ok').replace('version: 1', 'version: 2'),
     )
 
@@ -170,7 +170,7 @@ describe('rejecting a malformed config module', () => {
 describe('the JSON path through resolveConfig', () => {
   test('matches loadConfig and carries no providers', async () => {
     const root = fixturePath('ok')
-    const configPath = path.join(tempDir(), 'soffit.config.json')
+    const configPath = path.join(tempDir(), 'fitc4.config.json')
     fs.writeFileSync(
       configPath,
       JSON.stringify({

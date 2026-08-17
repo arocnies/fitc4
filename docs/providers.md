@@ -1,12 +1,12 @@
 # Writing a provider
 
-A provider is a plain async function. There is no registry, lifecycle, or discovery system: providers are composed into phase arrays, either in code through `runPipeline`, or in a `soffit.config.ts` / `soffit.config.js` whose default export the CLI loads. The pipeline runs
+A provider is a plain async function. There is no registry, lifecycle, or discovery system: providers are composed into phase arrays, either in code through `runPipeline`, or in a `fitc4.config.ts` / `fitc4.config.js` whose default export the CLI loads. The pipeline runs
 
 ```
 native LikeC4 validation → scan → resolve → validate → report
 ```
 
-and each phase has one provider type, defined in [`packages/soffit/src/types.ts`](../packages/soffit/src/types.ts):
+and each phase has one provider type, defined in [`packages/fitc4/src/types.ts`](../packages/fitc4/src/types.ts):
 
 | Phase | Type | Receives | Returns |
 |---|---|---|---|
@@ -22,7 +22,7 @@ A scan provider knows nothing about the model beyond the ownership prefixes; a r
 
 ## The kind vocabulary
 
-`Observation.kind` and `Ref.kind` are the one contract that crosses provider boundaries, named in [`packages/soffit/src/kinds.ts`](../packages/soffit/src/kinds.ts).
+`Observation.kind` and `Ref.kind` are the one contract that crosses provider boundaries, named in [`packages/fitc4/src/kinds.ts`](../packages/fitc4/src/kinds.ts).
 
 Standard observation kinds: `file` (a source file exists and is in scope for ownership), `dependency` (`subject` depends on `target`), `unresolved-dependency` (a dependency whose target could not be resolved), `scan-root` (a path the provider actually looked at — the coverage attestation).
 
@@ -44,7 +44,7 @@ A provider that throws becomes one `error` finding (`provider-failure`) attribut
 
 The property the whole tool exists for: a check that silently reports nothing is worse than no check, because it looks like success. Concretely — a scan provider that means `dependency` but emits `import` produces observations no rule reads, therefore zero findings and exit 0, indistinguishable from a genuinely clean repository. That is why unknown kinds are reported rather than skipped. When writing a provider, ask what its output looks like when its input is empty or malformed; if that case is indistinguishable from a clean run, it needs a finding.
 
-## A complete `soffit.config.ts`
+## A complete `fitc4.config.ts`
 
 A phase array present in the config replaces the preset for that phase entirely — present replaces, absent defaults. There are no merge semantics; a config that extends a phase rebuilds the preset entries explicitly, using the exported providers and their exported ids, so the composition is visible in the file that owns it.
 
@@ -55,7 +55,7 @@ import {
   defineConfig,
   type Finding,
   type ValidateContext,
-} from 'soffit'
+} from 'fitc4'
 
 const PROVIDER_ID = 'import-budget'
 const BUDGET = 20
@@ -97,4 +97,4 @@ export default defineConfig({
 })
 ```
 
-Discovery checks `soffit.config.ts`, `soffit.config.js`, then `soffit.config.json` — in the working directory and its `.soffit/`, then each ancestor. Two of the three in one directory is an error, because whichever lost a tiebreak would be a silently ignored config. A replaced scan phase rebuilds its preset entry the same way, with `typescriptImports({ tsconfigPath, roots })` under `TYPESCRIPT_IMPORTS_PROVIDER_ID`; resolve, with `sourceRoot` under `SOURCE_ROOT_PROVIDER_ID`.
+Discovery checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — in the working directory and its `.fitc4/`, then each ancestor. Two of the three in one directory is an error, because whichever lost a tiebreak would be a silently ignored config. A replaced scan phase rebuilds its preset entry the same way, with `typescriptImports({ tsconfigPath, roots })` under `TYPESCRIPT_IMPORTS_PROVIDER_ID`; resolve, with `sourceRoot` under `SOURCE_ROOT_PROVIDER_ID`.

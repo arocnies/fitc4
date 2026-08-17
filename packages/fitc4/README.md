@@ -1,8 +1,8 @@
-# soffit
+# FitC4
 
 Check an implementation against a LikeC4 architecture contract.
 
-A [LikeC4](https://likec4.dev) model says which components exist and which may depend on which. `soffit` scans your TypeScript code, maps every file and import onto that model, and fails the build where the two disagree.
+A [LikeC4](https://likec4.dev) model says which components exist and which may depend on which. `fitc4` scans your TypeScript code, maps every file and import onto that model, and fails the build where the two disagree.
 
 ## Setup
 
@@ -38,11 +38,11 @@ model {
 }
 ```
 
-**`soffit.config.json`** at your project root. Paths resolve relative to this file.
+**`fitc4.config.json`** at your project root. Paths resolve relative to this file.
 
 ```json
 {
-  "$schema": "./node_modules/soffit/schema/soffit.config.schema.json",
+  "$schema": "./node_modules/fitc4/schema/fitc4.config.schema.json",
   "version": 1,
   "repositoryRoot": ".",
   "model": "arch",
@@ -54,7 +54,7 @@ model {
 **Run it.**
 
 ```sh
-npx soffit
+npx fitc4
 ```
 
 A clean run prints a summary and exits 0. A file in `src/core` importing from `src/interface` — a dependency the model does not declare — exits 1:
@@ -67,7 +67,7 @@ error (1)
     src/core/bad.ts:1  ../interface/index.ts
 ```
 
-`--json` emits the full result instead of the report. `--config <path>` overrides discovery, which otherwise checks `./soffit.config.json`, then `./.soffit/soffit.config.json`, then the same two in each ancestor of the working directory.
+`--json` emits the full result instead of the report. `--config <path>` overrides discovery, which otherwise checks `./fitc4.config.json`, then `./.fitc4/fitc4.config.json`, then the same two in each ancestor of the working directory.
 
 ## Rules
 
@@ -92,7 +92,7 @@ An element with no `sources` is legal — a grouping element, or a component imp
 Everything the CLI does is reachable from the package entry point, so you can assert on architecture inside your own test suite instead of shelling out.
 
 ```ts
-import { findConfig, loadConfig, pipelineConfig, runPipeline, exitCodeFor } from 'soffit'
+import { findConfig, loadConfig, pipelineConfig, runPipeline, exitCodeFor } from 'fitc4'
 
 const result = await runPipeline(pipelineConfig(loadConfig(findConfig(process.cwd()))))
 expect(exitCodeFor(result)).toBe(0)
