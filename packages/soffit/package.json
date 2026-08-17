@@ -40,11 +40,14 @@
     "schema"
   ],
   "scripts": {
-    "check": "npm run typecheck && npm run build && npm run test",
+    "check": "npm run model:validate && npm run format:check && npm run typecheck && npm run build && npm run test && npm run arch",
     "build": "tsc -p tsconfig.build.json",
     "prepare": "npm run build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "model:validate": "likec4 validate arch",
+    "format:check": "likec4 format --check arch",
+    "arch": "node dist/cli.js"
   },
   "dependencies": {
     "likec4": "1.59.2",

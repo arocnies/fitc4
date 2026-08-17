@@ -1,0 +1,35 @@
+specification {
+  element system
+  element container
+  element component
+}
+
+model {
+  soffit = system 'soffit' {
+    lib = container 'Library & CLI' {
+      core = component 'Core' {
+        description 'Config, pipeline, model access, reporting, provider composition, and the CLI'
+        metadata {
+          sources 'src/**'
+        }
+      }
+
+      providers = component 'Providers' {
+        description 'The standard scan, resolve, and validate providers'
+        metadata {
+          sources 'src/providers/**'
+        }
+      }
+    }
+  }
+
+  soffit.lib.core -> soffit.lib.providers 'composes and re-exports (preset.ts, index.ts)'
+  soffit.lib.providers -> soffit.lib.core 'reads the shared contracts (types, model, ids, kinds)'
+}
+
+views {
+  view index of soffit {
+    include *
+    autoLayout TopBottom
+  }
+}
