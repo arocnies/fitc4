@@ -98,3 +98,41 @@ export default defineConfig({
 ```
 
 Discovery checks `fitc4.config.ts`, `fitc4.config.js`, then `fitc4.config.json` — in the working directory and its `.fitc4/`, then each ancestor. Two of the three in one directory is an error, because whichever lost a tiebreak would be a silently ignored config. A replaced scan phase rebuilds its preset entry the same way, with `typescriptImports({ tsconfigPath, roots })` under `TYPESCRIPT_IMPORTS_PROVIDER_ID`; resolve, with `sourceRoot` under `SOURCE_ROOT_PROVIDER_ID`.
+
+## AI-assisted providers (`fitc4/ai`)
+
+A separate entry point on purpose: nothing in `fitc4` imports it, the core gate stays deterministic, and composing an AI provider into a phase is an explicit act in your config file. The adapters shell out to **locally installed agent CLIs** — your own `claude` or `codex` install, login, and billing. FitC4 never holds an API key.
+
+```ts
+import { defineConfig, architectureRules, ARCHITECTURE_RULES_PROVIDER_ID } from 'fitc4'
+import { cached, claudeCli, aiOwnershipAdvisor, aiSemanticReview } from 'fitc4/ai'
+
+const cheap = cached(claudeCli({ model: 'haiku' }))
+const strong = cached(claudeCli({ model: 'sonnet' }))
+
+export default defineConfig({
+  version: 1,
+  repositoryRoot: '.',
+  model: 'arch',
+  scanRoots: ['src'],
+  tsconfig: 'tsconfig.json',
+  validate: [
+    { id: ARCHITECTURE_RULES_PROVIDER_ID, run: architectureRules },
+    aiOwnershipAdvisor({ exec: cheap }),
+    aiSemanticReview({ exec: strong }),
+  ],
+})
+```
+
+**The standing contract.** AI findings are additive and severity-capped: every provider takes a `maxSeverity` ceiling (`info` for the advisor, `warning` for the review) and nothing an AI says can suppress, rewrite, or outrank a deterministic finding. An unavailable or logged-out CLI is one visible `ai-unavailable` finding — never a failed build, never a silent skip. Anything a limit drops is reported as `ai-truncated`, because a silent cap reads as full coverage.
+
+**The exec layer.** `AiExec` is the one interface: `claudeCli()` runs `claude --print` isolated (no user settings, no MCP servers, and — by default — no tools, so the reply can only come from the prefilled context); `codexCli()` runs `codex exec` ephemeral with a read-only sandbox and schema-enforced JSON output. `agentic: true` on a request permits read-only exploration. A custom adapter is ~40 lines: implement `id` and `run`, return `{ ok, value }`.
+
+**Determinism and cost.** `cached()` keys on everything the model saw — adapter id, prompt, context, schema — so a rerun with unchanged inputs replays the recorded reply, free and identical (default cache: `node_modules/.cache/fitc4-ai`). Both providers are trigger-driven: the advisor only runs when unowned files exist, the review only over elements with descriptions, so a clean steady-state run makes zero AI calls. Cheap model for extraction-shaped work, strong model for judgment, chosen per instance.
+
+| Rule | Default severity | Meaning |
+|---|---|---|
+| `ownership-suggestion` | info | An unowned file, with the element the AI thinks should own it |
+| `description-drift` | warning | An element's implementation may not match its declared description |
+| `ai-unavailable` | warning (capped) | The CLI failed, was missing, or was logged out; enrichment did not run |
+| `ai-truncated` | info | Inputs beyond a configured limit were not reviewed |

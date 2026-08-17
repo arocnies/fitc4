@@ -125,6 +125,8 @@ expect(exitCodeFor(result)).toBe(0)
 
 Providers are plain functions — `ScanProvider`, `ResolveProvider`, `ValidateProvider` — composed into phase arrays. `pipelineConfig` is the batteries-included default; a caller wanting a different scanner builds its own `PipelineConfig` and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system.
 
+The `fitc4/ai` entry point adds AI-assisted validate providers over locally installed agent CLIs (`claude`, `codex`) — advisory by default, severity-capped, additive only, cached on their inputs, and never imported by the core. See [`docs/providers.md`](docs/providers.md).
+
 ## The provider vocabulary
 
 The one contract that crosses provider boundaries is the `kind` on an `Observation` or a `Ref`. A scanner emitting `import` where the rules read `dependency` produces no findings and a clean exit — indistinguishable from a healthy repository. So the standard set is named in [`kinds.ts`](packages/fitc4/src/kinds.ts) rather than left as string literals in two files.

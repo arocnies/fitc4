@@ -99,3 +99,14 @@ expect(exitCodeFor(result)).toBe(0)
 ```
 
 Providers are plain functions — `ScanProvider`, `ResolveProvider`, `ValidateProvider` — composed into phase arrays. `pipelineConfig` is the batteries-included default; to swap a scanner, build your own `PipelineConfig` and pass it to `runPipeline`.
+
+## AI-assisted providers
+
+`fitc4/ai` adds advisory providers that shell out to your locally installed agent CLIs (`claude`, `codex`) — your login, your billing, no API keys in fitc4. `aiOwnershipAdvisor` suggests an owner for every file the model leaves unowned; `aiSemanticReview` judges whether an element's implementation still matches its declared description. AI findings are additive and severity-capped (advisory by default), a missing or logged-out CLI is one visible `ai-unavailable` finding rather than a failed build, and `cached()` makes reruns with unchanged inputs free and identical.
+
+```ts
+import { cached, claudeCli, aiOwnershipAdvisor } from 'fitc4/ai'
+
+// in fitc4.config.ts, alongside the preset validate entry:
+aiOwnershipAdvisor({ exec: cached(claudeCli({ model: 'haiku' })) })
+```

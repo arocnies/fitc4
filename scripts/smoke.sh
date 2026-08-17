@@ -39,6 +39,13 @@ echo "== library entry point loads"
   if (exitCodeFor(result) !== 0) { console.error(result.findings); process.exit(1) }
 ")
 
+echo "== fitc4/ai entry point loads"
+(cd "$consumer" && node --input-type=module -e "
+  import { claudeCli, codexCli, cached, aiOwnershipAdvisor, aiSemanticReview } from 'fitc4/ai'
+  const provider = aiOwnershipAdvisor({ exec: claudeCli() })
+  if (provider.id !== 'ai-ownership-advisor' || typeof provider.run !== 'function') process.exit(1)
+")
+
 echo "== clean project passes"
 (cd "$consumer" && npx fitc4)
 

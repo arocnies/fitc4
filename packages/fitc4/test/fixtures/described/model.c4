@@ -1,0 +1,21 @@
+specification {
+  element system
+  element component
+}
+
+model {
+  demo = system 'Demo' {
+    core = component 'Core' {
+      description 'Pure calculation; performs no I/O'
+      metadata {
+        sources 'src/core/**'
+      }
+    }
+  }
+}
+
+views {
+  view index of demo {
+    include *
+  }
+}

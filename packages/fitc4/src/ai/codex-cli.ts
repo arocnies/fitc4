@@ -1,0 +1,116 @@
+/**
+ * The Codex CLI adapter.
+ *
+ * Runs `codex exec` isolated: ephemeral (no session state), user config and
+ * rules ignored, sandbox locked to read-only. Codex has no tool-less mode, so
+ * every call is effectively agentic-read-only — the prefilled context is still
+ * the primary input, the sandbox is what bounds the exploring.
+ *
+ * Codex enforces JSON replies natively through `--output-schema`, so a schema
+ * request round-trips through a temp file instead of prompt discipline. The
+ * reply is read from `--output-last-message` rather than parsed out of the
+ * `--json` event stream.
+ */
+
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+
+import type { JsonValue } from '../types.ts'
+import { composeInput, finishReply, runProcess, truncate } from './exec.ts'
+import type { AiExec, AiReply, AiRequest } from './exec.ts'
+
+export interface CodexCliOptions {
+  /** Model name; omitted, the CLI's own default applies. */
+  model?: string
+  /** Path to the CLI binary. Default: `codex` on PATH. */
+  binary?: string
+  timeoutMs?: number
+}
+
+/**
+ * Make a JSON Schema acceptable to strict structured output.
+ *
+ * The OpenAI endpoint behind `--output-schema` rejects any object schema that
+ * does not pin `additionalProperties: false`, so it is pinned on every object
+ * node that leaves it open. Callers keep writing plain schemas.
+ */
+export function strictSchema(node: JsonValue): JsonValue {
+  if (Array.isArray(node)) return node.map(strictSchema)
+  if (node === null || typeof node !== 'object') return node
+
+  const copy: { [key: string]: JsonValue } = {}
+  for (const [key, value] of Object.entries(node)) copy[key] = strictSchema(value)
+  if (copy['properties'] !== undefined && copy['additionalProperties'] === undefined) {
+    copy['additionalProperties'] = false
+  }
+  return copy
+}
+
+export function codexCli(options: CodexCliOptions = {}): AiExec {
+  const binary = options.binary ?? 'codex'
+  const defaultTimeoutMs = options.timeoutMs ?? 120_000
+
+  return {
+    id: `codex-cli/${options.model ?? 'default'}`,
+    async run(request: AiRequest): Promise<AiReply> {
+      const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-ai-'))
+      try {
+        const replyFile = path.join(workDir, 'reply.txt')
+        const args = [
+          'exec',
+          '--ephemeral',
+          '--ignore-user-config',
+          '--ignore-rules',
+          '--sandbox',
+          'read-only',
+          '--skip-git-repo-check',
+          '--color',
+          'never',
+          '--output-last-message',
+          replyFile,
+        ]
+        if (options.model !== undefined) args.push('--model', options.model)
+        if (request.cwd !== undefined) args.push('--cd', request.cwd)
+        if (request.schema !== undefined) {
+          const schemaFile = path.join(workDir, 'schema.json')
+          fs.writeFileSync(schemaFile, JSON.stringify(strictSchema(request.schema)))
+          args.push('--output-schema', schemaFile)
+        }
+        args.push('-')
+
+        let result
+        try {
+          result = await runProcess(binary, args, {
+            stdin: composeInput(request),
+            cwd: request.cwd,
+            timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
+          })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          return { ok: false, error: `${binary}: ${message}` }
+        }
+
+        if (result.timedOut) {
+          return { ok: false, error: `${binary} timed out` }
+        }
+        if (result.code !== 0) {
+          return {
+            ok: false,
+            error: `${binary} exited ${result.code}: ${truncate(result.stderr || result.stdout, 300)}`,
+          }
+        }
+
+        let reply: string
+        try {
+          reply = fs.readFileSync(replyFile, 'utf8')
+        } catch {
+          return { ok: false, error: `${binary} wrote no reply` }
+        }
+        return finishReply(request, reply)
+      } finally {
+        fs.rmSync(workDir, { recursive: true, force: true })
+      }
+    },
+  }
+}

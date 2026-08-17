@@ -14,7 +14,15 @@ export default function setup(): void {
   const link = path.join(scope, 'lib')
   const target = path.join(fixture, 'packages', 'lib')
 
-  if (fs.existsSync(link)) return
+  // `existsSync` follows symlinks, so a link whose target moved — a renamed
+  // package directory, say — reads as missing and recreation hits EEXIST.
+  // Compare the link itself and heal anything stale.
+  try {
+    if (fs.readlinkSync(link) === target) return
+  } catch {
+    // Missing or not a symlink; either way, rebuild it.
+  }
+  fs.rmSync(link, { recursive: true, force: true })
   fs.mkdirSync(scope, { recursive: true })
   // 'junction' keeps this working on Windows without elevated privileges;
   // on POSIX it falls back to an ordinary directory symlink.
