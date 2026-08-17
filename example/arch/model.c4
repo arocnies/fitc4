@@ -33,4 +33,9 @@ views {
     include *
     autoLayout TopBottom
   }
+
+  view app of example.app {
+    include *
+    autoLayout TopBottom
+  }
 }

@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "example-arch",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "-u", "OPENAI_API_KEY", "-u", "OPENROUTER_API_KEY", "-u", "ANTHROPIC_API_KEY",
+        "-u", "GEMINI_API_KEY", "-u", "OLLAMA_HOST",
+        "npx", "likec4", "start", "example/arch", "--port", "5173"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "soffit-arch",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "-u", "OPENAI_API_KEY", "-u", "OPENROUTER_API_KEY", "-u", "ANTHROPIC_API_KEY",
+        "-u", "GEMINI_API_KEY", "-u", "OLLAMA_HOST",
+        "npx", "likec4", "start", "packages/soffit/arch", "--port", "5174"
+      ],
+      "port": 5174
+    }
+  ]
+}

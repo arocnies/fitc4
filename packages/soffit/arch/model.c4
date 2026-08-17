@@ -32,4 +32,9 @@ views {
     include *
     autoLayout TopBottom
   }
+
+  view lib of soffit.lib {
+    include *
+    autoLayout TopBottom
+  }
 }
