@@ -63,7 +63,7 @@ model {
 npx fitc4
 ```
 
-Most projects wire it as a script — `"arch": "fitc4"` — and run `npm run arch` in CI.
+Most projects wire it as a script — `"fitc4": "fitc4"` — and run `npm run fitc4` in CI.
 
 A clean run prints a summary and exits 0. A file in `src/core` importing from `src/interface` — a dependency the model does not declare — exits 1:
 
@@ -137,6 +137,28 @@ export default defineConfig({
 ```
 
 The advisor makes zero calls on a clean repository; the review makes one call per described element (cached after the first run).
+
+## For AI agents
+
+FitC4's agent interface is the CLI itself: run it, read the report, fix what it names. Failing reports link back to the rules table above, and `--json` emits the full pipeline result — the `PipelineResult` type shipped in `dist/index.d.ts` — for structured consumption. FitC4 is the *enforcement* half of the ecosystem's AI story: for querying a LikeC4 model, LikeC4 ships an MCP server (`npx likec4 mcp`), and for writing the DSL there is the LikeC4 agent skill (`npx skills add https://likec4.dev/`).
+
+The one norm an agent cannot infer from the CLI: **the model is the contract, and the cheapest path to a green build — editing the model to permit whatever the code does — defeats the tool.** If agents work in your repository, add this to your `AGENTS.md` or `CLAUDE.md`:
+
+```markdown
+## Architecture gate (fitc4)
+
+- Run `npm run fitc4` before handing off changes; it checks the code against
+  the LikeC4 architecture model. Exit 1 is an architecture violation, not a
+  flaky tool.
+- A finding means the code and the contract disagree. Fixing the code is the
+  default. Editing the model is a design decision — legitimate when the
+  architecture genuinely changed, never merely to silence a finding — and any
+  model change must be called out explicitly when handing off.
+- Never delete `sources` metadata or a declared relationship to make a finding
+  go away: that removes code from architecture control entirely.
+- Rule reference: `node_modules/fitc4/README.md#rules`. Structured output:
+  `npx fitc4 --json`.
+```
 
 ## Links
 

@@ -8,7 +8,7 @@ A minimal project under architecture control. Two components, one declared depen
 ## Run the check
 
 ```bash
-npm run arch -w example
+npm run fitc4 -w example
 ```
 
 A clean pass looks like this — every file owned, every import inside a declared boundary:
@@ -30,7 +30,7 @@ import { status } from '../interface/index.js'
 export const bad = status
 ```
 
-Rerun `npm run arch -w example`. Exit code 1:
+Rerun `npm run fitc4 -w example`. Exit code 1:
 
 ```text
 error (1)
@@ -62,7 +62,7 @@ Still exit 0 — unowned code is a nudge by default, promotable to an error with
 This is also the state where the AI variant has something to say. With a logged-in `claude` CLI:
 
 ```bash
-npm run arch:ai -w example
+npm run fitc4:ai -w example
 ```
 
 runs the same gate plus [`fitc4.ai.config.ts`](fitc4.ai.config.ts): the ownership advisor reads `src/util.ts` and suggests which element should own it — or says the model is missing one — and the semantic review judges each described component against its actual code. Without the CLI the run still passes and prints an `ai-unavailable` note instead. Delete `util.ts` when done.
@@ -73,6 +73,7 @@ runs the same gate plus [`fitc4.ai.config.ts`](fitc4.ai.config.ts): the ownershi
 arch/model.c4        the contract: elements, sources ownership, allowed dependencies
 fitc4.config.json    where things are — the config CI discovers and runs
 fitc4.ai.config.ts   the same gate plus advisory AI providers, run on demand
+AGENTS.md            norms for AI agents working here — the model is the contract
 src/                 the implementation being checked
 ```
 

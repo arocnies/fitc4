@@ -35,6 +35,14 @@ export function renderReport(result: PipelineResult): Report {
   const counts = countBySeverity(result.findings)
   const lines: string[] = []
 
+  // A reader mid-failure — human or agent — should not have to hunt for what
+  // a rule means. The shipped README documents every rule and its fixes, and
+  // the local path works offline.
+  if (result.findings.length > 0) {
+    lines.push('rules: node_modules/fitc4/README.md#rules')
+    lines.push('')
+  }
+
   for (const severity of SEVERITIES) {
     const findings = result.findings.filter((finding) => finding.severity === severity)
     if (findings.length === 0) continue

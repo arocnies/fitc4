@@ -527,6 +527,15 @@ describe('report', () => {
     expect(report.text).toContain('Interface looks like a facade over Core.')
   })
 
+  // A reader mid-failure — human or agent — should not have to hunt for what
+  // a rule means; a clean run has nothing to look up.
+  test('a report with findings points at the rule reference; a clean one does not', async () => {
+    expect(renderReport(await runFixture('ok')).text).not.toContain('rules:')
+    expect(renderReport(await runFixture('violations')).text).toContain(
+      'rules: node_modules/fitc4/README.md#rules',
+    )
+  })
+
   test('evidence is capped so one boundary cannot bury the report', async () => {
     const crossings = EVIDENCE_LIMIT + 5
     const observations: Observation[] = []

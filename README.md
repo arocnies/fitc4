@@ -80,7 +80,9 @@ scan typescript-imports · resolve source-root · validate architecture-rules
 
 Exit code 1. `--json` emits the full result instead of the report; `--config <path>` overrides discovery.
 
-The example also carries [`fitc4.ai.config.ts`](example/fitc4.ai.config.ts) — the same gate plus the `fitc4/ai` advisory providers, run on demand with `npm run arch:ai -w example`. A non-discovery filename plus `--config` is the pattern for keeping an AI-assisted variant beside the deterministic one CI runs: an unowned file gets the standard `unmapped-source` warning *and* an AI `ownership-suggestion` naming the element that should own it (or saying the model is missing one), and described elements get their implementations reviewed against their descriptions. Requires a logged-in `claude` CLI; without one the run still passes and reports `ai-unavailable`.
+The example also carries [`fitc4.ai.config.ts`](example/fitc4.ai.config.ts) — the same gate plus the `fitc4/ai` advisory providers, run on demand with `npm run fitc4:ai -w example`. A non-discovery filename plus `--config` is the pattern for keeping an AI-assisted variant beside the deterministic one CI runs: an unowned file gets the standard `unmapped-source` warning *and* an AI `ownership-suggestion` naming the element that should own it (or saying the model is missing one), and described elements get their implementations reviewed against their descriptions. Requires a logged-in `claude` CLI; without one the run still passes and reports `ai-unavailable`.
+
+Agents get the same treatment as humans: the CLI is the interface, failing reports link the rule reference, and `--json` emits the typed `PipelineResult`. What an agent cannot infer is the norm that the model is the contract — so the [npm README](packages/fitc4/README.md#for-ai-agents) ships a copy-paste `AGENTS.md` block for repositories where agents work, and [`example/AGENTS.md`](example/AGENTS.md) is the checked-in version. For querying and authoring the model itself, LikeC4 ships an MCP server (`npx likec4 mcp`) and an agent skill — FitC4 is the enforcement half.
 
 ## Where things live
 

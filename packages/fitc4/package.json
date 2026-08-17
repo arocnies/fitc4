@@ -45,14 +45,14 @@
     "schema"
   ],
   "scripts": {
-    "check": "npm run model:validate && npm run format:check && npm run typecheck && npm run build && npm run test && npm run arch",
+    "check": "npm run model:validate && npm run format:check && npm run typecheck && npm run build && npm run test && npm run fitc4",
     "build": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node -e \"fs.chmodSync('dist/cli.js', 0o755)\"",
     "prepare": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "model:validate": "likec4 validate arch",
     "format:check": "likec4 format --check arch",
-    "arch": "node dist/cli.js"
+    "fitc4": "node dist/cli.js"
   },
   "dependencies": {
     "likec4": "1.59.2",
