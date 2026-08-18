@@ -22,6 +22,9 @@ model {
 
   likec4 = system 'LikeC4' {
     description 'Parses the arch/ model, validates it, and computes the element graph'
+    metadata {
+      packages 'likec4'
+    }
   }
 
   fitc4 = system 'FitC4' {

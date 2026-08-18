@@ -1,0 +1,55 @@
+specification {
+  element system
+  element component
+  tag drift
+}
+
+model {
+  fixture = system 'Fixture' {
+    app = component 'App' {
+      metadata {
+        sources 'src/app/**'
+      }
+    }
+
+    infra = component 'Infra' {
+      metadata {
+        sources 'src/infra/**'
+        packages 'pg'
+      }
+    }
+
+    // Claims a package without owning any source — legal, and enough to make
+    // the element observed.
+    cloud = component 'Cloud' {
+      metadata {
+        packages '@aws-sdk/client-s3'
+      }
+    }
+
+    legacy = component 'Legacy' {
+      metadata {
+        sources 'src/legacy/**'
+      }
+    }
+
+    oldstore = component 'OldStore' {
+      metadata {
+        packages 'oldpkg'
+      }
+    }
+  }
+
+  fixture.app -> fixture.cloud 'uploads through'
+
+  // A package edge tolerated as drift: legacy still talks to the old store.
+  fixture.legacy -> fixture.oldstore 'still reads' {
+    #drift
+  }
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

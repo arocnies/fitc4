@@ -1,0 +1,47 @@
+specification {
+  element system
+  element component
+  tag drift
+}
+
+model {
+  fixture = system 'Fixture' {
+    core = component 'Core' {
+      metadata {
+        sources 'src/core/**'
+      }
+    }
+
+    interface = component 'Interface' {
+      metadata {
+        sources 'src/interface/**'
+      }
+    }
+
+    legacy = component 'Legacy' {
+      metadata {
+        sources 'src/legacy/**'
+      }
+    }
+  }
+
+  fixture.interface -> fixture.core 'uses'
+
+  // Tolerated debt: the code still does this, the target architecture does not
+  // want it. Exercised by src/legacy.
+  fixture.legacy -> fixture.core 'legacy path' {
+    #drift
+  }
+
+  // Declared drift no code exercises anymore — the ratchet must demand its
+  // deletion.
+  fixture.interface -> fixture.legacy 'stale drift' {
+    #drift
+  }
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

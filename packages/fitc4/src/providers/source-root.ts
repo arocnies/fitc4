@@ -15,6 +15,8 @@ import {
   hasRelationship,
   isSameOrNested,
   ownershipPrefixes,
+  packageClaims,
+  packageNameOf,
   type DeclaredRelationships,
   type OwnershipPrefix,
 } from '../model.ts'
@@ -22,9 +24,13 @@ import type { Association, Observation, ResolveContext, Ref } from '../types.ts'
 
 export const PROVIDER_ID = 'source-root'
 
+/** Claiming element ids per package name, unique and sorted for determinism. */
+export type PackageClaimants = Map<string, string[]>
+
 export async function sourceRoot(context: ResolveContext): Promise<Association[]> {
   const { prefixes } = ownershipPrefixes(context.model)
   const declared = declaredRelationships(context.model)
+  const claimants = claimantsByPackage(context)
   const associations: Association[] = []
 
   for (const observation of context.observations) {
@@ -37,12 +43,23 @@ export async function sourceRoot(context: ResolveContext): Promise<Association[]
     // owning element by construction, so it lands on the `unresolved` branch
     // below and the rules provider is the one that says anything about it.
     if (observation.kind === 'dependency' || observation.kind === 'unresolved-dependency') {
-      const association = dependencyAssociation(observation, prefixes, declared)
+      const association = dependencyAssociation(observation, prefixes, declared, claimants)
       if (association !== undefined) associations.push(association)
     }
   }
 
   return associations
+}
+
+function claimantsByPackage(context: ResolveContext): PackageClaimants {
+  const claimants: PackageClaimants = new Map()
+  for (const claim of packageClaims(context.model).claims) {
+    const existing = claimants.get(claim.name) ?? []
+    if (!existing.includes(claim.elementId)) {
+      claimants.set(claim.name, [...existing, claim.elementId].sort())
+    }
+  }
+  return claimants
 }
 
 export type Ownership =
@@ -124,6 +141,7 @@ function dependencyAssociation(
   observation: Observation,
   prefixes: OwnershipPrefix[],
   declared: DeclaredRelationships,
+  claimants: PackageClaimants,
 ): Association | undefined {
   const fromPath = observation.subject?.id
   if (fromPath === undefined) return undefined
@@ -134,8 +152,21 @@ function dependencyAssociation(
     provider: PROVIDER_ID,
   }
 
-  // A package or a broken specifier has no owning element by construction, so
-  // there is no model-level dependency for the contract to speak about.
+  // A module target may still map onto the model: an element can claim an
+  // external package via `packages` metadata. Only demonstrably external
+  // dependencies qualify — an unresolvable specifier already gets its own
+  // `unresolved-import` finding, and resolving it here would silently bless a
+  // broken import as a checked model edge.
+  if (observation.kind === 'dependency' && observation.target?.kind === 'module') {
+    const claimedBy = claimants.get(packageNameOf(observation.target.id))
+    if (claimedBy !== undefined) {
+      return packageAssociation(base, fromPath, observation.target.id, claimedBy, prefixes, declared)
+    }
+  }
+
+  // An unclaimed package or a broken specifier has no owning element by
+  // construction, so there is no model-level dependency for the contract to
+  // speak about.
   if (observation.target?.kind !== 'file') {
     return {
       ...base,
@@ -183,5 +214,60 @@ function dependencyAssociation(
     target: element(to.elementId),
     relationship: match === undefined ? undefined : { kind: 'relationship', id: match.id },
     description: `${from.elementId} → ${to.elementId}`,
+  }
+}
+
+/**
+ * Map an external dependency onto the element claiming its package.
+ *
+ * From here on the association is indistinguishable from a file-to-file
+ * crossing — same statuses, same `relationship` lookup — so the standard rules
+ * judge the edge with no package-specific rule code.
+ */
+function packageAssociation(
+  base: { id: string; observationId: string; provider: string },
+  fromPath: string,
+  specifier: string,
+  claimedBy: string[],
+  prefixes: OwnershipPrefix[],
+  declared: DeclaredRelationships,
+): Association {
+  const from = ownerOf(fromPath, prefixes)
+  const [claimant, ...moreClaimants] = claimedBy
+
+  if (from.status !== 'resolved' || claimant === undefined || moreClaimants.length > 0) {
+    return {
+      ...base,
+      status:
+        from.status === 'ambiguous' || moreClaimants.length > 0 ? 'ambiguous' : 'unresolved',
+      candidates: [
+        ...(from.status === 'ambiguous' ? from.candidates : []),
+        ...(moreClaimants.length > 0 ? claimedBy : []),
+      ].map(element),
+      description: `${fromPath} → ${specifier} could not be mapped to two elements`,
+    }
+  }
+
+  // An element importing a package it claims itself stays inside one boundary,
+  // exactly like a file-to-file dependency within one element.
+  if (isSameOrNested(from.elementId, claimant)) {
+    return {
+      ...base,
+      status: 'resolved',
+      source: element(from.elementId),
+      target: element(claimant),
+      description: `${from.elementId} depends within its own boundary`,
+    }
+  }
+
+  const match = hasRelationship(declared, from.elementId, claimant)
+
+  return {
+    ...base,
+    status: 'resolved',
+    source: element(from.elementId),
+    target: element(claimant),
+    relationship: match === undefined ? undefined : { kind: 'relationship', id: match.id },
+    description: `${from.elementId} → ${claimant} (package ${specifier})`,
   }
 }

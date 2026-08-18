@@ -14,6 +14,17 @@ export interface Report {
   exitCode: number
 }
 
+/**
+ * Above this many `unmapped-source` findings, the report renders one grouped
+ * block instead of a block per file. Rendering only: `--json` keeps every
+ * finding, so structured consumers see each file. A brownfield repo's 450
+ * unowned files are one adoption fact, not 450 separate ones.
+ */
+export const UNMAPPED_SOURCE_GROUP_THRESHOLD = 5
+
+/** How many individual paths the grouped `unmapped-source` block lists. */
+const UNMAPPED_SOURCE_LISTED_PATHS = 10
+
 /** The single definition of the gate, shared by the text and JSON paths. */
 export function exitCodeFor(result: PipelineResult): number {
   if (result.modelErrors.length > 0) return 1
@@ -47,8 +58,16 @@ export function renderReport(result: PipelineResult): Report {
     const findings = result.findings.filter((finding) => finding.severity === severity)
     if (findings.length === 0) continue
 
+    // Findings stay per-file in `--json`; only the rendering collapses.
+    const unmapped = findings.filter((finding) => finding.ruleId === 'unmapped-source')
+    const grouped = unmapped.length > UNMAPPED_SOURCE_GROUP_THRESHOLD
+    const rendered = grouped
+      ? findings.filter((finding) => finding.ruleId !== 'unmapped-source')
+      : findings
+
     lines.push(`${severity} (${findings.length})`)
-    for (const finding of sortById(findings)) {
+    if (grouped) lines.push(...groupedUnmappedBlock(unmapped))
+    for (const finding of sortById(rendered)) {
       lines.push(`  ${finding.ruleId}  ${finding.description}`)
       lines.push(`    ${finding.provider} · ${finding.id}`)
       for (const evidence of finding.evidence ?? []) {
@@ -57,6 +76,8 @@ export function renderReport(result: PipelineResult): Report {
     }
     lines.push('')
   }
+
+  lines.push(...driftBurnDown(result.findings))
 
   // Who judged the run is part of the run. A config that replaced a phase —
   // deliberately or by forgetting to spread the defaults back in — is visible
@@ -73,6 +94,51 @@ export function renderReport(result: PipelineResult): Report {
   )
 
   return { text: lines.join('\n'), exitCode }
+}
+
+/**
+ * One block for many unowned files: total, a by-directory breakdown, and a
+ * sample of paths. The per-file detail is still one `--json` away.
+ */
+function groupedUnmappedBlock(unmapped: Finding[]): string[] {
+  const paths = unmapped
+    .map((finding) => finding.subject?.id ?? '(unknown)')
+    .sort((a, b) => a.localeCompare(b))
+
+  const byDirectory = new Map<string, number>()
+  for (const filePath of paths) {
+    const top = filePath.includes('/') ? `${filePath.split('/')[0]}/` : './'
+    byDirectory.set(top, (byDirectory.get(top) ?? 0) + 1)
+  }
+  const breakdown = [...byDirectory]
+    .sort(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b))
+    .map(([directory, count]) => `${directory} ${count}`)
+    .join(' · ')
+
+  const provider = unmapped[0]?.provider ?? 'architecture-rules'
+  const lines = [
+    `  unmapped-source  ${unmapped.length} files are not owned by any model element.`,
+    `    ${provider} · ${unmapped.length} findings (grouped; --json lists each file)`,
+    `    ${breakdown}`,
+    ...paths.slice(0, UNMAPPED_SOURCE_LISTED_PATHS).map((filePath) => `    ${filePath}`),
+  ]
+  if (paths.length > UNMAPPED_SOURCE_LISTED_PATHS) {
+    lines.push(`    +${paths.length - UNMAPPED_SOURCE_LISTED_PATHS} more`)
+  }
+  return lines
+}
+
+/**
+ * The drift ratchet's burn-down, derived from the findings alone so a `--json`
+ * consumer computes the identical numbers: every drift edge yields exactly one
+ * `drift-relationship` (exercised) or `unused-drift` (unused) finding.
+ */
+function driftBurnDown(findings: Finding[]): string[] {
+  const exercised = findings.filter((finding) => finding.ruleId === 'drift-relationship').length
+  const unused = findings.filter((finding) => finding.ruleId === 'unused-drift').length
+  const declared = exercised + unused
+  if (declared === 0) return []
+  return [`drift: ${declared} declared · ${exercised} exercised · ${unused} unused`]
 }
 
 function formatEvidence(evidence: Evidence): string {

@@ -29,7 +29,7 @@ export type { PhaseProviders, PipelineConfig, PipelineResult } from './pipeline.
 
 export { pipelineConfig, defaultResolve, defaultValidate } from './defaults.ts'
 
-export { exitCodeFor, renderReport } from './report.ts'
+export { exitCodeFor, renderReport, UNMAPPED_SOURCE_GROUP_THRESHOLD } from './report.ts'
 
 export { relationshipId, findingId, namespaced } from './ids.ts'
 
@@ -45,6 +45,7 @@ export {
 // config file that replaces a phase can rebuild the default entries verbatim.
 export {
   architectureRules,
+  DEFAULT_DRIFT_TAG,
   EVIDENCE_LIMIT,
   PROVIDER_ID as ARCHITECTURE_RULES_PROVIDER_ID,
 } from './providers/architecture-rules.ts'

@@ -1,0 +1,10 @@
+{
+  "name": "packages-fixture",
+  "private": true,
+  "dependencies": {
+    "pg": "^8.0.0",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "lodash": "^4.0.0",
+    "oldpkg": "^1.0.0"
+  }
+}

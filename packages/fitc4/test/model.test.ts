@@ -9,6 +9,9 @@ import {
   loadModel,
   normalizeSources,
   ownershipPrefixes,
+  packageClaims,
+  packageNameOf,
+  toPackageName,
   toPrefix,
 } from '../src/model.ts'
 import { ownerOf } from '../src/providers/source-root.ts'
@@ -135,6 +138,80 @@ describe('ownerOf', () => {
     expect(ownerOf('src-legacy/old.ts', [prefixes[0] as (typeof prefixes)[number]])).toEqual({
       status: 'unresolved',
     })
+  })
+})
+
+describe('package name derivation', () => {
+  test.each([
+    ['pg', 'pg'],
+    ['pg/promises', 'pg'],
+    ['@aws-sdk/client-s3', '@aws-sdk/client-s3'],
+    ['@aws-sdk/client-s3/commands', '@aws-sdk/client-s3'],
+    ['node:path', 'node:path'],
+  ])('derives %j from %j', (specifier, name) => {
+    expect(packageNameOf(specifier)).toBe(name)
+  })
+})
+
+describe('toPackageName', () => {
+  test.each([
+    ['pg', 'pg'],
+    ['@aws-sdk/client-s3', '@aws-sdk/client-s3'],
+    ['  pg  ', 'pg'],
+  ])('accepts %j as %j', (declared, name) => {
+    expect(toPackageName(declared)).toEqual({ name })
+  })
+
+  // A claim that is not an exact package name would silently gate nothing —
+  // the fail-open the loud rejection exists to prevent.
+  test.each([
+    ['', 'empty'],
+    ['   ', 'empty'],
+    ['pg client', 'whitespace'],
+    ['pg/promises', "claim the package 'pg'"],
+    ['@aws-sdk/client-s3/commands', "claim the package '@aws-sdk/client-s3'"],
+    ['pg/', 'subpath'],
+    ['@scope', 'scope without a package'],
+    ['./pg', 'path'],
+    ['/pg', 'path'],
+  ])('rejects %j', (declared, hint) => {
+    const result = toPackageName(declared)
+    expect(result).toHaveProperty('reason')
+    expect('reason' in result ? result.reason : '').toContain(hint)
+  })
+})
+
+describe('package claims', () => {
+  test('claims carry the claiming element and the exact name', async () => {
+    const { model } = await loadModel(fixturePath('packages'))
+    const { claims, rejected } = packageClaims(model)
+
+    expect(rejected).toEqual([])
+    expect(claims.map((claim) => `${claim.elementId} ${claim.name}`).sort()).toEqual([
+      'fixture.cloud @aws-sdk/client-s3',
+      'fixture.infra pg',
+      'fixture.oldstore oldpkg',
+    ])
+  })
+
+  test('an invalid claim is rejected rather than silently ignored', async () => {
+    const { model } = await loadModel(fixturePath('bad-packages'))
+    const { rejected } = packageClaims(model)
+
+    expect(rejected.map((entry) => entry.elementId).sort()).toEqual([
+      'fixture.blank',
+      'fixture.deep',
+    ])
+  })
+})
+
+describe('relationship tags', () => {
+  test('declared relationships record their tags', async () => {
+    const { model } = await loadModel(fixturePath('drift'))
+    const { byId } = declaredRelationships(model)
+
+    expect(byId.get('fixture.legacy::_::fixture.core')?.tags).toEqual(['drift'])
+    expect(byId.get('fixture.interface::_::fixture.core')?.tags).toEqual([])
   })
 })
 

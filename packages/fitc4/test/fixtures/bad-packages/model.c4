@@ -1,0 +1,50 @@
+specification {
+  element system
+  element component
+}
+
+model {
+  fixture = system 'Fixture' {
+    a = component 'A' {
+      metadata {
+        sources 'src/a/**'
+        packages 'dup-pkg'
+      }
+    }
+
+    b = component 'B' {
+      metadata {
+        packages 'dup-pkg'
+      }
+    }
+
+    // Claims a package no scanned file imports — a typo'd claim must not
+    // silently pass.
+    ghost = component 'Ghost' {
+      metadata {
+        packages 'ghost-pkg'
+      }
+    }
+
+    // A subpath is not a package name.
+    deep = component 'Deep' {
+      metadata {
+        packages 'pg/promises'
+      }
+    }
+
+    // Whitespace inside a name claims nothing. (A whitespace-only value never
+    // reaches the reader: LikeC4 drops it while parsing metadata.)
+    blank = component 'Blank' {
+      metadata {
+        packages 'pg client'
+      }
+    }
+  }
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

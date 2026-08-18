@@ -1,0 +1,35 @@
+specification {
+  element system
+  element component
+}
+
+model {
+  // A parent whose child carries the claim is structural, not unobserved.
+  fixture = system 'Fixture' {
+    core = component 'Core' {
+      metadata {
+        sources 'src/core/**'
+      }
+    }
+  }
+
+  // Twelve unobserved leaves: enough to exercise the list cap.
+  ghost01 = system 'Ghost 01'
+  ghost02 = system 'Ghost 02'
+  ghost03 = system 'Ghost 03'
+  ghost04 = system 'Ghost 04'
+  ghost05 = system 'Ghost 05'
+  ghost06 = system 'Ghost 06'
+  ghost07 = system 'Ghost 07'
+  ghost08 = system 'Ghost 08'
+  ghost09 = system 'Ghost 09'
+  ghost10 = system 'Ghost 10'
+  ghost11 = system 'Ghost 11'
+  ghost12 = system 'Ghost 12'
+}
+
+views {
+  view index {
+    include *
+  }
+}

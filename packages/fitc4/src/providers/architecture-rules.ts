@@ -15,8 +15,15 @@ import { isStandardObservationKind } from '../kinds.ts'
 import {
   hasRelationship,
   declaredRelationships,
+  isAncestorOf,
   isSameOrNested,
+  normalizeSources,
   ownershipPrefixes,
+  packageClaims,
+  packageNameOf,
+  PACKAGES_KEY,
+  SOURCES_KEY,
+  type DeclaredRelationship,
 } from '../model.ts'
 import type {
   Association,
@@ -44,10 +51,19 @@ export type ArchitectureRuleId =
   | 'ambiguous-source'
   | 'invalid-sources'
   | 'unmatched-sources'
+  | 'invalid-packages'
+  | 'ambiguous-package'
+  | 'unmatched-packages'
   | 'unmapped-source'
   | 'unresolved-import'
+  | 'drift-relationship'
+  | 'unused-drift'
+  | 'unobserved-elements'
   | 'duplicate-relationship'
   | 'unknown-observation-kind'
+
+/** The default tag marking a relationship as tolerated drift. */
+export const DEFAULT_DRIFT_TAG = 'drift'
 
 export interface ArchitectureRulesOptions {
   /**
@@ -58,8 +74,22 @@ export interface ArchitectureRulesOptions {
    * `{ 'unmapped-source': 'error' }` — and unowned code then fails the gate
    * instead of slipping past it, since dependencies from unowned files are
    * never boundary-checked. Softening works the same way during a migration.
+   *
+   * The drift ratchet is tuned the same way: `{ 'drift-relationship': 'error' }`
+   * forbids all tolerated drift, `{ 'unused-drift': 'error' }` makes the
+   * ratchet hard — a drift edge the code stopped exercising fails the gate
+   * until it is deleted from the model.
    */
   severity?: Partial<Record<ArchitectureRuleId, Severity>>
+  /**
+   * The relationship tag that marks model-native debt.
+   *
+   * A relationship carrying this tag is permitted but counted: dependencies it
+   * covers stay legal while the `drift-relationship` finding keeps the edge
+   * visible in every report. The tag must be declared in the LikeC4
+   * specification (`tag drift`) — LikeC4 itself rejects unknown tags.
+   */
+  driftTag?: string
 }
 
 /** How load-bearing each rule is: the configured override, or the standard severity. */
@@ -74,10 +104,12 @@ export function architectureRules(
   options: ArchitectureRulesOptions = {},
 ): NamedProvider<ValidateProvider> {
   const severityOf: SeverityOf = (rule, standard) => options.severity?.[rule] ?? standard
+  const driftTag = options.driftTag ?? DEFAULT_DRIFT_TAG
 
   const run: ValidateProvider = async (context: ValidateContext): Promise<Finding[]> => {
     const observations = new Map(context.observations.map((item) => [item.id, item]))
     const declared = declaredRelationships(context.model)
+    const drift = new DriftLedger(declared.byId.values(), driftTag)
     const collector = new FindingCollector()
 
     for (const association of context.associations) {
@@ -88,14 +120,19 @@ export function architectureRules(
         collector.add(fileRule(association, observation, severityOf))
       } else if (observation.kind === 'dependency') {
         collector.add(dependencyRule(association, observation, declared, severityOf))
+        drift.record(association, observation)
       } else if (observation.kind === 'unresolved-dependency') {
         collector.add(unresolvedImportRule(association, observation, severityOf))
       }
     }
 
+    for (const finding of drift.findings(severityOf)) collector.add(finding)
+
     return [
       ...collector.findings(),
       ...coverageRules(context, observations, severityOf),
+      ...packageRules(context, observations, severityOf),
+      ...unobservedElementsRule(context, severityOf),
       ...modelHygieneRules(declared, severityOf),
       ...vocabularyRules(context, severityOf),
     ]
@@ -147,6 +184,97 @@ class FindingCollector {
       }
     }
     return [...this.#byId.values()]
+  }
+}
+
+/**
+ * The drift ratchet: model-native debt, tagged in the model and counted here.
+ *
+ * A drift-tagged relationship is an ordinary declared relationship, so the
+ * dependencies it covers are already permitted; this ledger only makes them
+ * visible. Coverage is tested per drift edge rather than read from
+ * `association.relationship`, so a dependency also covered by an untagged
+ * relationship still counts as exercising the drift edge — the edge is only
+ * `unused-drift` when nothing it covers happens anymore.
+ */
+class DriftLedger {
+  readonly #edges = new Map<
+    string,
+    { relationship: DeclaredRelationship; count: number; evidence: Evidence[] }
+  >()
+
+  constructor(declared: Iterable<DeclaredRelationship>, driftTag: string) {
+    for (const relationship of declared) {
+      if (relationship.tags.includes(driftTag)) {
+        this.#edges.set(relationship.id, { relationship, count: 0, evidence: [] })
+      }
+    }
+  }
+
+  /** Count a resolved boundary crossing against every drift edge covering it. */
+  record(association: Association, observation: Observation): void {
+    if (this.#edges.size === 0) return
+    if (association.status !== 'resolved') return
+
+    const sourceId = association.source?.id
+    const targetId = association.target?.id
+    if (sourceId === undefined || targetId === undefined) return
+    if (isSameOrNested(sourceId, targetId)) return
+
+    for (const edge of this.#edges.values()) {
+      const { relationship } = edge
+      const coversSource =
+        relationship.sourceId === sourceId || isAncestorOf(relationship.sourceId, sourceId)
+      const coversTarget =
+        relationship.targetId === targetId || isAncestorOf(relationship.targetId, targetId)
+      if (!coversSource || !coversTarget) continue
+
+      edge.count += 1
+      // Borrowed evidence; the collector copies and caps it on add.
+      edge.evidence.push(...(observation.evidence ?? []))
+    }
+  }
+
+  /**
+   * One finding per drift edge: exercised edges at `info` (the burn-down),
+   * unused edges at `warning` (the ratchet's shrink mechanism — the code no
+   * longer does this, so the model must stop tolerating it).
+   */
+  findings(severityOf: SeverityOf): Finding[] {
+    return [...this.#edges.values()].map(({ relationship, count, evidence }) => {
+      const edge = `${relationship.sourceId} → ${relationship.targetId}`
+      if (count > 0) {
+        return {
+          id: findingId(PROVIDER_ID, 'drift-relationship', relationship.id),
+          ruleId: 'drift-relationship',
+          severity: severityOf('drift-relationship', 'info'),
+          description:
+            `${edge} is declared drift; ${count} ${count === 1 ? 'dependency still rides' : 'dependencies still ride'} it. ` +
+            `Remove the code path, then delete the tagged relationship from the model.`,
+          subject: { kind: 'relationship', id: relationship.id },
+          related: [
+            { kind: 'element', id: relationship.sourceId },
+            { kind: 'element', id: relationship.targetId },
+          ],
+          evidence,
+          provider: PROVIDER_ID,
+        }
+      }
+      return {
+        id: findingId(PROVIDER_ID, 'unused-drift', relationship.id),
+        ruleId: 'unused-drift',
+        severity: severityOf('unused-drift', 'warning'),
+        description:
+          `${edge} is declared drift, but no code exercises it anymore. ` +
+          `Delete the relationship: the model must not keep tolerating what stopped happening.`,
+        subject: { kind: 'relationship', id: relationship.id },
+        related: [
+          { kind: 'element', id: relationship.sourceId },
+          { kind: 'element', id: relationship.targetId },
+        ],
+        provider: PROVIDER_ID,
+      }
+    })
   }
 }
 
@@ -332,6 +460,130 @@ function coverageRules(
   }
 
   return findings
+}
+
+/**
+ * Package claims that gate nothing.
+ *
+ * The same fail-open family as `coverageRules`, on the package side: a typo'd
+ * claim (`postgres` for `pg`, a subpath, an empty string) silently claims
+ * nothing, every import of the real package stays unrestricted, and the run
+ * goes green. Each broken claim is an error instead.
+ */
+function packageRules(
+  context: ValidateContext,
+  observations: Map<string, Observation>,
+  severityOf: SeverityOf,
+): Finding[] {
+  const { claims, rejected } = packageClaims(context.model)
+  const findings: Finding[] = []
+
+  for (const entry of rejected) {
+    findings.push({
+      id: findingId(PROVIDER_ID, 'invalid-packages', `${entry.elementId}/${entry.declared}`),
+      ruleId: 'invalid-packages',
+      severity: severityOf('invalid-packages', 'error'),
+      description: `${entry.elementId} declares packages '${entry.declared}', which ${entry.reason}.`,
+      subject: { kind: 'element', id: entry.elementId },
+      provider: PROVIDER_ID,
+    })
+  }
+
+  const claimantsByName = new Map<string, string[]>()
+  for (const claim of claims) {
+    claimantsByName.set(claim.name, [...(claimantsByName.get(claim.name) ?? []), claim.elementId])
+  }
+
+  // Two elements claiming one package is genuine ambiguity in the model: every
+  // import of it resolves to no single element, so nothing gets judged.
+  for (const [name, elementIds] of claimantsByName) {
+    if (elementIds.length < 2) continue
+    const sorted = [...elementIds].sort()
+    findings.push({
+      id: findingId(PROVIDER_ID, 'ambiguous-package', name),
+      ruleId: 'ambiguous-package',
+      severity: severityOf('ambiguous-package', 'error'),
+      description: `Package '${name}' is claimed by ${sorted.join(' and ')}.`,
+      subject: { kind: 'module', id: name },
+      related: sorted.map((id) => ({ kind: 'element', id })),
+      provider: PROVIDER_ID,
+    })
+  }
+
+  const all = [...observations.values()]
+
+  // With nothing scanned, every claim trivially matches nothing. That says
+  // something about the scan, not about the model, and whatever broke the scan
+  // has already reported itself. Same guard as `coverageRules`.
+  if (!all.some((observation) => observation.kind === 'file')) return findings
+
+  const imported = new Set(
+    all
+      .filter(
+        (observation) =>
+          observation.kind === 'dependency' && observation.target?.kind === 'module',
+      )
+      .map((observation) => packageNameOf(observation.target?.id ?? '')),
+  )
+
+  for (const claim of claims) {
+    if (imported.has(claim.name)) continue
+    findings.push({
+      id: findingId(PROVIDER_ID, 'unmatched-packages', `${claim.elementId}/${claim.declared}`),
+      ruleId: 'unmatched-packages',
+      severity: severityOf('unmatched-packages', 'error'),
+      description: `${claim.elementId} claims package '${claim.declared}', which no scanned file imports.`,
+      subject: { kind: 'element', id: claim.elementId },
+      provider: PROVIDER_ID,
+    })
+  }
+
+  return findings
+}
+
+/** How many unobserved element ids the finding lists before collapsing to a count. */
+const UNOBSERVED_LIST_LIMIT = 10
+
+/**
+ * Leaf elements nothing observes.
+ *
+ * An element with neither `sources` nor `packages` is legal — a person, an
+ * external system, a pure-thought element — but silently unenforced, which is
+ * indistinguishable from a typo'd claim key. One `info` finding lists them so
+ * the state is chosen, not accidental. A parent whose children carry the
+ * claims is structural, not unobserved, so only leaves count.
+ */
+function unobservedElementsRule(context: ValidateContext, severityOf: SeverityOf): Finding[] {
+  const unobserved: string[] = []
+
+  for (const element of context.model.elements()) {
+    if (element.children().size > 0) continue
+    if (normalizeSources(element.metadata[SOURCES_KEY]).length > 0) continue
+    if (normalizeSources(element.metadata[PACKAGES_KEY]).length > 0) continue
+    unobserved.push(element.id)
+  }
+
+  if (unobserved.length === 0) return []
+
+  unobserved.sort()
+  const listed = unobserved.slice(0, UNOBSERVED_LIST_LIMIT).join(', ')
+  const overflow =
+    unobserved.length > UNOBSERVED_LIST_LIMIT
+      ? ` +${unobserved.length - UNOBSERVED_LIST_LIMIT} more`
+      : ''
+
+  return [
+    {
+      id: findingId(PROVIDER_ID, 'unobserved-elements', 'model'),
+      ruleId: 'unobserved-elements',
+      severity: severityOf('unobserved-elements', 'info'),
+      description:
+        `${unobserved.length} element(s) declare neither 'sources' nor 'packages', ` +
+        `so nothing checks them: ${listed}${overflow}.`,
+      related: unobserved.slice(0, UNOBSERVED_LIST_LIMIT).map((id) => ({ kind: 'element', id })),
+      provider: PROVIDER_ID,
+    },
+  ]
 }
 
 /**

@@ -20,6 +20,7 @@ import fs from 'node:fs'
 import { isBuiltin } from 'node:module'
 import path from 'node:path'
 import ts from 'typescript'
+import { packageNameOf } from '../model.ts'
 import type { Observation, ScanContext } from '../types.ts'
 
 export const PROVIDER_ID = 'typescript-imports'
@@ -373,13 +374,6 @@ function matchesPathsAlias(
     }
   }
   return false
-}
-
-/** The package a specifier names: `@scope/name/deep` → `@scope/name`, `name/deep` → `name`. */
-function packageNameOf(specifier: string): string {
-  const segments = specifier.split('/')
-  if (specifier.startsWith('@') && segments.length >= 2) return `${segments[0]}/${segments[1]}`
-  return segments[0] ?? specifier
 }
 
 interface DeclaredPackageLookup {

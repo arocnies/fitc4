@@ -1,0 +1,7 @@
+{
+  "name": "bad-packages-fixture",
+  "private": true,
+  "dependencies": {
+    "dup-pkg": "^1.0.0"
+  }
+}

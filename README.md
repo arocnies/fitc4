@@ -101,8 +101,14 @@ The model itself lives wherever `model` points. It is authored architecture docu
 | `missing-relationship` | error | Code crosses a boundary the model does not declare |
 | `relationship-direction` | error | The model declares only the opposite direction |
 | `unresolved-import` | warning | An import resolves to nothing — a broken path, a dead tsconfig alias, an undeclared package — so it cannot be checked |
+| `drift-relationship` | info | Code still exercises a drift-tagged relationship; burn it down, then delete the relationship |
+| `unused-drift` | warning | A drift-tagged relationship no code exercises anymore — delete it from the model |
+| `unobserved-elements` | info | Leaf elements with neither `sources` nor `packages`; nothing checks them |
 | `invalid-sources` | error | Ownership metadata the prefix matcher cannot honour |
 | `unmatched-sources` | error | Ownership metadata that matches no scanned file |
+| `invalid-packages` | error | A `packages` claim that is not an exact npm package name |
+| `ambiguous-package` | error | Two elements claim the same package |
+| `unmatched-packages` | error | A claimed package that no scanned file imports |
 | `duplicate-relationship` | info | Two relationships share one stable identity |
 | `unknown-observation-kind` | info | A provider emitted facts no rule interprets |
 | `orphaned-association` | error | A provider referenced an observation that does not exist |
