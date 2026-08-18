@@ -1,17 +1,19 @@
 /**
  * `fitc4 init` — scaffold a project into a first green run.
  *
- * Drops the two files a project needs: a `fitc4.config.json` and a starter
- * `arch/model.c4` whose single element owns `src/**`, so the very first
- * `npx fitc4` is green rather than a wall of unowned files. The starter is a
- * placeholder to split, not a suggestion of shape.
+ * Drops the files a project needs: a `fitc4.config.json`, a starter
+ * `arch/model.c4` whose single element owns `src/**` — so the very first
+ * `npx fitc4` is green rather than a wall of unowned files — and an
+ * `AGENTS.md` carrying the one norm a coding agent cannot infer from the CLI:
+ * the model is the contract, not a knob for silencing findings. The starter
+ * model is a placeholder to split, not a suggestion of shape.
  *
  * Never overwrites: an existing config is an error (running init twice is a
- * mistake worth stopping), an existing model file is kept with a note (the
- * model is authored documentation, not this tool's property). Prerequisites
- * that cannot be scaffolded — a tsconfig, a source tree — become notes rather
- * than created files, because guessing a project's TypeScript setup wrong is
- * worse than asking.
+ * mistake worth stopping), an existing model file or AGENTS.md is kept with a
+ * note (both are authored documentation, not this tool's property).
+ * Prerequisites that cannot be scaffolded — a tsconfig, a source tree —
+ * become notes rather than created files, because guessing a project's
+ * TypeScript setup wrong is worse than asking.
  */
 
 import fs from 'node:fs'
@@ -29,6 +31,7 @@ export interface InitResult {
 
 export const MODEL_DIR = 'arch'
 export const MODEL_FILENAME = 'model.c4'
+export const AGENTS_FILENAME = 'AGENTS.md'
 
 const CONFIG_TEMPLATE = `{
   "$schema": "./node_modules/fitc4/schema/fitc4.config.schema.json",
@@ -63,6 +66,23 @@ views {
 }
 `
 
+const AGENTS_TEMPLATE = `# Agent instructions
+
+## Architecture gate (fitc4)
+
+- Run \`npx fitc4\` before handing off changes; it checks the code against the
+  LikeC4 architecture model. Exit 1 is an architecture violation, not a flaky
+  tool.
+- A finding means the code and the contract disagree. Fixing the code is the
+  default. Editing the model is a design decision — legitimate when the
+  architecture genuinely changed, never merely to silence a finding — and any
+  model change must be called out explicitly when handing off.
+- Never delete \`sources\` metadata or a declared relationship to make a finding
+  go away: that removes code from architecture control entirely.
+- Rule reference: \`node_modules/fitc4/README.md#rules\`. Structured output:
+  \`npx fitc4 --json\`.
+`
+
 export function init(directory: string): InitResult {
   const target = path.resolve(directory)
 
@@ -93,6 +113,18 @@ export function init(directory: string): InitResult {
     fs.mkdirSync(path.dirname(modelPath), { recursive: true })
     fs.writeFileSync(modelPath, MODEL_TEMPLATE)
     result.created.push(modelRelative)
+  }
+
+  const agentsPath = path.join(target, AGENTS_FILENAME)
+  if (fs.existsSync(agentsPath)) {
+    result.skipped.push(AGENTS_FILENAME)
+    result.notes.push(
+      `AGENTS.md already exists — merge the fitc4 norms into it yourself: ` +
+        `the copy-paste block is at node_modules/fitc4/README.md#for-ai-agents`,
+    )
+  } else {
+    fs.writeFileSync(agentsPath, AGENTS_TEMPLATE)
+    result.created.push(AGENTS_FILENAME)
   }
 
   if (!fs.existsSync(path.join(target, 'tsconfig.json'))) {

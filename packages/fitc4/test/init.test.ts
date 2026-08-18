@@ -30,7 +30,7 @@ describe('init', () => {
 
     const result = init(root)
 
-    expect(result.created).toEqual(['fitc4.config.json', 'arch/model.c4'])
+    expect(result.created).toEqual(['fitc4.config.json', 'arch/model.c4', 'AGENTS.md'])
     expect(result.skipped).toEqual([])
     // A fresh directory has neither prerequisite; both are notes, not files —
     // guessing a project's TypeScript setup wrong is worse than asking.
@@ -76,8 +76,31 @@ describe('init', () => {
 
     const result = init(root)
 
-    expect(result.created).toEqual(['fitc4.config.json'])
+    expect(result.created).toEqual(['fitc4.config.json', 'AGENTS.md'])
     expect(result.skipped).toEqual(['arch/model.c4'])
     expect(fs.readFileSync(path.join(root, 'arch', 'model.c4'), 'utf8')).toBe('// authored\n')
+  })
+
+  test('the scaffolded AGENTS.md carries the fitc4 norms', () => {
+    const root = scratch()
+    init(root)
+
+    const content = fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8')
+    // The one norm an agent cannot infer from the CLI: the model is the
+    // contract, never edited merely to make a finding go away.
+    expect(content).toContain('never merely to silence a finding')
+    expect(content).toContain('node_modules/fitc4/README.md#rules')
+  })
+
+  test('keeps an existing AGENTS.md untouched and points at the README block', () => {
+    const root = scratch()
+    fs.writeFileSync(path.join(root, 'AGENTS.md'), '# House rules\n')
+
+    const result = init(root)
+
+    expect(result.skipped).toContain('AGENTS.md')
+    // The author merges the norms themselves — the note says where from.
+    expect(result.notes.join('\n')).toContain('#for-ai-agents')
+    expect(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8')).toBe('# House rules\n')
   })
 })

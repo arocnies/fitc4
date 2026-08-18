@@ -19,8 +19,9 @@ const USAGE = `Usage: fitc4 [command] [options]
 
 Commands:
   (none)           Check the code against the LikeC4 architecture model.
-  init             Scaffold fitc4.config.json and a starter arch/model.c4 in
-                   the current directory. Never overwrites existing files.
+  init             Scaffold fitc4.config.json, a starter arch/model.c4, and
+                   an AGENTS.md with the fitc4 norms in the current
+                   directory. Never overwrites existing files.
 
 Options:
   --config <path>  Path to a fitc4 config (.ts, .mts, .js, .mjs, or .json).
