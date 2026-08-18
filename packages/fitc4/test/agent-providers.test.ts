@@ -198,6 +198,56 @@ describe('agentSemanticReview', () => {
     expect(request?.context).toContain('### src/core/calc.ts')
   })
 
+  test('the context is a pack: element facts and the complete owned-file list come first', async () => {
+    const exec = stubExec([ok({ matches: true, issues: [] })])
+
+    await runFixture('described', { validate: [agentSemanticReview({ exec })] })
+
+    const context = exec.requests[0]?.context ?? ''
+    // The versioned header makes the pack format explicit in the cache key.
+    expect(context.startsWith('context-pack v1')).toBe(true)
+    expect(context).toContain("### Element facts: demo.core ('Core')")
+    expect(context).toContain('Description: Pure calculation; performs no I/O')
+    expect(context).toContain('Declared relationships:')
+    // The complete list, with the excerpted files marked as such.
+    expect(context).toContain('Owned files (2 total, 2 excerpted below):')
+    expect(context).toContain('- src/core/calc.ts (excerpted)')
+    expect(context).toContain('- src/core/twice.ts (excerpted)')
+    expect(context).toContain('### src/core/calc.ts')
+  })
+
+  test('files beyond maxFilesPerElement are announced in the context AND attested as a finding', async () => {
+    const exec = stubExec([ok({ matches: true, issues: [] }), ok({ matches: true, issues: [] })])
+
+    const result = await runFixture('described', {
+      validate: [agentSemanticReview({ exec, maxFilesPerElement: 1 })],
+    })
+
+    // The model was told its view is partial — the unexcerpted file still
+    // appears in the element facts, and the drop is announced inline.
+    const context = exec.requests[0]?.context ?? ''
+    expect(context).toContain('Owned files (2 total, 1 excerpted below):')
+    expect(context).toContain('- src/core/twice.ts (not excerpted)')
+    expect(context).toContain('NOTE: 1 owned files of demo.core beyond budget not shown')
+    expect(context).not.toContain('### src/core/twice.ts')
+
+    // And the pipeline was told too: the drop is a standard agent-truncated
+    // finding, never a silent thinning of the judge's evidence.
+    const finding = findingFor(result.findings, 'agent-truncated')
+    expect(finding?.severity).toBe('info')
+    expect(finding?.description).toContain('1 owned files of demo.core')
+  })
+
+  test("severity: 'error' escalates the per-element file truncation — unjudged files bypassed the gate", async () => {
+    const exec = stubExec([ok({ matches: true, issues: [] }), ok({ matches: true, issues: [] })])
+
+    const result = await runFixture('described', {
+      validate: [agentSemanticReview({ exec, maxFilesPerElement: 1, severity: 'error' })],
+    })
+
+    expect(findingFor(result.findings, 'agent-truncated')?.severity).toBe('error')
+  })
+
   test('a matching verdict is silence', async () => {
     const exec = stubExec([ok({ matches: true, issues: [] })])
 
