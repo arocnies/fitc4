@@ -1,0 +1,59 @@
+specification {
+  element system
+  element component
+  tag drift
+}
+
+model {
+  mono = system 'Monolith' {
+    ui = component 'UI' {
+      description 'Rendering only: formats what the API returns and computes no business results itself'
+      metadata {
+        sources 'src/ui/**'
+      }
+    }
+
+    api = component 'API' {
+      metadata {
+        sources 'src/api/**'
+      }
+    }
+
+    core = component 'Core' {
+      description 'Pure order and pricing calculation; performs no I/O'
+      metadata {
+        sources 'src/core/**'
+      }
+    }
+
+    legacy = component 'Legacy' {
+      metadata {
+        sources 'src/legacy/**'
+      }
+    }
+  }
+
+  mono.ui -> mono.api 'renders via'
+  mono.api -> mono.core 'uses'
+
+  // Tolerated debt: the code still does this, the target architecture does
+  // not want it. Both edges are exercised by src/api and src/legacy.
+  mono.api -> mono.legacy 'reads legacy tables' {
+    #drift
+  }
+  mono.legacy -> mono.core 'legacy direct read' {
+    #drift
+  }
+
+  // Declared drift no code exercises anymore — the ratchet must demand its
+  // deletion.
+  mono.ui -> mono.legacy 'old entry point' {
+    #drift
+  }
+}
+
+views {
+  view index of mono {
+    include *
+  }
+}
