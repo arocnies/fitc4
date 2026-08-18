@@ -59,7 +59,7 @@ Brownfield adoption needs a way to say "this dependency exists, we know, stop sh
 
 - The tag defaults to `drift` (`architectureRules({ driftTag })` configures it) and must be declared in the LikeC4 specification (`tag drift`) — LikeC4 rejects unknown tags.
 - A drift-tagged relationship is an ordinary declared relationship, so the dependencies it covers stay legal. The `DriftLedger` counts resolved crossings against every drift edge covering them; coverage is tested per edge, so a dependency also covered by an untagged relationship still counts as exercising the drift edge.
-- Every drift edge yields exactly one finding per run: `drift-relationship` (info) while code still exercises it — the burn-down — or `unused-drift` (warning) once nothing does, whose fix is deleting the relationship. That deletion is the ratchet: tolerated debt can only shrink.
+- Every drift edge yields exactly one finding per run: `drift-relationship` (info) while code still exercises it — the burn-down — or `unused-drift` (warning) once nothing does, whose fix is deleting the relationship. That deletion is the ratchet: tolerated debt can only shrink. The granularity is the edge, not the import volume — one finding whether one dependency rides the edge or forty; the set that only shrinks is the set of tolerated edges.
 - The report derives a burn-down line from the findings alone — `drift: N declared · M exercised · K unused` — so a `--json` consumer computes identical numbers.
 - Promotions tune the policy: `drift-relationship: 'error'` forbids all tolerated drift; `unused-drift: 'error'` makes the ratchet hard.
 

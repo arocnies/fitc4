@@ -2,16 +2,20 @@
 
 Fit the code to the model: check an implementation against a LikeC4 architecture contract.
 
-A [LikeC4](https://likec4.dev) model is a user-defined contract — which components exist and which may depend on which. `fitc4` is the enforcement half of LikeC4: it scans your code, maps every file and import onto that model, and fails the build where the two disagree. TypeScript imports are the built-in evidence, not the limit of the contract — providers extend the same gate to anything observable about the implementation. Brownfield code adopts through [the drift ratchet](#the-drift-ratchet): declare the dependencies that really exist, tagged as drift, and burn them down — the model shows the debt, the report counts it. And agents are held to the same contract through the same CLI — see [For AI agents](#for-ai-agents).
+A [LikeC4](https://likec4.dev) model is a user-defined contract — which components exist and which may depend on which. `fitc4` is the enforcement half of LikeC4: it scans your code, maps every file and import onto that model, and fails the build where the two disagree.
 
-## Setup
+- **A deterministic CI gate.** Imports are checked against declared relationships — same inputs, same findings, exit 1 on violation. TypeScript imports are what it checks out of the box; providers extend the same gate to anything observable about the implementation — compose files, runbooks, OpenAPI.
+- **A brownfield on-ramp.** A truthful model fails on day one; [the drift ratchet](#the-drift-ratchet) declares the debt in the model, counts it in every report, and only lets it shrink.
+- **A contract agents are held to.** Agents write more of the code now; fitc4 holds them to the same model through the same CLI — and ships the norms that keep "edit the model to silence the finding" off the table. See [For AI agents](#for-ai-agents).
+
+## Quickstart
 
 ```sh
 npm install --save-dev fitc4
 npx fitc4 init
 ```
 
-`init` scaffolds `fitc4.config.json` and a starter `arch/model.c4` whose single element owns `src/**`, so the very first check is green — split the placeholder into real components from there. It never overwrites existing files. Requires Node >= 22.22.3 (the CLI loads `.ts` configs with Node's native type stripping) and a `tsconfig.json`, whose module resolution the scanner uses.
+Green in under a minute: `init` scaffolds `fitc4.config.json` and a starter `arch/model.c4` whose single element owns `src/**`, so the very first check passes — split the placeholder into real components from there. It never overwrites existing files. Requires Node >= 22.22.3 (the CLI loads `.ts` configs with Node's native type stripping) and a `tsconfig.json`, whose module resolution the scanner uses.
 
 The pieces, whether scaffolded or written by hand:
 
@@ -64,8 +68,6 @@ model {
 npx fitc4
 ```
 
-Most projects wire it as a script — `"fitc4": "fitc4"` — and run `npm run fitc4` in CI.
-
 A clean run prints a summary and exits 0. A file in `src/core` importing from `src/interface` — a dependency the model does not declare — exits 1:
 
 ```text
@@ -75,6 +77,10 @@ error (1)
   dependency that the code actually has.
     src/core/bad.ts:1  ../interface/index.ts
 ```
+
+That exit 1 is the product: the gate that fails exactly where code and contract disagree. Most projects wire it as a script — `"fitc4": "fitc4"` — and run `npm run fitc4` in CI.
+
+## Configuration
 
 `--json` emits the full result instead of the report. `--config <path>` overrides discovery, which otherwise checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json` — in the working directory, then under `.fitc4/`, repeating up each ancestor. Two configs in one directory is an error rather than a silent choice.
 
@@ -149,7 +155,7 @@ info (1)
 drift: 1 declared · 1 exercised · 0 unused
 ```
 
-When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. That deletion is the ratchet: tolerated debt can shrink, never quietly persist — and it lives in model text, visible in the diagram and reviewed in diffs, not in a generated baseline file. The tag is `drift` by default (`architectureRules({ driftTag })` changes it) and must be declared in the specification — LikeC4 rejects unknown tags. `severity: { 'drift-relationship': 'error' }` forbids tolerated drift entirely; `{ 'unused-drift': 'error' }` makes the ratchet hard.
+When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. That deletion is the ratchet: tolerated debt can shrink, never quietly persist — and it lives in model text, visible in the diagram and reviewed in diffs, not in a generated baseline file. The ratchet turns on edges, not volumes: a drift relationship is one finding whether one import rides it or forty, so what can only shrink is the set of tolerated edges — the per-edge dependency count in the finding is informational, not gated. The tag is `drift` by default (`architectureRules({ driftTag })` changes it) and must be declared in the specification — LikeC4 rejects unknown tags. `severity: { 'drift-relationship': 'error' }` forbids tolerated drift entirely; `{ 'unused-drift': 'error' }` makes the ratchet hard.
 
 ## Package claims
 
@@ -207,7 +213,11 @@ export default defineConfig({
 
 The advisor makes zero calls on a clean repository; the review makes one call per described element (cached after the first run).
 
-The same entry point also ships `agentScan` and `agentResolve` — a scan provider driven by prose instructions (enforce model domains no parser covers: compose files, runbooks, OpenAPI) and a resolve provider that maps external and unresolvable dependencies onto model elements, including description-only ones like an external system. Unlike the advisory validate providers these are load-bearing, so they fail closed: any exec failure, off-schema reply, or hallucinated path is a `provider-failure` error, never a quietly thinner run. They are the prototyping path for new model domains — prose explores, and a proven domain graduates to a small deterministic provider. Details: [`docs/agent-providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/agent-providers.md).
+Judgment quality is measured, not assumed: against planted ground truth in [`evals/`](https://github.com/arocnies/fitc4/tree/main/evals), `sonnet` and `gpt-5.6-luna` score 12/12 across the fixture matrix, and the cheap-model failure mode is extra findings, never silent misses — the failure direction a gate can live with.
+
+The same entry point also ships `agentScan` and `agentResolve` — a scan provider driven by prose instructions (enforce model domains no parser covers: compose files, runbooks, OpenAPI) and a resolve provider that maps external and unresolvable dependencies onto model elements, including description-only ones like an external system. Unlike the advisory validate providers these are load-bearing, so they fail closed: any exec failure, off-schema reply, or hallucinated path is a `provider-failure` error, never a quietly thinner run.
+
+They are the prototyping path for new model domains: prose explores, and a proven domain graduates to a small deterministic provider. Details: [`docs/agent-providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/agent-providers.md).
 
 ## For AI agents
 
