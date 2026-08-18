@@ -18,6 +18,7 @@
 
 import { spawn } from 'node:child_process'
 
+import { messageOf } from '../errors.ts'
 import type { JsonObject, JsonValue } from '../types.ts'
 
 export interface AiRequest {
@@ -41,6 +42,13 @@ export type AiReply =
 export interface AiExec {
   /** Stable identity for cache keys and finding provenance; includes the model. */
   id: string
+  /**
+   * Names the fixed surface the model sees beyond the request itself — a
+   * baked-in system prompt, tool flags, isolation switches. A response cache
+   * folds it into the key, so an adapter that changes what it puts in front of
+   * the model bumps this string instead of replaying stale replies.
+   */
+  readonly fingerprint?: string
   run(request: AiRequest): Promise<AiReply>
 }
 
@@ -239,4 +247,33 @@ export function runProcess(
     child.stdin.on('error', () => {})
     child.stdin.end(options.stdin ?? '')
   })
+}
+
+/**
+ * Run an agent CLI and fold every transport-level failure — spawn error,
+ * timeout, non-zero exit — into the adapters' shared `{ ok: false }` shape.
+ * On success the caller still owns interpreting the output.
+ */
+export async function runCliProcess(
+  binary: string,
+  args: string[],
+  options: { stdin?: string; cwd?: string; timeoutMs: number },
+): Promise<{ ok: true; result: ProcessResult } | { ok: false; error: string }> {
+  let result: ProcessResult
+  try {
+    result = await runProcess(binary, args, options)
+  } catch (error) {
+    return { ok: false, error: `${binary}: ${messageOf(error)}` }
+  }
+
+  if (result.timedOut) {
+    return { ok: false, error: `${binary} timed out` }
+  }
+  if (result.code !== 0) {
+    return {
+      ok: false,
+      error: `${binary} exited ${result.code}: ${truncate(result.stderr || result.stdout, 300)}`,
+    }
+  }
+  return { ok: true, result }
 }

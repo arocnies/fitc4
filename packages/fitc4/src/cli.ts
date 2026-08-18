@@ -8,7 +8,8 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { findConfig, resolveConfig } from './config.ts'
+import { closestName, findConfig, resolveConfig } from './config.ts'
+import { messageOf } from './errors.ts'
 import { init } from './init.ts'
 import { runPipeline } from './pipeline.ts'
 import { pipelineConfig } from './defaults.ts'
@@ -50,33 +51,70 @@ function version(): string {
   return 'unknown'
 }
 
-interface Options {
-  configPath: string
+interface Arguments {
+  help: boolean
+  version: boolean
+  command: 'init' | undefined
+  configPath: string | undefined
   json: boolean
 }
 
-/**
- * Config discovery starts at the working directory, never at this file.
- *
- * Deriving it from `import.meta.url` works only while the tool lives in the
- * repository it checks. Installed from a package it would resolve inside
- * `node_modules` and find the wrong config, or none.
- */
-function parseArguments(argv: string[]): Options | undefined {
-  if (argv.includes('--help') || argv.includes('-h')) return undefined
+const KNOWN_OPTIONS = ['--help', '--version', '--config', '--json']
+const KNOWN_COMMANDS = ['init']
 
-  const flag = argv.indexOf('--config')
-  if (flag !== -1) {
-    const value = argv[flag + 1]
-    // Silently discovering a different config than the one named would check
-    // the wrong repository and report it as this one.
-    if (value === undefined || value.startsWith('-')) {
-      throw new Error('--config requires a path')
-    }
-    return { configPath: path.resolve(value), json: argv.includes('--json') }
+/**
+ * Parse argv, rejecting anything unrecognized.
+ *
+ * A typo'd flag or command that is silently ignored runs the default check
+ * instead of what was asked — `--josn` quietly loses the JSON output some
+ * script was about to parse. Same fail-open as an ignored config key, so it
+ * gets the same treatment: a loud error with a suggestion when one is close.
+ */
+function parseArguments(argv: string[]): Arguments {
+  const parsed: Arguments = {
+    help: false,
+    version: false,
+    command: undefined,
+    configPath: undefined,
+    json: false,
   }
 
-  return { configPath: findConfig(process.cwd()), json: argv.includes('--json') }
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index] as string
+
+    if (argument === '--help' || argument === '-h') {
+      parsed.help = true
+    } else if (argument === '--version') {
+      parsed.version = true
+    } else if (argument === '--json') {
+      parsed.json = true
+    } else if (argument === '--config') {
+      index += 1
+      const value = argv[index]
+      // Silently discovering a different config than the one named would
+      // check the wrong repository and report it as this one.
+      if (value === undefined || value.startsWith('-')) {
+        throw new Error('--config requires a path')
+      }
+      parsed.configPath = path.resolve(value)
+    } else if (argument.startsWith('-')) {
+      throw new Error(unknownArgument('option', argument, KNOWN_OPTIONS))
+    } else if (parsed.command === undefined && KNOWN_COMMANDS.includes(argument)) {
+      parsed.command = argument as 'init'
+    } else {
+      throw new Error(unknownArgument('command', argument, KNOWN_COMMANDS))
+    }
+  }
+
+  return parsed
+}
+
+function unknownArgument(what: string, argument: string, known: string[]): string {
+  const suggestion = closestName(argument, known)
+  return (
+    `unknown ${what} '${argument}'` +
+    (suggestion === undefined ? '' : ` — did you mean '${suggestion}'?`)
+  )
 }
 
 function runInit(): void {
@@ -93,24 +131,27 @@ function runInit(): void {
 }
 
 async function main(): Promise<void> {
-  const argv = process.argv.slice(2)
-  if (argv.includes('--version')) {
+  const options = parseArguments(process.argv.slice(2))
+
+  if (options.help) {
+    process.stdout.write(`${USAGE}\n`)
+    return
+  }
+  if (options.version) {
     process.stdout.write(`${version()}\n`)
     return
   }
-
-  if (argv[0] === 'init') {
+  if (options.command === 'init') {
     runInit()
     return
   }
 
-  const options = parseArguments(argv)
-  if (options === undefined) {
-    process.stdout.write(`${USAGE}\n`)
-    return
-  }
-
-  const result = await runPipeline(pipelineConfig(await resolveConfig(options.configPath)))
+  // Config discovery starts at the working directory, never at this file.
+  // Deriving it from `import.meta.url` works only while the tool lives in the
+  // repository it checks. Installed from a package it would resolve inside
+  // `node_modules` and find the wrong config, or none.
+  const configPath = options.configPath ?? findConfig(process.cwd())
+  const result = await runPipeline(pipelineConfig(await resolveConfig(configPath)))
 
   if (options.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
@@ -129,7 +170,6 @@ async function main(): Promise<void> {
 try {
   await main()
 } catch (error) {
-  const message = error instanceof Error ? error.message : String(error)
-  process.stderr.write(`fitc4: ${message}\n`)
+  process.stderr.write(`fitc4: ${messageOf(error)}\n`)
   process.exitCode = 1
 }

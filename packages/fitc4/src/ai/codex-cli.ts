@@ -17,7 +17,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import type { JsonValue } from '../types.ts'
-import { composeInput, finishReply, runProcess, truncate } from './exec.ts'
+import { composeInput, finishReply, runCliProcess } from './exec.ts'
 import type { AiExec, AiReply, AiRequest } from './exec.ts'
 
 export interface CodexCliOptions {
@@ -47,12 +47,20 @@ export function strictSchema(node: JsonValue): JsonValue {
   return copy
 }
 
+/**
+ * The fixed surface the model sees beyond the request: the isolation and
+ * sandbox flags above. Bump when they change, so a response cache stops
+ * replaying replies recorded against the old surface.
+ */
+const FINGERPRINT = 'codex-cli/flags-v1'
+
 export function codexCli(options: CodexCliOptions = {}): AiExec {
   const binary = options.binary ?? 'codex'
   const defaultTimeoutMs = options.timeoutMs ?? 120_000
 
   return {
     id: `codex-cli/${options.model ?? 'default'}`,
+    fingerprint: FINGERPRINT,
     async run(request: AiRequest): Promise<AiReply> {
       const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-ai-'))
       try {
@@ -79,27 +87,12 @@ export function codexCli(options: CodexCliOptions = {}): AiExec {
         }
         args.push('-')
 
-        let result
-        try {
-          result = await runProcess(binary, args, {
-            stdin: composeInput(request),
-            cwd: request.cwd,
-            timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
-          })
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          return { ok: false, error: `${binary}: ${message}` }
-        }
-
-        if (result.timedOut) {
-          return { ok: false, error: `${binary} timed out` }
-        }
-        if (result.code !== 0) {
-          return {
-            ok: false,
-            error: `${binary} exited ${result.code}: ${truncate(result.stderr || result.stdout, 300)}`,
-          }
-        }
+        const run = await runCliProcess(binary, args, {
+          stdin: composeInput(request),
+          cwd: request.cwd,
+          timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
+        })
+        if (!run.ok) return run
 
         let reply: string
         try {

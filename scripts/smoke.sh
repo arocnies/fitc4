@@ -49,13 +49,28 @@ echo "== fitc4/ai entry point loads"
 echo "== clean project passes"
 (cd "$consumer" && npx fitc4)
 
-echo "== violation fails"
+echo "== --json emits parseable JSON"
+(cd "$consumer" && npx fitc4 --json > "$work/result.json")
+node -e "
+  const assert = require('node:assert')
+  const result = JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8'))
+  assert.ok(Array.isArray(result.findings), '--json output has no findings array')
+  assert.deepEqual(result.modelErrors, [])
+" "$work/result.json"
+
+echo "== violation fails and names the rule"
 printf "import { status } from '../interface/index.ts'\nexport const bad = status\n" \
   > "$consumer/src/core/bad.ts"
-if (cd "$consumer" && npx fitc4); then
+if violation_out="$(cd "$consumer" && npx fitc4 2>&1)"; then
   echo "FAIL: expected a non-zero exit for an undeclared dependency" >&2
   exit 1
 fi
+# Any non-zero exit could be a crash; the gate only worked if the report names
+# the rule this violation actually breaks.
+case "$violation_out" in
+  *"relationship-direction"*) ;;
+  *) echo "FAIL: violation report did not name relationship-direction: $violation_out" >&2; exit 1 ;;
+esac
 rm "$consumer/src/core/bad.ts"
 
 echo "== init scaffolds a green first run"

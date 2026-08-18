@@ -92,7 +92,7 @@ describe('rejecting a malformed config', () => {
 
   test('provider arrays in JSON are named as a module-form feature', () => {
     expect(() => loadConfig(writeConfig({ ...VALID, validate: [] }))).toThrow(
-      'only available in the fitc4.config.ts/.js forms',
+      'only available in the module config forms (.ts/.mts/.js/.mjs)',
     )
   })
 
@@ -145,11 +145,10 @@ describe('finding the config', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-noconfig-'))
     created.push(directory)
 
-    // Only meaningful if no ancestor of the temp dir happens to hold one.
-    try {
-      findConfig(directory)
-    } catch (error) {
-      expect((error as Error).message).toContain(CONFIG_FILENAME)
-    }
+    // If this throws for "found one", an ancestor of the temp dir holds a
+    // stray fitc4 config — an environment problem worth failing on, not
+    // something to pass silently.
+    expect(() => findConfig(directory)).toThrow(CONFIG_FILENAME)
+    expect(() => findConfig(directory)).toThrow(directory)
   })
 })

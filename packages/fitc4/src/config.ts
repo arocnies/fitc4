@@ -13,6 +13,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { messageOf } from './errors.ts'
 import type { NamedProvider, ResolveProvider, ScanProvider, ValidateProvider } from './types.ts'
 
 export const CONFIG_FILENAME = 'fitc4.config.json'
@@ -107,9 +108,9 @@ export function defineConfig(config: FitC4FileConfig): FitC4FileConfig {
 /**
  * Read and validate a JSON config.
  *
- * Kept synchronous, and JSON-only, on purpose: it predates `resolveConfig`
- * and library callers use it inside synchronous setup. The CLI goes through
- * `resolveConfig`, which handles all three forms.
+ * The synchronous, JSON-only loader: importing a module config is inherently
+ * async, so this is the form library callers can use inside synchronous
+ * setup. The CLI goes through `resolveConfig`, which handles every form.
  */
 export function loadConfig(configPath: string): FitC4Config {
   let raw: unknown
@@ -227,8 +228,8 @@ function rejectUnknownKeys(
     if (known.includes(key)) continue
     if (form === 'json' && MODULE_KEYS.includes(key)) {
       throw new Error(
-        `${configPath}: '${key}' is only available in the fitc4.config.ts/.js forms — ` +
-          `a provider is a function, which JSON cannot carry`,
+        `${configPath}: '${key}' is only available in the module config forms ` +
+          `(.ts/.mts/.js/.mjs) — a provider is a function, which JSON cannot carry`,
       )
     }
     const candidates = known.filter((name) => name !== '$schema')
@@ -241,7 +242,7 @@ function rejectUnknownKeys(
 }
 
 /** The known name within edit distance 2, if any — enough for the typo case. */
-function closestName(key: string, candidates: string[]): string | undefined {
+export function closestName(key: string, candidates: string[]): string | undefined {
   let best: { name: string; distance: number } | undefined
   for (const name of candidates) {
     const distance = editDistance(key.toLowerCase(), name.toLowerCase())
@@ -381,8 +382,4 @@ function requireStringArray(
     )
   }
   return value as string[]
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }

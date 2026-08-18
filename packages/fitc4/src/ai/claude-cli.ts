@@ -11,7 +11,7 @@
  * work opts into a stronger model per instance.
  */
 
-import { composeInput, finishReply, runProcess, truncate } from './exec.ts'
+import { composeInput, finishReply, runCliProcess, truncate } from './exec.ts'
 import type { AiExec, AiReply, AiRequest } from './exec.ts'
 
 export const DEFAULT_CLAUDE_MODEL = 'haiku'
@@ -31,6 +31,13 @@ const SYSTEM_PROMPT =
 
 const READ_ONLY_TOOLS = 'Read,Grep,Glob'
 
+/**
+ * The fixed surface the model sees beyond the request: SYSTEM_PROMPT, the
+ * isolation flags, and the tool sets above. Bump when any of them changes, so
+ * a response cache stops replaying replies recorded against the old surface.
+ */
+const FINGERPRINT = 'claude-cli/system-prompt-v1/flags-v1'
+
 export function claudeCli(options: ClaudeCliOptions = {}): AiExec {
   const model = options.model ?? DEFAULT_CLAUDE_MODEL
   const binary = options.binary ?? 'claude'
@@ -38,6 +45,7 @@ export function claudeCli(options: ClaudeCliOptions = {}): AiExec {
 
   return {
     id: `claude-cli/${model}`,
+    fingerprint: FINGERPRINT,
     async run(request: AiRequest): Promise<AiReply> {
       const args = [
         '--print',
@@ -54,34 +62,22 @@ export function claudeCli(options: ClaudeCliOptions = {}): AiExec {
         request.agentic === true ? READ_ONLY_TOOLS : '',
       ]
 
-      let result
-      try {
-        result = await runProcess(binary, args, {
-          stdin: composeInput(request),
-          cwd: request.cwd,
-          timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
-        })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        return { ok: false, error: `${binary}: ${message}` }
-      }
-
-      if (result.timedOut) {
-        return { ok: false, error: `${binary} timed out` }
-      }
-      if (result.code !== 0) {
-        return {
-          ok: false,
-          error: `${binary} exited ${result.code}: ${truncate(result.stderr || result.stdout, 300)}`,
-        }
-      }
+      const run = await runCliProcess(binary, args, {
+        stdin: composeInput(request),
+        cwd: request.cwd,
+        timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
+      })
+      if (!run.ok) return run
 
       // `--output-format json` wraps the reply in a result envelope.
       let envelope: unknown
       try {
-        envelope = JSON.parse(result.stdout)
+        envelope = JSON.parse(run.result.stdout)
       } catch {
-        return { ok: false, error: `${binary} printed a malformed envelope: ${truncate(result.stdout, 200)}` }
+        return {
+          ok: false,
+          error: `${binary} printed a malformed envelope: ${truncate(run.result.stdout, 200)}`,
+        }
       }
 
       const record = envelope as { is_error?: unknown; result?: unknown }
