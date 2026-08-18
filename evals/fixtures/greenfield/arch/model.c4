@@ -1,0 +1,48 @@
+specification {
+  element system
+  element container
+  element component
+}
+
+model {
+  shop = system 'Shop' {
+    app = container 'App' {
+      api = component 'API' {
+        description 'HTTP surface; delegates checkout to Core'
+        metadata {
+          sources 'src/api/**'
+        }
+      }
+
+      core = component 'Core' {
+        description 'Checkout and document handling'
+        metadata {
+          sources 'src/core/**'
+        }
+      }
+    }
+
+    external = container 'Managed services' {
+      payments = component 'Payments gateway' {
+        description 'Third-party card payments API; description-only, owns no sources'
+      }
+
+      storage = component 'Order storage' {
+        description 'Object-storage bucket holding live order documents'
+      }
+
+      archive = component 'Order archive' {
+        description 'Object-storage bucket holding cold order documents'
+      }
+    }
+  }
+
+  shop.app.api -> shop.app.core 'delegates checkout'
+  shop.app.core -> shop.external.payments 'charges cards'
+}
+
+views {
+  view index of shop {
+    include *
+  }
+}

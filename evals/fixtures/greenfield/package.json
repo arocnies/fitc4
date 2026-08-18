@@ -1,0 +1,9 @@
+{
+  "name": "greenfield-fixture",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "stripe": "1.0.0",
+    "@aws-sdk/client-s3": "1.0.0"
+  }
+}

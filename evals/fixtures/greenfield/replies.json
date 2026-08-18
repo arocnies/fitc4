@@ -1,0 +1,12 @@
+[
+  {
+    "when": { "promptIncludes": "Map each candidate decision" },
+    "reply": [
+      {
+        "candidateId": "shop.app.core=>stripe",
+        "elementId": "shop.external.payments",
+        "reason": "stripe is the third-party card payments SDK the payments gateway describes."
+      }
+    ]
+  }
+]

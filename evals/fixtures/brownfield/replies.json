@@ -1,0 +1,30 @@
+[
+  {
+    "when": { "promptIncludes": "name the id of the existing model element that should own it" },
+    "reply": {
+      "files": [
+        {
+          "path": "src/render-helpers.ts",
+          "element": "mono.ui",
+          "rationale": "Only UI files import it and it formats strings for rendering."
+        }
+      ]
+    }
+  },
+  {
+    "when": { "promptIncludes": "Element mono.core declares" },
+    "reply": {
+      "matches": false,
+      "issues": [
+        "report.ts writes report files to disk with fs.writeFileSync, but the description says the component performs no I/O."
+      ]
+    }
+  },
+  {
+    "when": { "promptIncludes": "Element mono.ui declares" },
+    "reply": {
+      "matches": true,
+      "issues": []
+    }
+  }
+]

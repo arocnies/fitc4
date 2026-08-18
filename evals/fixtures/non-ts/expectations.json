@@ -1,0 +1,65 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "subject": { "kind": "element", "id": "deploy.web" },
+      "related": ["deploy.db"],
+      "label": "the planted web → db compose edge is forbidden by the model"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unknown-observation-kind",
+      "severity": "info",
+      "descriptionIncludes": "'service'",
+      "label": "the domain-specific 'service' observations are reported, not dropped"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:compose",
+        "kind": "scan-root",
+        "subject": "docker-compose.yml",
+        "label": "the scan attests to having examined the compose file"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "services/web/Dockerfile",
+        "target": "services/api/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "services/web/Dockerfile",
+        "target": "services/db/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "services/api/Dockerfile",
+        "target": "services/db/Dockerfile"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "deploy.web",
+        "target": "deploy.api",
+        "declared": true,
+        "label": "the permitted web → api compose edge resolves onto the declared relationship"
+      },
+      {
+        "provider": "source-root",
+        "source": "deploy.api",
+        "target": "deploy.db",
+        "declared": true,
+        "label": "the permitted api → db compose edge resolves onto the declared relationship"
+      }
+    ]
+  }
+}

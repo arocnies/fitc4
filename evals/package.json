@@ -1,0 +1,12 @@
+{
+  "name": "fitc4-evals",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "eval": "node run.ts"
+  },
+  "devDependencies": {
+    "fitc4": "*"
+  }
+}
