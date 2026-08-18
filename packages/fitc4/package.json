@@ -20,6 +20,7 @@
     "boundaries"
   ],
   "type": "module",
+  "sideEffects": false,
   "engines": {
     "node": ">=22.22.3"
   },
