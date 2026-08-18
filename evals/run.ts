@@ -4,6 +4,7 @@
  *
  *   npm run eval                      # stub mode: free, deterministic, exact
  *   npm run eval -- --exec claude     # live mode: YOUR claude CLI, YOUR bill
+ *   npm run eval -- --exec codex      # live mode: YOUR codex CLI, YOUR bill
  *
  * Each fixture under `fixtures/` is a tiny self-contained project with a
  * LikeC4 model, planted ground truth, and three checked-in files:
@@ -27,7 +28,7 @@ import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
 import { runPipeline, type PipelineConfig } from 'fitc4'
-import { cached, claudeCli, type AgentExec } from 'fitc4/agent'
+import { cached, claudeCli, codexCli, DEFAULT_CLAUDE_MODEL, type AgentExec } from 'fitc4/agent'
 
 import { perfect, renderScorecard, scoreFixture, type Expectations, type FixtureScore } from './harness/score.ts'
 import { scriptedExec, type ScriptedReply } from './harness/stub.ts'
@@ -40,13 +41,15 @@ type FixtureSpec = (exec: AgentExec, root: string) => PipelineConfig
 const { values: flags } = parseArgs({
   options: {
     exec: { type: 'string', default: 'stub' },
-    model: { type: 'string', default: 'haiku' },
+    // No parse-time default: the model default is per exec — claude falls back
+    // to its cheap DEFAULT_CLAUDE_MODEL, codex to whatever its CLI defaults to.
+    model: { type: 'string' },
     fixture: { type: 'string', multiple: true },
   },
 })
 
-if (flags.exec !== 'stub' && flags.exec !== 'claude') {
-  console.error(`unknown --exec '${flags.exec}'; use 'stub' (default) or 'claude'`)
+if (flags.exec !== 'stub' && flags.exec !== 'claude' && flags.exec !== 'codex') {
+  console.error(`unknown --exec '${flags.exec}'; use 'stub' (default), 'claude', or 'codex'`)
   process.exit(2)
 }
 
@@ -72,14 +75,21 @@ for (const name of selected) {
   }
 }
 
-if (flags.exec === 'claude') {
+if (flags.exec !== 'stub') {
   console.warn(
-    '\nWARNING: --exec claude shells out to your locally installed `claude` CLI —\n' +
+    `\nWARNING: --exec ${flags.exec} shells out to your locally installed \`${flags.exec}\` CLI —\n` +
       'your login, your billing, one or more live model calls per fixture.\n' +
       'Successful replies are cached under evals/.cache/, so a rerun with\n' +
       'unchanged fixtures is free. This mode is for humans; never wire it into CI.\n',
   )
 }
+
+/**
+ * The model actually in effect for the scorecard header. `--model` passes
+ * through verbatim — users know their model ids better than this harness does.
+ */
+const model =
+  flags.model ?? (flags.exec === 'claude' ? DEFAULT_CLAUDE_MODEL : undefined)
 
 /** Build the exec one fixture runs against, per the `--exec` mode. */
 function execFor(fixture: string): AgentExec {
@@ -87,9 +97,17 @@ function execFor(fixture: string): AgentExec {
     const replies = readJson(path.join(fixturesDir, fixture, 'replies.json')) as ScriptedReply[]
     return scriptedExec(fixture, replies)
   }
-  return cached(claudeCli({ model: flags.model }), {
-    directory: path.join(evalsDir, '.cache', 'fitc4-agent'),
-  })
+  // One cache directory for both CLIs is safe: `cached()` keys every entry on
+  // the exec's `id` (which carries the CLI and model) and `fingerprint`, so a
+  // reply recorded by one exec is never replayed as another's measurement.
+  const directory = path.join(evalsDir, '.cache', 'fitc4-agent')
+  if (flags.exec === 'claude') {
+    return cached(claudeCli({ model }), { directory })
+  }
+  // No `--model` passes nothing through, deferring to the codex CLI's own
+  // default (the adapter runs codex isolated from ~/.codex/config.toml, so
+  // that default is the CLI's built-in one — pass --model to override it).
+  return cached(codexCli(model === undefined ? {} : { model }), { directory })
 }
 
 function readJson(file: string): unknown {
@@ -119,7 +137,7 @@ for (const fixture of selected) {
   scores.push(score)
 }
 
-console.log(`\nexec: ${flags.exec}${flags.exec === 'claude' ? ` (model: ${flags.model})` : ''}\n`)
+console.log(`\nexec: ${flags.exec}${flags.exec === 'stub' ? '' : ` (model: ${model ?? 'CLI default'})`}\n`)
 console.log(renderScorecard(scores))
 console.log('')
 

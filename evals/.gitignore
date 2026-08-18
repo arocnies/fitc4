@@ -1,2 +1,2 @@
-# Recorded live replies from `--exec claude` runs; per-machine, never committed.
+# Recorded live replies from `--exec claude` / `--exec codex` runs; per-machine, never committed.
 .cache/
