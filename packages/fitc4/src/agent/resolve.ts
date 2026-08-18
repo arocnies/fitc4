@@ -36,7 +36,16 @@
  * same way: truncation is announced in the context (so the model knows its
  * list is partial) and the rest stay unmapped, not failed.
  *
- * The prefilled context is deterministic — element catalog plus candidate
+ * **Candidates are decisions, not import sites.** Twelve imports of `stripe`
+ * from files owned by one element are one question — "which element does that
+ * package belong to?" — so leftover observations collapse to distinct
+ * (owning-element, package-or-specifier) decisions, each with a stable
+ * `candidateId` and a site count. The reply maps `candidateId → elementId`,
+ * and an accepted mapping fans back out to one association per underlying
+ * observation, so the standard rules still see every site. `maxObservations`
+ * counts decisions.
+ *
+ * The prefilled context is deterministic — element catalog plus decision
  * listing — so the provider composes with `cached()` unchanged.
  */
 
@@ -47,7 +56,6 @@ import {
   packageClaims,
   packageNameOf,
 } from '../model.ts'
-import type { OwnershipPrefix } from '../model.ts'
 import type {
   Association,
   JsonObject,
@@ -56,6 +64,7 @@ import type {
   ResolveContext,
   ResolveProvider,
 } from '../types.ts'
+import { unambiguousOwner } from './context-pack.ts'
 import type { AgentExec } from './exec.ts'
 import { schemaMismatch, truncate } from './exec.ts'
 import { elementCatalog } from './findings.ts'
@@ -72,7 +81,8 @@ export interface AgentResolveOptions {
   /** Suffix for the provider id: `agent-resolve:<id>` instead of `agent-resolve`. */
   id?: string
   /**
-   * Candidates sent per run. The rest are announced as truncated in the
+   * Candidate *decisions* sent per run — distinct (owning-element, target)
+   * pairs, not import sites. The rest are announced as truncated in the
    * context and stay unmapped — visible through the existing rules, not a
    * failure.
    */
@@ -81,13 +91,16 @@ export interface AgentResolveOptions {
 
 const DEFAULT_MAX_OBSERVATIONS = 100
 
+/** Import sites named per decision line before the count elides the rest. */
+const SITES_SHOWN = 5
+
 const REPLY_SCHEMA: JsonObject = {
   type: 'array',
   items: {
     type: 'object',
-    required: ['observationId', 'elementId'],
+    required: ['candidateId', 'elementId'],
     properties: {
-      observationId: { type: 'string' },
+      candidateId: { type: 'string' },
       elementId: { type: 'string' },
       reason: { type: 'string' },
     },
@@ -95,8 +108,8 @@ const REPLY_SCHEMA: JsonObject = {
 }
 
 const PROMPT =
-  'Map each candidate observation in the context onto the id of the existing model element its ' +
-  'target belongs to. Reply with a JSON array of mappings. Use only observationIds listed in the ' +
+  'Map each candidate decision in the context onto the id of the existing model element its ' +
+  'target belongs to. Reply with a JSON array of mappings. Use only candidateIds listed in the ' +
   'context, each at most once, and only element ids from the element catalog. Map a candidate ' +
   'only when the catalog clearly contains the thing the dependency points at; omit any candidate ' +
   'you are not confident about — an omitted candidate simply stays unmapped. ' +
@@ -107,11 +120,11 @@ export function agentResolve(options: AgentResolveOptions): NamedProvider<Resolv
   const maxObservations = options.maxObservations ?? DEFAULT_MAX_OBSERVATIONS
 
   const run: ResolveProvider = async (context: ResolveContext): Promise<Association[]> => {
-    const candidates = leftoverCandidates(context)
-    if (candidates.length === 0) return []
+    const decisions = leftoverDecisions(context)
+    if (decisions.length === 0) return []
 
-    const sent = candidates.slice(0, maxObservations)
-    const dropped = candidates.length - sent.length
+    const sent = decisions.slice(0, maxObservations)
+    const dropped = decisions.length - sent.length
 
     const reply = await options.exec.run({
       prompt: PROMPT,
@@ -133,12 +146,12 @@ export function agentResolve(options: AgentResolveOptions): NamedProvider<Resolv
     }
 
     const mappings = reply.value as unknown as {
-      observationId: string
+      candidateId: string
       elementId: string
       reason?: string
     }[]
 
-    const byObservationId = new Map(sent.map((candidate) => [candidate.observation.id, candidate]))
+    const byCandidateId = new Map(sent.map((decision) => [decision.candidateId, decision]))
     const knownElements = new Set<string>([...context.model.elements()].map((element) => element.id))
     const declared = declaredRelationships(context.model)
 
@@ -149,18 +162,18 @@ export function agentResolve(options: AgentResolveOptions): NamedProvider<Resolv
       // Hard hallucination guards. Ids the reply was never given, and elements
       // the model does not contain, fail the provider visibly — dropping the
       // entry would let the rest of an untrustworthy reply pass as clean.
-      const candidate = byObservationId.get(mapping.observationId)
-      if (candidate === undefined) {
+      const decision = byCandidateId.get(mapping.candidateId)
+      if (decision === undefined) {
         throw new Error(
-          `Agent resolve reply named an observationId it was not given: '${truncate(mapping.observationId, 160)}'`,
+          `Agent resolve reply named a candidateId it was not given: '${truncate(mapping.candidateId, 160)}'`,
         )
       }
-      if (mapped.has(mapping.observationId)) {
+      if (mapped.has(mapping.candidateId)) {
         throw new Error(
-          `Agent resolve reply mapped '${truncate(mapping.observationId, 160)}' more than once`,
+          `Agent resolve reply mapped '${truncate(mapping.candidateId, 160)}' more than once`,
         )
       }
-      mapped.add(mapping.observationId)
+      mapped.add(mapping.candidateId)
 
       if (!knownElements.has(mapping.elementId)) {
         throw new Error(
@@ -168,23 +181,28 @@ export function agentResolve(options: AgentResolveOptions): NamedProvider<Resolv
         )
       }
 
-      const match = hasRelationship(declared, candidate.sourceElementId, mapping.elementId)
-      const targetName = candidate.observation.target?.id ?? candidate.observation.id
+      const match = hasRelationship(declared, decision.sourceElementId, mapping.elementId)
 
-      associations.push({
-        id: `mapped:${candidate.observation.id}`,
-        observationId: candidate.observation.id,
-        status: 'resolved',
-        source: { kind: 'element', id: candidate.sourceElementId },
-        target: { kind: 'element', id: mapping.elementId },
-        ...(match === undefined ? {} : { relationship: { kind: 'relationship', id: match.id } }),
-        description: `${candidate.sourceElementId} → ${mapping.elementId} (agent-mapped from ${targetName})`,
-        data: {
-          agent: options.exec.id,
-          ...(mapping.reason === undefined ? {} : { reason: mapping.reason }),
-        },
-        provider: providerId,
-      })
+      // One accepted decision fans back out to one association per underlying
+      // observation, so the standard rules still see every import site.
+      for (const observation of decision.observations) {
+        const targetName = observation.target?.id ?? observation.id
+        associations.push({
+          id: `mapped:${observation.id}`,
+          observationId: observation.id,
+          status: 'resolved',
+          source: { kind: 'element', id: decision.sourceElementId },
+          target: { kind: 'element', id: mapping.elementId },
+          ...(match === undefined ? {} : { relationship: { kind: 'relationship', id: match.id } }),
+          description: `${decision.sourceElementId} → ${mapping.elementId} (agent-mapped from ${targetName})`,
+          data: {
+            agent: options.exec.id,
+            candidateId: decision.candidateId,
+            ...(mapping.reason === undefined ? {} : { reason: mapping.reason }),
+          },
+          provider: providerId,
+        })
+      }
     }
 
     return associations
@@ -193,31 +211,46 @@ export function agentResolve(options: AgentResolveOptions): NamedProvider<Resolv
   return { id: providerId, run }
 }
 
-interface Candidate {
-  observation: Observation
-  /** The unambiguous owner of the subject file — the association's source end. */
+interface Decision {
+  /** Stable id derived from the owner and the target key, never from sites. */
+  candidateId: string
+  /** The unambiguous owner of every subject file — the associations' source end. */
   sourceElementId: string
+  /** The ref kind of the target ('module', or a provider's own kind). */
+  targetKind: string
+  /** Package name for module dependencies; the raw specifier otherwise. */
+  targetKey: string
+  /** True when the key is a package name covering possibly-deeper specifiers. */
+  packaged: boolean
+  /** Every underlying observation — the import sites this decision fans out to. */
+  observations: Observation[]
 }
 
 /**
- * The observations `source-root` cannot map, in stable id order.
+ * The observations `source-root` cannot map, collapsed into distinct
+ * decisions and sorted by `candidateId`.
  *
  * Recomputed per run from the same inputs `source-root` reads — providers
- * recompute rather than share state by design. A candidate is a dependency
- * whose target is not a repository file (external package, unresolvable
- * specifier), with a subject file owned by exactly one element: dependencies
- * with file targets are `source-root`'s job, and a subject without an
- * unambiguous owner has no source end for a resolved association.
+ * recompute rather than share state by design. A candidate observation is a
+ * dependency whose target is not a repository file (external package,
+ * unresolvable specifier), with a subject file owned by exactly one element:
+ * dependencies with file targets are `source-root`'s job, and a subject
+ * without an unambiguous owner has no source end for a resolved association.
  *
  * External dependencies whose package an element claims via `packages`
  * metadata are also excluded, mirroring `source-root`'s claim resolution:
  * `source-root` already maps them deterministically, so offering them to the
  * agent would be redundant.
+ *
+ * Candidate observations then collapse: every site whose subject is owned by
+ * one element and whose target names one package (via `packageNameOf` for
+ * resolvable module targets; the raw specifier otherwise) is the same
+ * question, asked once.
  */
-function leftoverCandidates(context: ResolveContext): Candidate[] {
+function leftoverDecisions(context: ResolveContext): Decision[] {
   const { prefixes } = ownershipPrefixes(context.model)
   const claimed = new Set(packageClaims(context.model).claims.map((claim) => claim.name))
-  const candidates: Candidate[] = []
+  const decisions = new Map<string, Decision>()
 
   for (const observation of context.observations) {
     if (observation.kind !== 'dependency' && observation.kind !== 'unresolved-dependency') continue
@@ -234,33 +267,38 @@ function leftoverCandidates(context: ResolveContext): Candidate[] {
     const owner = unambiguousOwner(observation.subject.id, prefixes)
     if (owner === undefined) continue
 
-    candidates.push({ observation, sourceElementId: owner })
+    // A resolvable module target keys on its package: `stripe` and
+    // `stripe/webhooks` are one decision. An unresolvable specifier keys on
+    // itself — `./missing.js` names no package.
+    const packaged = observation.kind === 'dependency' && observation.target.kind === 'module'
+    const targetKey = packaged ? packageNameOf(observation.target.id) : observation.target.id
+    const candidateId = `${owner}=>${targetKey}`
+
+    const existing = decisions.get(candidateId)
+    if (existing === undefined) {
+      decisions.set(candidateId, {
+        candidateId,
+        sourceElementId: owner,
+        targetKind: observation.target.kind,
+        targetKey,
+        packaged,
+        observations: [observation],
+      })
+    } else {
+      existing.observations.push(observation)
+    }
   }
 
-  return candidates.sort((a, b) => a.observation.id.localeCompare(b.observation.id))
-}
-
-/**
- * The single owning element of a path — longest `sources` prefix wins,
- * mirroring `source-root`. Unowned and ambiguous paths return undefined.
- */
-function unambiguousOwner(filePath: string, prefixes: OwnershipPrefix[]): string | undefined {
-  const matches = prefixes.filter((candidate) => filePath.startsWith(candidate.prefix))
-  if (matches.length === 0) return undefined
-
-  const longest = Math.max(...matches.map((match) => match.prefix.length))
-  const elementIds = [
-    ...new Set(
-      matches.filter((match) => match.prefix.length === longest).map((match) => match.elementId),
-    ),
-  ]
-  return elementIds.length === 1 ? elementIds[0] : undefined
+  for (const decision of decisions.values()) {
+    decision.observations.sort((a, b) => a.id.localeCompare(b.id))
+  }
+  return [...decisions.values()].sort((a, b) => a.candidateId.localeCompare(b.candidateId))
 }
 
 function composeContext(
   context: ResolveContext,
   instructions: string | undefined,
-  sent: Candidate[],
+  sent: Decision[],
   dropped: number,
 ): string {
   const parts = [elementCatalog(context.model)]
@@ -269,19 +307,33 @@ function composeContext(
     parts.push(`### Mapping instructions\n\n${instructions}`)
   }
 
-  const lines = sent.map((candidate) => {
-    const { observation, sourceElementId } = candidate
-    const target = observation.target
-    const what =
-      observation.description ??
-      `${observation.subject?.id} depends on ${target?.kind} ${target?.id}`
-    return `- observationId: ${observation.id}\n  ${what} (subject owned by ${sourceElementId})`
+  const lines = sent.map((decision) => {
+    const sites = decision.observations.map((observation) => {
+      const line = observation.evidence?.[0]?.line
+      return line === undefined ? `${observation.subject?.id}` : `${observation.subject?.id}:${line}`
+    })
+    const shown = sites.slice(0, SITES_SHOWN)
+    const elided = sites.length - shown.length
+    const siteList = shown.join(', ') + (elided > 0 ? ` and ${elided} more` : '')
+
+    const unresolvable = decision.observations.every(
+      (observation) => observation.kind === 'unresolved-dependency',
+    )
+    const verb = unresolvable ? 'references unresolvable' : 'depends on'
+    const noun = decision.packaged ? 'package' : decision.targetKind
+    const siteNoun = sites.length === 1 ? 'import site' : 'import sites'
+
+    return (
+      `- candidateId: ${decision.candidateId}\n` +
+      `  ${decision.sourceElementId} ${verb} ${noun} ${decision.targetKey} ` +
+      `at ${sites.length} ${siteNoun}: ${siteList}`
+    )
   })
   parts.push(
-    '### Candidate observations\n\n' +
+    '### Candidate decisions\n\n' +
       lines.join('\n') +
       (dropped > 0
-        ? `\n\nNOTE: this listing is truncated — ${dropped} more candidates exist beyond the configured limit and will simply stay unmapped this run.`
+        ? `\n\nNOTE: this listing is truncated — ${dropped} more candidate decisions exist beyond the configured limit and will simply stay unmapped this run.`
         : ''),
   )
 

@@ -2,11 +2,13 @@
  * `agentResolve` tests inject a stub `AgentExec` and run the real pipeline over the
  * `external` fixture — a repository depending on external packages, checked
  * against a model with description-only elements. Under test: leftover-
- * candidate scoping, context assembly, the fail-closed contract (exec failure,
- * off-schema reply, hallucinated observationId, unknown elementId), the
- * legitimate-abstention paths (empty reply, truncation), cache composition —
- * and the point of the feature: an agent-mapped association is judged by the
- * standard relationship rules exactly like a deterministic one.
+ * candidate scoping, the collapse of import sites into per-(owner, package)
+ * decisions and the fan-out back to per-site associations, context assembly,
+ * the fail-closed contract (exec failure, off-schema reply, hallucinated
+ * candidateId, unknown elementId), the legitimate-abstention paths (empty
+ * reply, truncation), cache composition — and the point of the feature: an
+ * agent-mapped association is judged by the standard relationship rules
+ * exactly like a deterministic one.
  *
  * No real agent CLI is ever invoked: the exec is an in-process stub.
  */
@@ -43,8 +45,15 @@ function ok(value: unknown): AgentReply {
 
 // The exact namespaced observation ids the `external` fixture's scan produces.
 const STRIPE_ID = 'typescript-imports/dependency:src/index.ts:1->stripe'
+const STRIPE_SUBPATH_ID = 'typescript-imports/dependency:src/more.ts:4->stripe/webhooks'
 const AMQP_ID = 'typescript-imports/dependency:src/index.ts:2->amqplib'
 const MISSING_ID = 'typescript-imports/dependency:src/index.ts:3->./missing.js'
+
+// The candidate decisions those observations collapse into: one per distinct
+// (owning element, package-or-specifier), stable across import-site churn.
+const STRIPE_DECISION = 'demo.app.core=>stripe'
+const AMQP_DECISION = 'demo.app.core=>amqplib'
+const MISSING_DECISION = 'demo.app.core=>./missing.js'
 
 /** Alongside the default resolver, exactly as the docs compose it. */
 function resolvePhase(exec: AgentExec, options: { maxObservations?: number } = {}) {
@@ -60,9 +69,9 @@ describe('agentResolve end to end', () => {
     const exec = stubExec([
       ok([
         // Undeclared in the model → must surface as missing-relationship.
-        { observationId: STRIPE_ID, elementId: 'demo.external.payments', reason: 'stripe is the payments gateway' },
+        { candidateId: STRIPE_DECISION, elementId: 'demo.external.payments', reason: 'stripe is the payments gateway' },
         // Declared (demo.app.core -> demo.external.queue) → must pass silently.
-        { observationId: AMQP_ID, elementId: 'demo.external.queue' },
+        { candidateId: AMQP_DECISION, elementId: 'demo.external.queue' },
       ]),
     ])
 
@@ -85,17 +94,49 @@ describe('agentResolve end to end', () => {
     expect(queueMapping?.target).toEqual({ kind: 'element', id: 'demo.external.queue' })
     expect(queueMapping?.relationship).toBeDefined()
 
-    // The mapping's provenance and reason ride in data.
+    // The mapping's provenance, decision, and reason ride in data.
     const paymentsMapping = result.associations.find(
       (association) => association.observationId === STRIPE_ID && association.provider === 'agent-resolve',
     )
-    expect(paymentsMapping?.data).toEqual({ agent: 'stub/model', reason: 'stripe is the payments gateway' })
+    expect(paymentsMapping?.data).toEqual({
+      agent: 'stub/model',
+      candidateId: STRIPE_DECISION,
+      reason: 'stripe is the payments gateway',
+    })
 
     expect(providerFailure(result.findings)).toBeUndefined()
     expect(findingFor(result.findings, 'orphaned-association')).toBeUndefined()
   })
 
-  test('the context carries the element catalog and only the leftover candidates', async () => {
+  test('same-package import sites collapse to one decision and fan back out on acceptance', async () => {
+    const exec = stubExec([
+      ok([{ candidateId: STRIPE_DECISION, elementId: 'demo.external.payments' }]),
+    ])
+
+    const result = await runFixture('external', { resolve: resolvePhase(exec) })
+
+    // Two stripe import sites (`stripe`, `stripe/webhooks`) were ONE candidate
+    // with the site count announced — one question, asked once.
+    const context = exec.requests[0]?.context ?? ''
+    expect(context.split(STRIPE_DECISION)).toHaveLength(2)
+    expect(context).toContain('at 2 import sites: src/index.ts:1, src/more.ts:4')
+    expect(context).not.toContain('observationId')
+
+    // The accepted decision fanned back out: one association per site, so the
+    // standard rules still see every import.
+    const mapped = result.associations.filter(
+      (association) =>
+        association.provider === 'agent-resolve' &&
+        association.target?.id === 'demo.external.payments',
+    )
+    expect(mapped.map((association) => association.observationId).sort()).toEqual([
+      STRIPE_ID,
+      STRIPE_SUBPATH_ID,
+    ])
+    expect(providerFailure(result.findings)).toBeUndefined()
+  })
+
+  test('the context carries the element catalog and only the leftover decisions', async () => {
     const exec = stubExec([ok([])])
 
     await runFixture('external', { resolve: resolvePhase(exec) })
@@ -108,12 +149,14 @@ describe('agentResolve end to end', () => {
     expect(request?.context).toContain('Elements in the architecture model')
     expect(request?.context).toContain('demo.external.payments')
     expect(request?.context).toContain('Third-party payments API')
-    // Candidates: both external-module dependencies and the unresolvable one.
-    expect(request?.context).toContain(STRIPE_ID)
-    expect(request?.context).toContain(AMQP_ID)
-    expect(request?.context).toContain(MISSING_ID)
+    // Decisions: both external-module packages and the unresolvable specifier.
+    expect(request?.context).toContain(`candidateId: ${STRIPE_DECISION}`)
+    expect(request?.context).toContain(`candidateId: ${AMQP_DECISION}`)
+    expect(request?.context).toContain(`candidateId: ${MISSING_DECISION}`)
+    expect(request?.context).toContain('references unresolvable module ./missing.js')
     // NOT the internal file dependency — that is source-root's job.
     expect(request?.context).not.toContain('->./util.js')
+    expect(request?.context).not.toContain('=>./util.js')
     expect(request?.context).not.toContain('truncated')
   })
 
@@ -126,8 +169,8 @@ describe('agentResolve end to end', () => {
 
     const context = exec.requests[0]?.context ?? ''
     expect(exec.requests).toHaveLength(1)
-    // The unclaimed package is offered to the agent.
-    expect(context).toContain('->lodash')
+    // The unclaimed package is offered to the agent, as a decision.
+    expect(context).toContain('=>lodash')
     // Claimed packages are not — including subpath imports of a claim.
     expect(context).not.toContain('pg/promises')
     expect(context).not.toContain('@aws-sdk/client-s3')
@@ -161,9 +204,9 @@ describe('agentResolve abstention is legitimate', () => {
     expect(findingFor(result.findings, 'unresolved-import')?.severity).toBe('warning')
   })
 
-  test('truncation is announced in the context and is non-fatal', async () => {
+  test('truncation counts decisions, is announced in the context, and is non-fatal', async () => {
     const exec = stubExec([
-      ok([{ observationId: STRIPE_ID, elementId: 'demo.external.payments' }]),
+      ok([{ candidateId: MISSING_DECISION, elementId: 'demo.external.payments' }]),
     ])
 
     const result = await runFixture('external', {
@@ -171,15 +214,21 @@ describe('agentResolve abstention is legitimate', () => {
     })
 
     const context = exec.requests[0]?.context ?? ''
-    // Candidates sort by id, so the stripe dependency is the one sent.
-    expect(context).toContain(STRIPE_ID)
-    expect(context).not.toContain(AMQP_ID)
+    // Decisions sort by candidateId, so the unresolvable specifier is the one
+    // sent; the stripe decision (two sites) and amqplib stay behind the limit.
+    expect(context).toContain(MISSING_DECISION)
+    expect(context).not.toContain(STRIPE_DECISION)
+    expect(context).not.toContain(AMQP_DECISION)
     expect(context).toContain('truncated')
-    expect(context).toContain('2 more candidates')
+    expect(context).toContain('2 more candidate decisions')
 
-    // The truncated candidates are simply unmapped; the sent one still lands.
+    // The truncated decisions are simply unmapped; the sent one still lands.
     expect(providerFailure(result.findings)).toBeUndefined()
-    expect(findingFor(result.findings, 'missing-relationship')).toBeDefined()
+    const mapped = result.associations.find(
+      (association) => association.provider === 'agent-resolve',
+    )
+    expect(mapped?.observationId).toBe(MISSING_ID)
+    expect(mapped?.target).toEqual({ kind: 'element', id: 'demo.external.payments' })
   })
 })
 
@@ -206,23 +255,35 @@ describe('agentResolve fails closed', () => {
     expect(failure?.description).toContain('did not match the requested schema')
   })
 
-  test('a hallucinated observationId fails the provider, never a silent drop', async () => {
+  test('a reply keyed on the old observationId shape fails the provider', async () => {
     const exec = stubExec([
-      ok([{ observationId: 'typescript-imports/dependency:src/invented.ts:1->stripe', elementId: 'demo.external.payments' }]),
+      ok([{ observationId: STRIPE_ID, elementId: 'demo.external.payments' }]),
+    ])
+
+    const result = await runFixture('external', { resolve: resolvePhase(exec) })
+
+    // A stale cache entry or custom adapter speaking the pre-decision shape
+    // must fail visibly, never flow half-parsed into the pipeline.
+    expect(providerFailure(result.findings)?.severity).toBe('error')
+  })
+
+  test('a hallucinated candidateId fails the provider, never a silent drop', async () => {
+    const exec = stubExec([
+      ok([{ candidateId: 'demo.app.core=>invented-pkg', elementId: 'demo.external.payments' }]),
     ])
 
     const result = await runFixture('external', { resolve: resolvePhase(exec) })
 
     const failure = providerFailure(result.findings)
     expect(failure?.severity).toBe('error')
-    expect(failure?.description).toContain('observationId it was not given')
+    expect(failure?.description).toContain('candidateId it was not given')
     // Nothing from the untrustworthy reply landed — no half-result.
     expect(result.associations.filter((a) => a.provider === 'agent-resolve')).toEqual([])
   })
 
   test('an element that is not in the model fails the provider', async () => {
     const exec = stubExec([
-      ok([{ observationId: STRIPE_ID, elementId: 'demo.external.nope' }]),
+      ok([{ candidateId: STRIPE_DECISION, elementId: 'demo.external.nope' }]),
     ])
 
     const result = await runFixture('external', { resolve: resolvePhase(exec) })
@@ -232,11 +293,11 @@ describe('agentResolve fails closed', () => {
     expect(failure?.description).toContain('not in the model')
   })
 
-  test('mapping one observation twice fails the provider — contradictions are not resolved by order', async () => {
+  test('mapping one decision twice fails the provider — contradictions are not resolved by order', async () => {
     const exec = stubExec([
       ok([
-        { observationId: STRIPE_ID, elementId: 'demo.external.payments' },
-        { observationId: STRIPE_ID, elementId: 'demo.external.queue' },
+        { candidateId: STRIPE_DECISION, elementId: 'demo.external.payments' },
+        { candidateId: STRIPE_DECISION, elementId: 'demo.external.queue' },
       ]),
     ])
 
@@ -252,7 +313,7 @@ describe('agentResolve composition', () => {
 
   test('works under cached(): the second run replays the reply without a call', async () => {
     const exec = stubExec([
-      ok([{ observationId: STRIPE_ID, elementId: 'demo.external.payments' }]),
+      ok([{ candidateId: STRIPE_DECISION, elementId: 'demo.external.payments' }]),
     ])
     const phase = resolvePhase(cached(exec, { directory: cacheDir }))
 
