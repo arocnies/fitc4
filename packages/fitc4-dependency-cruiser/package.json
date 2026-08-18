@@ -1,0 +1,56 @@
+{
+  "name": "fitc4-dependency-cruiser",
+  "version": "0.1.0",
+  "description": "dependency-cruiser as a FitC4 scan provider — JS/CJS/ESM dependency observations for the LikeC4 model to judge",
+  "license": "MIT",
+  "author": "Aaron Nies",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arocnies/fitc4.git",
+    "directory": "packages/fitc4-dependency-cruiser"
+  },
+  "homepage": "https://github.com/arocnies/fitc4#readme",
+  "bugs": "https://github.com/arocnies/fitc4/issues",
+  "keywords": [
+    "architecture",
+    "likec4",
+    "c4",
+    "dependency-cruiser",
+    "fitc4",
+    "boundaries"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.3"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "check": "npm run typecheck && npm run build && npm run test",
+    "build": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "dependency-cruiser": "^18.2.0"
+  },
+  "peerDependencies": {
+    "fitc4": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "fitc4": "^0.1.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

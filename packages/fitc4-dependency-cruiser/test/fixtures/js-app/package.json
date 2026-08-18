@@ -1,0 +1,8 @@
+{
+  "name": "js-app-fixture",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "semver": "^7.0.0"
+  }
+}
