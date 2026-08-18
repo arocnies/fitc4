@@ -19,6 +19,23 @@ export { codexCli, type CodexCliOptions } from './codex-cli.ts'
 export { cached, type CacheOptions } from './cache.ts'
 
 export {
+  assemblePack,
+  buildGraph,
+  codeFirstExcerpt,
+  DEFAULT_PACK_BUDGET_BYTES,
+  elementPack,
+  fencedExcerpt,
+  fileNeighborhood,
+  PACK_HEADER,
+  type AssembledPack,
+  type CodeFirstExcerpt,
+  type ContextGraph,
+  type ElementFacts,
+  type NeighborEdge,
+  type PackSection,
+} from './context-pack.ts'
+
+export {
   agentScan,
   PROVIDER_ID as AGENT_SCAN_PROVIDER_ID,
   type AgentScanOptions,
