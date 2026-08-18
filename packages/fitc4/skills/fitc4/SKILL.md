@@ -17,6 +17,9 @@ and import onto that model, and fails where the two disagree.
 - `npx fitc4 --json` — the full structured result instead of the report
   (the `PipelineResult` type in `node_modules/fitc4/dist/index.d.ts`).
 - `npx fitc4 --config <path>` — use a specific config instead of discovery.
+- `npx fitc4 init` — scaffold a project that has no model yet: a config, a
+  starter `arch/model.c4` whose one element owns `src/**` (so the first run
+  is green), and an `AGENTS.md` with the norms below. Never overwrites.
 
 Run the gate before handing off changes. Exit 1 is an architecture violation,
 not a flaky tool.

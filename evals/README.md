@@ -2,7 +2,7 @@
 
 An opt-in harness that measures the agent providers — `agentScan`, `agentResolve`, `agentOwnershipAdvisor`, `agentSemanticReview` — against fixtures with planted, known-correct answers. The fixtures double as checked-in end-to-end examples: four tiny projects showing how FitC4 fits code to a model, from a clean greenfield gate to a domain no TypeScript parser can see.
 
-Nothing here runs in CI or under `npm test`, ever. The harness is invoked deliberately:
+Nothing here runs in CI or in any package's test suite, ever. The harness is invoked deliberately:
 
 ```bash
 npm run eval                          # stub mode (default): free, deterministic, exact
@@ -51,7 +51,7 @@ One row per provider, because the provider is the unit of judgment. **hits** are
 
 ## The four fixtures: fitting code to a model, in stages
 
-**[`greenfield/`](fixtures/greenfield/)** — a small, clean TypeScript project whose deterministic gate passes. What is left over is exactly what no parser can map: `src/core` imports `stripe` and `@aws-sdk/client-s3`, external packages claimed by no element. `agentResolve` gets both as candidate decisions. `stripe` has one right answer — the description-only payments-gateway element, backed by a declared relationship — and must be mapped. The S3 client is genuinely ambiguous on purpose: the model declares *two* object-storage elements and nothing says which bucket the code touches, so the correct behavior is abstention, and mapping it is a named regression. Run the plain gate yourself: `node ../packages/fitc4/dist/cli.js` from the fixture directory passes with one info finding.
+**[`greenfield/`](fixtures/greenfield/)** — a small, clean TypeScript project whose deterministic gate passes. What is left over is exactly what no parser can map: `src/core` imports `stripe` and `@aws-sdk/client-s3`, external packages claimed by no element. `agentResolve` gets both as candidate decisions. `stripe` has one right answer — the description-only payments-gateway element, backed by a declared relationship — and must be mapped. The S3 client is genuinely ambiguous on purpose: the model declares *two* object-storage elements and nothing says which bucket the code touches, so the correct behavior is abstention, and mapping it is a named regression. Run the plain gate yourself: `node ../../../packages/fitc4/dist/cli.js` from the fixture directory passes with one info finding.
 
 **[`brownfield/`](fixtures/brownfield/)** — a mid-size project carrying declared debt, the adoption story. The deterministic rules find everything on their own (the same CLI run exits 1 here): two `#drift` edges the code still exercises, one stale drift edge the ratchet wants deleted, one genuine `relationship-direction` violation, one unowned file. The agent providers add judgment on top: the semantic reviewer must flag `mono.core` — described as pure and I/O-free while `report.ts` writes to disk — and must *not* flag the honestly described `mono.ui`; the ownership advisor must suggest `mono.ui` for the unowned `src/render-helpers.ts`, whose entire import neighborhood is UI code.
 

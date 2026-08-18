@@ -174,7 +174,7 @@ Judgment about how load-bearing to make this belongs to the user, and the dials 
 
 ## Evals
 
-[`evals/`](../evals/) at the repository root is the opt-in harness that measures these providers against fixtures with planted ground truth — `npm run eval` scores the recorded ideal-agent replies for free (and is the harness's own regression test), `npm run eval -- --exec claude` measures a live model on your own CLI and billing. It never runs in CI or under `npm test`. The fixtures double as checked-in end-to-end examples, and the `non-ts` fixture is the worked non-TypeScript `agentScan` example: a docker-compose domain, scanned in focused one-shot mode, judged by the stock deterministic rules. See [`evals/README.md`](../evals/README.md).
+[`evals/`](../evals/) at the repository root is the opt-in harness that measures these providers against fixtures with planted ground truth — `npm run eval` scores the recorded ideal-agent replies for free (and is the harness's own regression test), `npm run eval -- --exec claude` measures a live model on your own CLI and billing. It never runs in CI or in any package's test suite. The fixtures double as checked-in end-to-end examples, and the `non-ts` fixture is the worked non-TypeScript `agentScan` example: a docker-compose domain, scanned in focused one-shot mode, judged by the stock deterministic rules. See [`evals/README.md`](../evals/README.md).
 
 ## Design note: a code-graph provider fits the same seams
 

@@ -108,6 +108,15 @@ The module forms default-export the same fields (wrap them in `defineConfig` for
 | `orphaned-association` | error | A provider referenced an observation that does not exist |
 | `provider-failure` | error | A provider threw; other providers still ran |
 
+Four more rules appear only when the [agent providers](#agent-providers) are composed in. Their severity follows the emitting provider's `severity` option; the defaults below are the advisory defaults:
+
+| Rule | Severity | Meaning |
+|---|---|---|
+| `ownership-suggestion` | info | The ownership advisor suggests an element for an unowned file — or says the model is missing one |
+| `description-drift` | warning | The semantic review judges an element's code to contradict its described responsibility |
+| `agent-unavailable` | warning | An agent provider's CLI failed or is not installed; escalates to error for a gating provider, which must not pass when its judge is absent |
+| `agent-truncated` | info | An agent provider hit a configured input limit and announces what it did not review; escalates to error for a gating provider |
+
 An element with no `sources` is legal — a grouping element, or a component implemented elsewhere. An unowned *file* is a finding; an unowned *element* is not. Legal, but not invisible: one `unobserved-elements` info finding per run lists the leaf elements with neither `sources` nor `packages`, so deliberate abstraction stays visible rather than accidental. A relationship declared between two parents covers traffic between their descendants. Test files are excluded from the scan, by filename and by directory.
 
 Above five `unmapped-source` findings the report renders one grouped block — the total, a by-directory breakdown, the first ten paths — because a brownfield repository's unowned files are one adoption fact, not hundreds. `--json` is unchanged and keeps every finding.
@@ -247,4 +256,4 @@ The package also ships a Claude Code skill at `skills/fitc4/` — the full fit w
 
 ## Links
 
-Source, issues, a full worked example, and the provider contract live in the [GitHub repository](https://github.com/arocnies/fitc4) — see [`example/`](https://github.com/arocnies/fitc4/tree/main/example) and [`docs/providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/providers.md). Checking JavaScript or mixed JS/TS projects? The companion package [`fitc4-dependency-cruiser`](https://www.npmjs.com/package/fitc4-dependency-cruiser) wraps dependency-cruiser as a scan provider — install both and compose it in config.
+Source, issues, a full worked example, and the provider contract live in the [GitHub repository](https://github.com/arocnies/fitc4) — see [`example/`](https://github.com/arocnies/fitc4/tree/main/example) and [`docs/providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/providers.md). Checking JavaScript or mixed JS/TS projects? The companion package [`fitc4-dependency-cruiser`](https://github.com/arocnies/fitc4/tree/main/packages/fitc4-dependency-cruiser) wraps dependency-cruiser as a scan provider, installed alongside this one and composed in config.
