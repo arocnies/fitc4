@@ -25,7 +25,7 @@ import type { Association, Observation, ResolveContext, Ref } from '../types.ts'
 export const PROVIDER_ID = 'source-root'
 
 /** Claiming element ids per package name, unique and sorted for determinism. */
-export type PackageClaimants = Map<string, string[]>
+type PackageClaimants = Map<string, string[]>
 
 export async function sourceRoot(context: ResolveContext): Promise<Association[]> {
   const { prefixes } = ownershipPrefixes(context.model)

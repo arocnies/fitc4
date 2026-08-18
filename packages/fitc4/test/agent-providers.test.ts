@@ -8,12 +8,10 @@
 import { describe, expect, test } from 'vitest'
 
 import type { AgentExec, AgentReply, AgentRequest } from '../src/agent/exec.ts'
-import { elementCatalog, fileExcerpts } from '../src/agent/findings.ts'
 import { agentOwnershipAdvisor, PROVIDER_ID as ADVISOR_ID } from '../src/agent/ownership-advisor.ts'
 import { agentSemanticReview, PROVIDER_ID as REVIEW_ID } from '../src/agent/semantic-review.ts'
-import { loadModel } from '../src/model.ts'
 import { renderReport } from '../src/report.ts'
-import { findingFor, fixturePath, ruleIds, runFixture } from './helpers.ts'
+import { findingFor, ruleIds, runFixture } from './helpers.ts'
 
 function stubExec(replies: AgentReply[]): AgentExec & { requests: AgentRequest[] } {
   const exec = {
@@ -75,25 +73,6 @@ describe('agentOwnershipAdvisor', () => {
     expect(context).toContain('Neighborhood:')
     expect(context).toContain('- imports src/core/health.ts (owned by fixture.app.core)')
     expect(context).toContain('Excerpt (code-first):')
-  })
-
-  test('neighborhood lines replace excerpt bulk — the request does not grow', async () => {
-    const exec = stubExec([ok({ files: [] })])
-
-    await runFixture('violations', { validate: [agentOwnershipAdvisor({ exec })] })
-
-    const context = exec.requests[0]?.context ?? ''
-    // Rough, not byte-exact: the old context was the catalog plus a
-    // 2,000-char file-head excerpt per unowned file. The new default —
-    // 1,000 code-first chars plus the neighborhood lines — must come in
-    // under it on this fixture, whose orphan file exceeds both caps.
-    const { model } = await loadModel(fixturePath('violations'))
-    const oldStyle = `${elementCatalog(model)}\n\n${fileExcerpts(
-      fixturePath('violations'),
-      ['src/orphan/thing.ts'],
-      2_000,
-    )}`
-    expect(context.length).toBeLessThan(oldStyle.length)
   })
 
   test('a suggestion naming a non-existent element is reported as exactly that', async () => {

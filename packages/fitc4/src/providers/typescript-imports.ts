@@ -19,6 +19,8 @@
 import fs from 'node:fs'
 import { isBuiltin } from 'node:module'
 import path from 'node:path'
+// The runtime dependency stays on TypeScript 6.x: this provider needs the
+// classic compiler API (program/checker), which 7.x no longer exposes.
 import ts from 'typescript'
 import { packageNameOf } from '../model.ts'
 import type { Observation, ScanContext } from '../types.ts'
@@ -191,7 +193,7 @@ interface ModuleReference {
  * is the standard way to break a static cycle, so it is exactly the form that
  * must not escape the check.
  */
-export function moduleReferences(sourceFile: ts.SourceFile): ModuleReference[] {
+function moduleReferences(sourceFile: ts.SourceFile): ModuleReference[] {
   const references: ModuleReference[] = []
 
   const record = (

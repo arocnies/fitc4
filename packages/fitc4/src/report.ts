@@ -163,7 +163,7 @@ function sortById(findings: Finding[]): Finding[] {
  * so a miscounted finding can never make the summary look clean. The pipeline
  * already rewrites these, but the renderer does not assume that.
  */
-export function countBySeverity(findings: Finding[]): Record<Severity, number> {
+function countBySeverity(findings: Finding[]): Record<Severity, number> {
   const counts: Record<Severity, number> = { error: 0, warning: 0, info: 0 }
   for (const finding of findings) {
     counts[isSeverity(finding.severity) ? finding.severity : 'error'] += 1

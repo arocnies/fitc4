@@ -203,7 +203,7 @@ export function truncate(text: string, limit: number): string {
   return collapsed.length <= limit ? collapsed : `${collapsed.slice(0, limit)}…`
 }
 
-export interface ProcessResult {
+interface ProcessResult {
   code: number | null
   stdout: string
   stderr: string
@@ -216,7 +216,7 @@ export interface ProcessResult {
  * SIGKILL rather than SIGTERM on timeout: an agent CLI mid-request may trap
  * SIGTERM to save session state, and a hung provider must not hang the gate.
  */
-export function runProcess(
+function runProcess(
   binary: string,
   args: string[],
   options: { stdin?: string; cwd?: string; timeoutMs: number },

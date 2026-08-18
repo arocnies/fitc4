@@ -10,7 +10,7 @@ import {
 } from '../src/providers/typescript-imports.ts'
 import type { Finding } from '../src/types.ts'
 
-export const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures')
+const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures')
 
 export { RULES_ID, SOURCE_ROOT_ID, TYPESCRIPT_IMPORTS_ID }
 

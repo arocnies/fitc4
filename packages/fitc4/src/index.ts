@@ -58,6 +58,7 @@ export {
   typescriptImports,
   PROVIDER_ID as TYPESCRIPT_IMPORTS_PROVIDER_ID,
 } from './providers/typescript-imports.ts'
+export type { TypeScriptImportsOptions } from './providers/typescript-imports.ts'
 
 export type {
   Association,

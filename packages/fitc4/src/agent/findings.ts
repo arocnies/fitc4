@@ -14,9 +14,6 @@
  * visible nudge instead.
  */
 
-import fs from 'node:fs'
-import path from 'node:path'
-
 import { findingId } from '../ids.ts'
 import { normalizeSources, SOURCES_KEY } from '../model.ts'
 import type { Finding, LikeC4Model, Severity } from '../types.ts'
@@ -91,25 +88,4 @@ export function elementCatalog(model: LikeC4Model): string {
     lines.push(`- ${element.id} ('${element.title}'): ${description}${owns}`)
   }
   return lines.join('\n')
-}
-
-/** Fenced excerpts of the named files, each capped at `excerptChars`. */
-export function fileExcerpts(
-  repositoryRoot: string,
-  files: string[],
-  excerptChars: number,
-): string {
-  const parts: string[] = []
-  for (const relative of files) {
-    let excerpt: string
-    try {
-      const content = fs.readFileSync(path.join(repositoryRoot, relative), 'utf8')
-      excerpt =
-        content.length <= excerptChars ? content : `${content.slice(0, excerptChars)}\n… truncated`
-    } catch {
-      excerpt = '(unreadable)'
-    }
-    parts.push(`### ${relative}\n\`\`\`\n${excerpt}\n\`\`\``)
-  }
-  return parts.join('\n\n')
 }
