@@ -1,0 +1,30 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unobserved-elements",
+      "severity": "info",
+      "related": ["shop.external.archive", "shop.external.payments", "shop.external.storage"],
+      "label": "the three description-only externals are reported as unobserved"
+    }
+  ],
+  "associations": {
+    "must": [
+      {
+        "provider": "agent-resolve",
+        "source": "shop.app.core",
+        "target": "shop.external.payments",
+        "candidateId": "shop.app.core=>stripe",
+        "declared": true,
+        "label": "stripe is mapped onto the payments gateway, backed by the declared relationship"
+      }
+    ],
+    "mustNot": [
+      {
+        "provider": "agent-resolve",
+        "candidateId": "shop.app.core=>@aws-sdk/client-s3",
+        "label": "the ambiguous object-storage package was mapped instead of left unmapped"
+      }
+    ]
+  }
+}
