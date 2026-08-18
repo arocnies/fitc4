@@ -11,6 +11,16 @@ model {
         sources 'src/core/**'
       }
     }
+
+    // A second described element, so tests can pin behavior that only shows
+    // with more than one reviewable element — e.g. that the first exec
+    // failure stops the run instead of billing one dead call per element.
+    extra = component 'Extra' {
+      description 'String helpers for the demo'
+      metadata {
+        sources 'src/extra/**'
+      }
+    }
   }
 }
 

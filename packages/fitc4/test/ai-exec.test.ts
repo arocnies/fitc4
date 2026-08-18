@@ -220,6 +220,12 @@ describe('codexCli', () => {
     const silent = await codexCli({ binary: fakeCodex }).run({ prompt: 'x' })
     expect(!silent.ok && silent.error).toContain('wrote no reply')
   })
+
+  test('a hung CLI is killed at the timeout', async () => {
+    const reply = await codexCli({ binary: slowBinary, timeoutMs: 200 }).run({ prompt: 'x' })
+
+    expect(!reply.ok && reply.error).toContain('timed out')
+  })
 })
 
 describe('extractJson', () => {

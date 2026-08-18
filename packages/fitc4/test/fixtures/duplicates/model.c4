@@ -1,0 +1,34 @@
+specification {
+  element system
+  element container
+  element component
+}
+
+model {
+  fixture = system 'Fixture' {
+    app = container 'App' {
+      core = component 'Core' {
+        metadata {
+          sources 'src/core/**'
+        }
+      }
+
+      interface = component 'Interface' {
+        metadata {
+          sources 'src/interface/**'
+        }
+      }
+    }
+  }
+
+  // Deliberately declared twice: LikeC4 permits identical source/kind/target
+  // triples, and the duplicate-relationship rule must surface the collision.
+  fixture.app.interface -> fixture.app.core
+  fixture.app.interface -> fixture.app.core
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

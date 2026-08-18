@@ -177,10 +177,15 @@ describe('aiOwnershipAdvisor', () => {
 
 describe('aiSemanticReview', () => {
   test('a mismatch verdict becomes a capped drift finding with the issues as evidence', async () => {
-    const exec = stubExec([ok({ matches: false, issues: ['performs file I/O in add()'] })])
+    // Elements are reviewed in id order: demo.core mismatches, demo.extra matches.
+    const exec = stubExec([
+      ok({ matches: false, issues: ['performs file I/O in add()'] }),
+      ok({ matches: true, issues: [] }),
+    ])
 
     const result = await runFixture('described', { validate: [aiSemanticReview({ exec })] })
 
+    expect(result.findings).toHaveLength(1)
     expect(ruleIds(result.findings)).toEqual(['description-drift'])
     const finding = findingFor(result.findings, 'description-drift')
     expect(finding?.severity).toBe('warning')
@@ -210,12 +215,15 @@ describe('aiSemanticReview', () => {
     expect(result.findings).toEqual([])
   })
 
+  // The fixture has two described elements on purpose: without the second,
+  // this passes even if the provider keeps calling a dead CLI per element.
   test('the first exec failure stops the run with one finding', async () => {
     const exec = stubExec([{ ok: false, error: 'CLI missing' }])
 
     const result = await runFixture('described', { validate: [aiSemanticReview({ exec })] })
 
     expect(exec.requests).toHaveLength(1)
+    expect(result.findings).toHaveLength(1)
     expect(ruleIds(result.findings)).toEqual(['ai-unavailable'])
     expect(findingFor(result.findings, 'ai-unavailable')?.severity).toBe('warning')
   })

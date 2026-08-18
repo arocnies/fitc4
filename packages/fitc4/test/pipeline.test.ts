@@ -175,6 +175,25 @@ describe('ownership metadata that claims nothing', () => {
   })
 })
 
+describe('model hygiene', () => {
+  // LikeC4 permits identical source/kind/target triples, which collapse onto
+  // one stable id; the collision must surface rather than silently drop.
+  test('duplicate relationship declarations are reported at info', async () => {
+    const result = await runFixture('duplicates')
+
+    expect(ruleIds(result.findings)).toEqual(['duplicate-relationship'])
+    const finding = findingFor(result.findings, 'duplicate-relationship')
+    expect(finding?.severity).toBe('info')
+    expect(finding?.subject).toEqual({
+      kind: 'relationship',
+      id: 'fixture.app.interface::_::fixture.app.core',
+    })
+    expect(finding?.description).toContain('2 relationships')
+    // Redundant, not wrong: the gate still passes.
+    expect(exitCodeFor(result)).toBe(0)
+  })
+})
+
 describe('module reference forms', () => {
   test('every static and dynamic form is observed', async () => {
     const { observations } = await runFixture('imports')

@@ -128,6 +128,17 @@ describe('rejecting a malformed config module', () => {
     await expect(resolveConfig(configPath)).rejects.toThrow('default export')
   })
 
+  test.each([
+    ['a string', 'export default "not a config"\n'],
+    ['an array', 'export default []\n'],
+  ])('a non-object default export (%s) is an error', async (_label, source) => {
+    const configPath = writeConfigFile('fitc4.config.js', source)
+
+    await expect(resolveConfig(configPath)).rejects.toThrow(
+      'the default export must be a config object',
+    )
+  })
+
   test('a provider entry without a run function is an error naming the entry', async () => {
     const configPath = writeConfigFile(
       'fitc4.config.js',
@@ -167,6 +178,22 @@ describe('rejecting a malformed config module', () => {
 
     const config = await resolveConfig(found)
     expect(config.scanRoots).toEqual(['src'])
+  })
+
+  // The plain-JS counterpart of .mts, for CommonJS packages that also skip
+  // the type-stripping step.
+  test('a .mjs config is discovered and loads', async () => {
+    const directory = tempDir()
+    fs.writeFileSync(
+      path.join(directory, 'fitc4.config.mjs'),
+      moduleSource('ok', CUSTOM_VALIDATE).replace(': string', ''),
+    )
+
+    const found = findConfig(directory)
+    expect(path.basename(found)).toBe('fitc4.config.mjs')
+
+    const result = await runPipeline(pipelineConfig(await resolveConfig(found)))
+    expect(result.findings.map((finding) => finding.ruleId)).toEqual(['custom/advice'])
   })
 
   // The module form gets the same strictness as JSON: a compiler may have
