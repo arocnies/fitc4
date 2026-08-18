@@ -1,0 +1,12 @@
+services:
+  web:
+    build: ./services/web
+    depends_on:
+      - api
+      - db
+  api:
+    build: ./services/api
+    depends_on:
+      - db
+  db:
+    build: ./services/db

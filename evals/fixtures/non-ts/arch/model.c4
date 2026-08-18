@@ -1,0 +1,38 @@
+specification {
+  element system
+  element service
+}
+
+model {
+  deploy = system 'Deployment' {
+    web = service 'Web frontend' {
+      description 'Serves the UI; talks only to the API'
+      metadata {
+        sources 'services/web/**'
+      }
+    }
+
+    api = service 'API' {
+      description 'Application backend; owns all database access'
+      metadata {
+        sources 'services/api/**'
+      }
+    }
+
+    db = service 'Database' {
+      description 'Postgres; reachable from the API only'
+      metadata {
+        sources 'services/db/**'
+      }
+    }
+  }
+
+  deploy.web -> deploy.api 'calls'
+  deploy.api -> deploy.db 'reads and writes'
+}
+
+views {
+  view index of deploy {
+    include *
+  }
+}
