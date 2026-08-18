@@ -21,8 +21,6 @@ The rules every pack obeys:
 
 ## The `agent-scan` provider
 
-## The `agent-scan` provider
-
 `agentScan` is a scan provider driven by prose instead of a parser. The TypeScript scanner sees imports; it cannot see that `docker-compose.yml` wires one service to another, that a runbook names a component, or that an OpenAPI file declares a dependency between systems. `agentScan` lets a user enforce those model domains anyway: describe in prose what to observe, and the agent explores the repository read-only and reports standard `Observation`s that feed the same deterministic resolve and validate phases as any other scanner's.
 
 This is the prototyping story for new model domains: an agent (human or otherwise) writes instructions, the deterministic rules judge whatever comes back, and a domain that proves its worth graduates to a purpose-built deterministic provider.
