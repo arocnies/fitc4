@@ -205,7 +205,7 @@ expect(exitCodeFor(result)).toBe(0)
 
 Providers are plain functions — `ScanProvider`, `ResolveProvider`, `ValidateProvider` — composed into phase arrays. `pipelineConfig` is the batteries-included default; a caller wanting a different scanner builds its own `PipelineConfig` and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system.
 
-The `fitc4/agent` entry point adds agent providers over locally installed agent CLIs (`claude`, `codex`) — cached on their inputs, and never imported by the core. They come in two tiers. The validate providers (ownership advice, semantic review) are advisory: additive findings, `severity` per provider, part of the gate only when you choose `'error'`. The scan and resolve providers (`agentScan`, `agentResolve`) are load-bearing and therefore fail closed — `agentScan` observes model domains no parser covers from prose instructions, `agentResolve` maps external and unresolvable dependencies onto elements the code cannot reach, including description-only ones, and any failure or off-schema reply is a `provider-failure` error rather than a quietly thinner run. They are also the prototyping path: prose explores a new domain, and a domain that proves out graduates to a small deterministic provider — same envelope, same rules. See [`docs/agent-providers.md`](docs/agent-providers.md). The agent providers are measured, not just tested: [`evals/`](evals) runs three fixture projects with planted ground truth — greenfield, brownfield with tolerated drift, and a docker-compose model domain no TypeScript parser sees (the worked non-TS `agentScan` example) — scored against expected findings, in a free stub mode by default or against a real agent CLI with `npm run eval -- --exec claude`.
+The `fitc4/agent` entry point adds agent providers over locally installed agent CLIs (`claude`, `codex`) — cached on their inputs, and never imported by the core. They come in two tiers. The validate providers (ownership advice, semantic review) are advisory: additive findings, `severity` per provider, part of the gate only when you choose `'error'`. The scan and resolve providers (`agentScan`, `agentResolve`) are load-bearing and therefore fail closed — `agentScan` observes model domains no parser covers from prose instructions, `agentResolve` maps external and unresolvable dependencies onto elements the code cannot reach, including description-only ones, and any failure or off-schema reply is a `provider-failure` error rather than a quietly thinner run. They are also the prototyping path: prose explores a new domain, and a domain that proves out graduates to a small deterministic provider — same envelope, same rules. See [`docs/agent-providers.md`](docs/agent-providers.md). The agent providers are measured, not just tested: [`evals/`](evals) runs four fixture projects with planted ground truth — greenfield, brownfield with tolerated drift, a docker-compose model domain no TypeScript parser sees (the worked non-TS `agentScan` example), and an exploratory markdown-runbook domain where the agent walks the repository itself — scored against expected findings, in a free stub mode by default or against a real agent CLI with `npm run eval -- --exec claude`.
 
 Extending a phase spreads the defaults back in — `validate: [...defaultValidate, myProvider]` — and every report names the providers that composed each phase. See [`docs/providers.md`](docs/providers.md) for the provider contract.
 
@@ -241,7 +241,7 @@ Kinds stay open: a provider may emit its own, and two that understand each other
 packages/fitc4/                     the library and CLI
 packages/fitc4-dependency-cruiser/  companion package: dependency-cruiser as a scan provider
 example/                            a project it checks
-evals/                              agent-provider evals: three fixtures with planted ground truth
+evals/                              agent-provider evals: four fixtures with planted ground truth
 docs/                               the design of record and provider references
 ```
 
@@ -268,6 +268,4 @@ FitC4 is also self-hosting: [`packages/fitc4/arch/model.c4`](packages/fitc4/arch
 
 `npm run build -w fitc4` cleans and re-emits `dist/` — JavaScript and declarations, no source maps since `src/` does not ship — from [`tsconfig.build.json`](packages/fitc4/tsconfig.build.json). Node strips types natively, so `node src/cli.ts` runs here, but a published package cannot assume its consumers are on Node 26. The sources import each other with `.ts` extensions, which `rewriteRelativeImportExtensions` converts on emit. `build` runs as part of `check` so the emit path cannot rot unnoticed, and as `prepare` so a fresh `npm install` produces `dist/` — npm links a `bin` only when its target exists, so without it a clean clone leaves `example` unable to find the `fitc4` command.
 
-The package is ready to publish but unpublished; `fitc4` is currently unregistered on npm.
-
-[`docs/DESIGN.md`](docs/DESIGN.md) is the design of record; the proof-of-concept design history is preserved in [`docs/history/`](docs/history).
+[`docs/DESIGN.md`](docs/DESIGN.md) is the design of record.

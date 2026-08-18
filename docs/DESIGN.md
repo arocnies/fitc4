@@ -1,6 +1,6 @@
 # FitC4 design
 
-The current design of record, written from the code as it stands. The path here — including the decisions this document quietly reverses — is preserved in [`history/`](history); [`history/POC-DESIGN-v4.md`](history/POC-DESIGN-v4.md) was the last proof-of-concept snapshot.
+The current design of record, written from the code as it stands. The proof-of-concept design history lives in the git history rather than alongside this document.
 
 FitC4 checks an implementation against a LikeC4 architecture model. The model is a user-defined contract — which components exist and which may depend on which — and the tool's job is fitting the code to that contract. The LikeC4 model is the *only* architecture-model representation: providers query the live model API, nothing snapshots elements or relationships, so no copy can drift from `model.c4`.
 
