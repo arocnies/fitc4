@@ -1,0 +1,8 @@
+{
+  "name": "external-fixture",
+  "private": true,
+  "dependencies": {
+    "stripe": "1.0.0",
+    "amqplib": "1.0.0"
+  }
+}
