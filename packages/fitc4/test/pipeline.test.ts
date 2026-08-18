@@ -1,8 +1,8 @@
-import { describe, expect, test } from 'vitest'
+import { beforeAll, describe, expect, test } from 'vitest'
 
-import { runPipeline } from '../src/pipeline.ts'
+import { runPipeline, type PipelineResult } from '../src/pipeline.ts'
 import { exitCodeFor, renderReport } from '../src/report.ts'
-import { architectureRules, EVIDENCE_LIMIT } from '../src/providers/architecture-rules.ts'
+import { architectureRules } from '../src/providers/architecture-rules.ts'
 import { typescriptImports } from '../src/providers/typescript-imports.ts'
 import type { Association, Finding, Observation, ResolveProvider, ValidateProvider } from '../src/types.ts'
 import {
@@ -17,17 +17,18 @@ import {
 import path from 'node:path'
 
 describe('a model whose implementation matches the contract', () => {
-  test('produces no findings and passes the gate', async () => {
-    const result = await runFixture('ok')
+  let result: PipelineResult
+  beforeAll(async () => {
+    result = await runFixture('ok')
+  })
 
+  test('produces no findings and passes the gate', () => {
     expect(result.modelErrors).toEqual([])
     expect(result.findings).toEqual([])
     expect(renderReport(result).exitCode).toBe(0)
   })
 
-  test('observes both files and the import between them', async () => {
-    const result = await runFixture('ok')
-
+  test('observes both files and the import between them', () => {
     const files = result.observations.filter((item) => item.kind === 'file')
     expect(files.map((item) => item.subject?.id).sort()).toEqual([
       'src/core/health.ts',
@@ -39,9 +40,7 @@ describe('a model whose implementation matches the contract', () => {
     expect(dependency?.target).toEqual({ kind: 'file', id: 'src/core/health.ts' })
   })
 
-  test('resolves the import to the declared relationship', async () => {
-    const result = await runFixture('ok')
-
+  test('resolves the import to the declared relationship', () => {
     const crossing = result.associations.find((item) => item.target?.kind === 'element')
     expect(crossing?.status).toBe('resolved')
     expect(crossing?.source?.id).toBe('fixture.app.interface')
@@ -51,9 +50,12 @@ describe('a model whose implementation matches the contract', () => {
 })
 
 describe('a model whose implementation contradicts the contract', () => {
-  test('reports each of the deterministic rules', async () => {
-    const result = await runFixture('violations')
+  let result: PipelineResult
+  beforeAll(async () => {
+    result = await runFixture('violations')
+  })
 
+  test('reports each of the deterministic rules', () => {
     expect(ruleIds(result.findings)).toEqual([
       'ambiguous-source',
       'missing-relationship',
@@ -62,16 +64,16 @@ describe('a model whose implementation contradicts the contract', () => {
     ])
   })
 
-  test('flags the undeclared dependency and names both elements', async () => {
-    const finding = findingFor((await runFixture('violations')).findings, 'missing-relationship')
+  test('flags the undeclared dependency and names both elements', () => {
+    const finding = findingFor(result.findings, 'missing-relationship')
 
     expect(finding?.severity).toBe('error')
     expect(finding?.subject?.id).toBe('fixture.app.extra')
     expect(finding?.related?.[0]?.id).toBe('fixture.app.core')
   })
 
-  test('flags the backwards dependency against the declared relationship', async () => {
-    const finding = findingFor((await runFixture('violations')).findings, 'relationship-direction')
+  test('flags the backwards dependency against the declared relationship', () => {
+    const finding = findingFor(result.findings, 'relationship-direction')
 
     expect(finding?.severity).toBe('error')
     expect(finding?.subject?.id).toBe('fixture.app.core')
@@ -81,8 +83,8 @@ describe('a model whose implementation contradicts the contract', () => {
     })
   })
 
-  test('treats an unowned file as a warning and a contested file as an error', async () => {
-    const { findings } = await runFixture('violations')
+  test('treats an unowned file as a warning and a contested file as an error', () => {
+    const { findings } = result
 
     const unmapped = findingFor(findings, 'unmapped-source')
     expect(unmapped?.severity).toBe('warning')
@@ -96,36 +98,39 @@ describe('a model whose implementation contradicts the contract', () => {
     ])
   })
 
-  test('fails the gate', async () => {
-    expect(renderReport(await runFixture('violations')).exitCode).toBe(1)
+  test('fails the gate', () => {
+    expect(renderReport(result).exitCode).toBe(1)
   })
 
   // The standard severities assume adoption; a team done adopting promotes
   // unmapped-source so new unowned code — whose dependencies are never
   // boundary-checked — fails the gate instead of slipping past it.
   test('a severity override promotes unmapped-source to a gate failure', async () => {
-    const result = await runFixture('violations', {
+    const promoted = await runFixture('violations', {
       validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })],
     })
 
-    const unmapped = findingFor(result.findings, 'unmapped-source')
+    const unmapped = findingFor(promoted.findings, 'unmapped-source')
     expect(unmapped?.severity).toBe('error')
     expect(unmapped?.subject?.id).toBe('src/orphan/thing.ts')
   })
 })
 
 describe('containment', () => {
+  let result: PipelineResult
+  beforeAll(async () => {
+    result = await runFixture('nested')
+  })
+
   // LikeC4 rejects a parent-child relationship, so flagging either of these
   // would produce a violation the author cannot fix.
-  test('nesting produces no violations', async () => {
-    const result = await runFixture('nested')
-
+  test('nesting produces no violations', () => {
     expect(result.findings).toEqual([])
     expect(renderReport(result).exitCode).toBe(0)
   })
 
-  test('a child importing from its own parent is inside one boundary', async () => {
-    const { associations } = await runFixture('nested')
+  test('a child importing from its own parent is inside one boundary', () => {
+    const { associations } = result
 
     const association = associations.find(
       (item) => item.source?.id === 'fixture.app.core' && item.target?.id === 'fixture.app',
@@ -134,8 +139,8 @@ describe('containment', () => {
     expect(association?.description).toContain('within its own boundary')
   })
 
-  test('a leaf-to-leaf crossing resolves to the parent-level relationship', async () => {
-    const { associations } = await runFixture('nested')
+  test('a leaf-to-leaf crossing resolves to the parent-level relationship', () => {
+    const { associations } = result
 
     const association = associations.find(
       (item) => item.source?.id === 'fixture.web.ui' && item.target?.id === 'fixture.app.core',
@@ -145,33 +150,34 @@ describe('containment', () => {
 })
 
 describe('ownership metadata that claims nothing', () => {
-  test('a prefix matching no scanned file is an error, not a silent pass', async () => {
-    const { findings } = await runFixture('bad-sources')
+  let result: PipelineResult
+  beforeAll(async () => {
+    result = await runFixture('bad-sources')
+  })
 
-    const unmatched = findingFor(findings, 'unmatched-sources')
+  test('a prefix matching no scanned file is an error, not a silent pass', () => {
+    const unmatched = findingFor(result.findings, 'unmatched-sources')
     expect(unmatched?.severity).toBe('error')
     expect(unmatched?.subject?.id).toBe('fixture.ghost')
   })
 
-  test('an unsupported glob is an error', async () => {
-    const { findings } = await runFixture('bad-sources')
-
-    const invalid = findingFor(findings, 'invalid-sources')
+  test('an unsupported glob is an error', () => {
+    const invalid = findingFor(result.findings, 'invalid-sources')
     expect(invalid?.severity).toBe('error')
     expect(invalid?.subject?.id).toBe('fixture.wild')
   })
 
   // A stray './' used to make every prefix stop matching, turning three
   // architecture errors into a green build.
-  test("a leading './' still matches", async () => {
-    const { findings } = await runFixture('bad-sources')
+  test("a leading './' still matches", () => {
+    const { findings } = result
 
     expect(findings.some((finding) => finding.subject?.id === 'fixture.core')).toBe(false)
     expect(findings.some((finding) => finding.ruleId === 'unmapped-source')).toBe(false)
   })
 
-  test('the gate fails', async () => {
-    expect(exitCodeFor(await runFixture('bad-sources'))).toBe(1)
+  test('the gate fails', () => {
+    expect(exitCodeFor(result)).toBe(1)
   })
 })
 
@@ -194,89 +200,18 @@ describe('model hygiene', () => {
   })
 })
 
-describe('module reference forms', () => {
-  test('every static and dynamic form is observed', async () => {
-    const { observations } = await runFixture('imports')
-
-    const kinds = observations
-      .filter((item) => item.kind === 'dependency' && item.target?.kind === 'file')
-      .map((item) => item.data?.['dependencyKind'])
-
-    expect(new Set(kinds)).toEqual(new Set(['import', 're-export', 'dynamic-import', 'require']))
-  })
-
-  // Lazy-loading across a boundary is the standard way to break a static
-  // cycle, so it must not escape the check.
-  test('a dynamic import is a real dependency', async () => {
-    const { observations } = await runFixture('imports')
-
-    const dynamic = observations.find((item) => item.data?.['dependencyKind'] === 'dynamic-import')
-    expect(dynamic?.target).toEqual({ kind: 'file', id: 'src/core/health.ts' })
-  })
-
-  test('import.meta.resolve is a dependency', async () => {
-    const { observations } = await runFixture('imports')
-
-    const meta = observations.find(
-      (item) => item.kind === 'dependency' && item.subject?.id === 'src/interface/meta.ts',
-    )
-    expect(meta?.target).toEqual({ kind: 'file', id: 'src/core/health.ts' })
-  })
-
-  // Two references to one specifier can share a line; keying only on the line
-  // made the scanner emit duplicate ids and fail itself.
-  test('two references on one line do not collide', async () => {
-    const result = await runFixture('imports')
-
-    expect(result.findings.filter((finding) => finding.ruleId === 'provider-failure')).toEqual([])
-
-    const sameLine = result.observations.filter(
-      (item) => item.kind === 'dependency' && item.subject?.id === 'src/interface/sameline.ts',
-    )
-    expect(sameLine).toHaveLength(2)
-    expect(new Set(sameLine.map((item) => item.id)).size).toBe(2)
-  })
-
-  test('repeated references to one target keep their own evidence lines', async () => {
-    const { observations } = await runFixture('imports')
-
-    const toCore = observations.filter(
-      (item) =>
-        item.kind === 'dependency' &&
-        item.subject?.id === 'src/interface/index.ts' &&
-        item.target?.id === 'src/core/health.ts',
-    )
-    const lines = toCore.map((item) => item.evidence?.[0]?.line)
-
-    expect(lines.length).toBeGreaterThan(3)
-    expect(new Set(lines).size).toBe(lines.length)
-    expect(new Set(observations.map((item) => item.id)).size).toBe(observations.length)
-  })
-
-  // Classifying a broken relative import as an external package would silently
-  // drop the dependency from the architecture check.
-  test('an unresolvable relative import is reported, not treated as a package', async () => {
-    const { observations, findings } = await runFixture('imports')
-
-    const broken = observations.find((item) => item.kind === 'unresolved-dependency')
-    expect(broken?.target?.id).toBe('./deleted.js')
-    // An external specifier is a module too — only the observation kind
-    // separates "could not resolve this" from "resolves outside the model".
-    expect(broken?.target?.kind).toBe('module')
-
-    const finding = findingFor(findings, 'unresolved-import')
-    expect(finding?.severity).toBe('warning')
-    expect(finding?.subject?.id).toBe('src/interface/broken.ts')
-  })
-})
-
 // A specifier that fails to resolve is only "external" when it is demonstrably
 // not our code: a Node builtin, or a package a manifest declares. Anything
 // else classified external silently drops a dependency from the check — a
 // wrong tsconfig `paths` map must not turn every alias import green.
 describe('unresolvable non-relative specifiers', () => {
-  test('a tsconfig paths alias that no longer maps is reported', async () => {
-    const { observations, findings } = await runFixture('phantom')
+  let result: PipelineResult
+  beforeAll(async () => {
+    result = await runFixture('phantom')
+  })
+
+  test('a tsconfig paths alias that no longer maps is reported', () => {
+    const { observations, findings } = result
 
     const aliased = observations.find((item) => item.target?.id === '@app/missing.js')
     expect(aliased?.kind).toBe('unresolved-dependency')
@@ -288,23 +223,23 @@ describe('unresolvable non-relative specifiers', () => {
     expect(finding?.severity).toBe('warning')
   })
 
-  test('a working paths alias still resolves into the repository', async () => {
-    const { observations } = await runFixture('phantom')
+  test('a working paths alias still resolves into the repository', () => {
+    const { observations } = result
 
     const real = observations.find((item) => item.data?.['specifier'] === '@app/real.js')
     expect(real?.kind).toBe('dependency')
     expect(real?.target).toEqual({ kind: 'file', id: 'src/app/real.ts' })
   })
 
-  test('an undeclared package that does not resolve is reported', async () => {
-    const { observations } = await runFixture('phantom')
+  test('an undeclared package that does not resolve is reported', () => {
+    const { observations } = result
 
     const phantom = observations.find((item) => item.target?.id === 'phantom-pkg')
     expect(phantom?.kind).toBe('unresolved-dependency')
   })
 
-  test('a declared package without type declarations stays external', async () => {
-    const { observations, findings } = await runFixture('phantom')
+  test('a declared package without type declarations stays external', () => {
+    const { observations, findings } = result
 
     const untyped = observations.find((item) => item.target?.id === 'untyped-pkg')
     expect(untyped?.kind).toBe('dependency')
@@ -312,8 +247,8 @@ describe('unresolvable non-relative specifiers', () => {
     expect(findings.filter((item) => item.description.includes('untyped-pkg'))).toEqual([])
   })
 
-  test('node builtins stay external and unreported', async () => {
-    const { observations, findings } = await runFixture('phantom')
+  test('node builtins stay external and unreported', () => {
+    const { observations, findings } = result
 
     const builtin = observations.find((item) => item.data?.['specifier'] === 'node:path')
     expect(builtin?.kind).toBe('dependency')
@@ -514,117 +449,6 @@ describe('malformed provider output', () => {
 
     expect(result.findings[0]?.severity).toBe('error')
     expect(report.text).toContain('should not disappear')
-    expect(report.exitCode).toBe(1)
-  })
-})
-
-describe('report', () => {
-  test('advisory findings are reported without failing the gate', async () => {
-    const advisory: ValidateProvider = async () => [
-      {
-        id: 'hint',
-        ruleId: 'mock/semantic-hint',
-        severity: 'info',
-        description: 'Interface looks like a facade over Core.',
-        subject: { kind: 'element', id: 'fixture.app.interface' },
-        provider: 'mock-semantic-validation',
-      },
-    ]
-
-    const result = await runFixture('ok', {
-      validate: [
-        { id: RULES_ID, run: architectureRulesProvider() },
-        { id: 'mock-semantic-validation', run: advisory },
-      ],
-    })
-    const report = renderReport(result)
-
-    expect(result.findings.map((finding) => finding.ruleId)).toEqual(['mock/semantic-hint'])
-    expect(report.exitCode).toBe(0)
-    expect(report.text).toContain('Interface looks like a facade over Core.')
-  })
-
-  // A reader mid-failure — human or agent — should not have to hunt for what
-  // a rule means; a clean run has nothing to look up.
-  test('a report with findings points at the rule reference; a clean one does not', async () => {
-    expect(renderReport(await runFixture('ok')).text).not.toContain('rules:')
-    expect(renderReport(await runFixture('violations')).text).toContain(
-      'rules: node_modules/fitc4/README.md#rules',
-    )
-  })
-
-  test('evidence is capped so one boundary cannot bury the report', async () => {
-    const crossings = EVIDENCE_LIMIT + 5
-    const observations: Observation[] = []
-    const associations: Association[] = []
-
-    for (let index = 0; index < crossings; index += 1) {
-      const observation: Observation = {
-        id: `dependency:${index}`,
-        kind: 'dependency',
-        subject: { kind: 'file', id: `src/a/f${index}.ts` },
-        target: { kind: 'file', id: 'src/b/g.ts' },
-        evidence: [{ path: `src/a/f${index}.ts`, line: 1 }],
-        provider: 'mock-scan',
-      }
-      observations.push(observation)
-      associations.push({
-        id: `association:${index}`,
-        observationId: `mock-scan/dependency:${index}`,
-        status: 'resolved',
-        source: { kind: 'element', id: 'fixture.app.interface' },
-        target: { kind: 'element', id: 'fixture.app.extra' },
-        provider: 'mock-resolve',
-      })
-    }
-
-    const result = await runPipeline(
-      fixtureConfig('ok', {
-        scan: [{ id: 'mock-scan', run: async () => observations }],
-        resolve: [{ id: 'mock-resolve', run: async () => associations }],
-      }),
-    )
-
-    const finding = findingFor(result.findings, 'missing-relationship')
-    expect(finding?.evidence).toHaveLength(EVIDENCE_LIMIT + 1)
-    expect(finding?.evidence?.at(-1)?.detail).toBe('and 5 more')
-  })
-
-  test('the scan provider keeps its own evidence array', async () => {
-    const result = await runFixture('violations')
-
-    const finding = findingFor(result.findings, 'missing-relationship')
-    const observation = result.observations.find(
-      (item) => item.kind === 'dependency' && item.subject?.id === 'src/extra/uses.ts',
-    )
-    expect(finding?.evidence).not.toBe(observation?.evidence)
-  })
-
-  test('evidence with no path renders without the literal word undefined', async () => {
-    const noPath: ValidateProvider = async () => [
-      {
-        id: 'e',
-        ruleId: 'mock/evidence',
-        severity: 'info',
-        description: 'detail only',
-        evidence: [{ detail: 'somewhere' }],
-        provider: 'mock-evidence',
-      },
-    ]
-
-    const report = renderReport(
-      await runFixture('ok', { validate: [{ id: 'mock-evidence', run: noPath }] }),
-    )
-    expect(report.text).not.toContain('undefined')
-    expect(report.text).toContain('somewhere')
-  })
-
-  test('an invalid model reports the model error and does not run the pipeline', async () => {
-    const result = await runPipeline(fixtureConfig('no-model'))
-    const report = renderReport(result)
-
-    expect(result.observations).toEqual([])
-    expect(report.text).toContain('did not run')
     expect(report.exitCode).toBe(1)
   })
 })

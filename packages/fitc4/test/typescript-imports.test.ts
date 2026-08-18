@@ -8,9 +8,11 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, test } from 'vitest'
+import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
+import type { PipelineResult } from '../src/pipeline.ts'
 import { enumerateSources, isTestPath, typescriptImports } from '../src/providers/typescript-imports.ts'
+import { findingFor, runFixture } from './helpers.ts'
 
 const roots: string[] = []
 afterAll(() => {
@@ -136,5 +138,80 @@ describe('the scan provider over the skip rules', () => {
       .filter((observation) => observation.kind === 'file')
       .map((observation) => observation.subject?.id)
     expect(files).toEqual(['src/main.ts'])
+  })
+})
+
+describe('module reference forms', () => {
+  let result: PipelineResult
+  beforeAll(async () => {
+    result = await runFixture('imports')
+  })
+
+  test('every static and dynamic form is observed', () => {
+    const kinds = result.observations
+      .filter((item) => item.kind === 'dependency' && item.target?.kind === 'file')
+      .map((item) => item.data?.['dependencyKind'])
+
+    expect(new Set(kinds)).toEqual(new Set(['import', 're-export', 'dynamic-import', 'require']))
+  })
+
+  // Lazy-loading across a boundary is the standard way to break a static
+  // cycle, so it must not escape the check.
+  test('a dynamic import is a real dependency', () => {
+    const dynamic = result.observations.find(
+      (item) => item.data?.['dependencyKind'] === 'dynamic-import',
+    )
+    expect(dynamic?.target).toEqual({ kind: 'file', id: 'src/core/health.ts' })
+  })
+
+  test('import.meta.resolve is a dependency', () => {
+    const meta = result.observations.find(
+      (item) => item.kind === 'dependency' && item.subject?.id === 'src/interface/meta.ts',
+    )
+    expect(meta?.target).toEqual({ kind: 'file', id: 'src/core/health.ts' })
+  })
+
+  // Two references to one specifier can share a line; keying only on the line
+  // made the scanner emit duplicate ids and fail itself.
+  test('two references on one line do not collide', () => {
+    expect(result.findings.filter((finding) => finding.ruleId === 'provider-failure')).toEqual([])
+
+    const sameLine = result.observations.filter(
+      (item) => item.kind === 'dependency' && item.subject?.id === 'src/interface/sameline.ts',
+    )
+    expect(sameLine).toHaveLength(2)
+    expect(new Set(sameLine.map((item) => item.id)).size).toBe(2)
+  })
+
+  test('repeated references to one target keep their own evidence lines', () => {
+    const { observations } = result
+
+    const toCore = observations.filter(
+      (item) =>
+        item.kind === 'dependency' &&
+        item.subject?.id === 'src/interface/index.ts' &&
+        item.target?.id === 'src/core/health.ts',
+    )
+    const lines = toCore.map((item) => item.evidence?.[0]?.line)
+
+    expect(lines.length).toBeGreaterThan(3)
+    expect(new Set(lines).size).toBe(lines.length)
+    expect(new Set(observations.map((item) => item.id)).size).toBe(observations.length)
+  })
+
+  // Classifying a broken relative import as an external package would silently
+  // drop the dependency from the architecture check.
+  test('an unresolvable relative import is reported, not treated as a package', () => {
+    const { observations, findings } = result
+
+    const broken = observations.find((item) => item.kind === 'unresolved-dependency')
+    expect(broken?.target?.id).toBe('./deleted.js')
+    // An external specifier is a module too — only the observation kind
+    // separates "could not resolve this" from "resolves outside the model".
+    expect(broken?.target?.kind).toBe('module')
+
+    const finding = findingFor(findings, 'unresolved-import')
+    expect(finding?.severity).toBe('warning')
+    expect(finding?.subject?.id).toBe('src/interface/broken.ts')
   })
 })

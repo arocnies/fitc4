@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest'
 
-import { renderReport, UNMAPPED_SOURCE_GROUP_THRESHOLD } from '../src/report.ts'
-import type { Observation } from '../src/types.ts'
-import { runFixture } from './helpers.ts'
+import { runPipeline } from '../src/pipeline.ts'
+import { EVIDENCE_LIMIT } from '../src/providers/architecture-rules.ts'
+import { exitCodeFor, renderReport, UNMAPPED_SOURCE_GROUP_THRESHOLD } from '../src/report.ts'
+import type { Association, Observation, ValidateProvider } from '../src/types.ts'
+import { findingFor, fixtureConfig, runFixture, RULES_ID } from './helpers.ts'
 
 /** A scan whose files are owned by no element of the `ok` model. */
 function unownedScan(paths: string[]) {
@@ -84,3 +86,118 @@ describe('unmapped-source grouping in the report', () => {
     expect(report.text).toContain('rules: node_modules/fitc4/README.md#rules')
   })
 })
+
+describe('report', () => {
+  test('advisory findings are reported without failing the gate', async () => {
+    const advisory: ValidateProvider = async () => [
+      {
+        id: 'hint',
+        ruleId: 'mock/semantic-hint',
+        severity: 'info',
+        description: 'Interface looks like a facade over Core.',
+        subject: { kind: 'element', id: 'fixture.app.interface' },
+        provider: 'mock-semantic-validation',
+      },
+    ]
+
+    const result = await runFixture('ok', {
+      validate: [
+        { id: RULES_ID, run: architectureRulesProvider() },
+        { id: 'mock-semantic-validation', run: advisory },
+      ],
+    })
+    const report = renderReport(result)
+
+    expect(result.findings.map((finding) => finding.ruleId)).toEqual(['mock/semantic-hint'])
+    expect(report.exitCode).toBe(0)
+    expect(report.text).toContain('Interface looks like a facade over Core.')
+  })
+
+  // A reader mid-failure — human or agent — should not have to hunt for what
+  // a rule means; a clean run has nothing to look up.
+  test('a report with findings points at the rule reference; a clean one does not', async () => {
+    expect(renderReport(await runFixture('ok')).text).not.toContain('rules:')
+    expect(renderReport(await runFixture('violations')).text).toContain(
+      'rules: node_modules/fitc4/README.md#rules',
+    )
+  })
+
+  test('evidence is capped so one boundary cannot bury the report', async () => {
+    const crossings = EVIDENCE_LIMIT + 5
+    const observations: Observation[] = []
+    const associations: Association[] = []
+
+    for (let index = 0; index < crossings; index += 1) {
+      const observation: Observation = {
+        id: `dependency:${index}`,
+        kind: 'dependency',
+        subject: { kind: 'file', id: `src/a/f${index}.ts` },
+        target: { kind: 'file', id: 'src/b/g.ts' },
+        evidence: [{ path: `src/a/f${index}.ts`, line: 1 }],
+        provider: 'mock-scan',
+      }
+      observations.push(observation)
+      associations.push({
+        id: `association:${index}`,
+        observationId: `mock-scan/dependency:${index}`,
+        status: 'resolved',
+        source: { kind: 'element', id: 'fixture.app.interface' },
+        target: { kind: 'element', id: 'fixture.app.extra' },
+        provider: 'mock-resolve',
+      })
+    }
+
+    const result = await runPipeline(
+      fixtureConfig('ok', {
+        scan: [{ id: 'mock-scan', run: async () => observations }],
+        resolve: [{ id: 'mock-resolve', run: async () => associations }],
+      }),
+    )
+
+    const finding = findingFor(result.findings, 'missing-relationship')
+    expect(finding?.evidence).toHaveLength(EVIDENCE_LIMIT + 1)
+    expect(finding?.evidence?.at(-1)?.detail).toBe('and 5 more')
+  })
+
+  test('the scan provider keeps its own evidence array', async () => {
+    const result = await runFixture('violations')
+
+    const finding = findingFor(result.findings, 'missing-relationship')
+    const observation = result.observations.find(
+      (item) => item.kind === 'dependency' && item.subject?.id === 'src/extra/uses.ts',
+    )
+    expect(finding?.evidence).not.toBe(observation?.evidence)
+  })
+
+  test('evidence with no path renders without the literal word undefined', async () => {
+    const noPath: ValidateProvider = async () => [
+      {
+        id: 'e',
+        ruleId: 'mock/evidence',
+        severity: 'info',
+        description: 'detail only',
+        evidence: [{ detail: 'somewhere' }],
+        provider: 'mock-evidence',
+      },
+    ]
+
+    const report = renderReport(
+      await runFixture('ok', { validate: [{ id: 'mock-evidence', run: noPath }] }),
+    )
+    expect(report.text).not.toContain('undefined')
+    expect(report.text).toContain('somewhere')
+  })
+
+  test('an invalid model reports the model error and does not run the pipeline', async () => {
+    const result = await runPipeline(fixtureConfig('no-model'))
+    const report = renderReport(result)
+
+    expect(result.observations).toEqual([])
+    expect(report.text).toContain('did not run')
+    expect(report.exitCode).toBe(1)
+  })
+})
+
+function architectureRulesProvider() {
+  return fixtureConfig('ok').validate[0]?.run as ValidateProvider
+}

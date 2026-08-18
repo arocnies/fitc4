@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'vitest'
+import { beforeAll, describe, expect, test } from 'vitest'
 
+import type { PipelineResult } from '../src/pipeline.ts'
 import { architectureRules } from '../src/providers/architecture-rules.ts'
 import { exitCodeFor, renderReport } from '../src/report.ts'
 import { findingFor, ruleIds, runFixture } from './helpers.ts'
@@ -8,16 +9,22 @@ import { findingFor, ruleIds, runFixture } from './helpers.ts'
 // has but the target architecture does not want, tagged in the model. Tagged
 // edges are permitted but counted; an edge nothing exercises must be deleted.
 describe('the drift ratchet', () => {
-  test('a drift-tagged relationship permits the dependencies it covers', async () => {
-    const { findings } = await runFixture('drift')
+  // One shared default run; only the override tests re-run the pipeline.
+  let drift: PipelineResult
+  beforeAll(async () => {
+    drift = await runFixture('drift')
+  })
+
+  test('a drift-tagged relationship permits the dependencies it covers', () => {
+    const { findings } = drift
 
     expect(findingFor(findings, 'missing-relationship')).toBeUndefined()
     expect(findingFor(findings, 'relationship-direction')).toBeUndefined()
     expect(ruleIds(findings)).toEqual(['drift-relationship', 'unused-drift'])
   })
 
-  test('an exercised drift edge is one info finding carrying its traffic', async () => {
-    const { findings } = await runFixture('drift')
+  test('an exercised drift edge is one info finding carrying its traffic', () => {
+    const { findings } = drift
 
     const finding = findingFor(findings, 'drift-relationship')
     expect(finding?.severity).toBe('info')
@@ -37,8 +44,8 @@ describe('the drift ratchet', () => {
 
   // The ratchet's shrink mechanism: the code no longer does this, so the model
   // must stop tolerating it.
-  test('a drift edge nothing exercises anymore demands deletion', async () => {
-    const { findings } = await runFixture('drift')
+  test('a drift edge nothing exercises anymore demands deletion', () => {
+    const { findings } = drift
 
     const finding = findingFor(findings, 'unused-drift')
     expect(finding?.severity).toBe('warning')
@@ -49,12 +56,12 @@ describe('the drift ratchet', () => {
     expect(finding?.description).toContain('Delete the relationship')
   })
 
-  test('tolerated drift does not fail the gate by default', async () => {
-    expect(exitCodeFor(await runFixture('drift'))).toBe(0)
+  test('tolerated drift does not fail the gate by default', () => {
+    expect(exitCodeFor(drift)).toBe(0)
   })
 
-  test('the report prints a burn-down derived from the findings', async () => {
-    const report = renderReport(await runFixture('drift'))
+  test('the report prints a burn-down derived from the findings', () => {
+    const report = renderReport(drift)
     expect(report.text).toContain('drift: 2 declared · 1 exercised · 1 unused')
   })
 

@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'vitest'
+import { beforeAll, describe, expect, test } from 'vitest'
 
+import type { PipelineResult } from '../src/pipeline.ts'
 import { architectureRules } from '../src/providers/architecture-rules.ts'
 import { exitCodeFor } from '../src/report.ts'
 import { findingFor, ruleIds, runFixture } from './helpers.ts'
@@ -8,8 +9,13 @@ import { findingFor, ruleIds, runFixture } from './helpers.ts'
 // indistinguishable from a typo'd model. One info finding makes the state
 // chosen instead of accidental, without turning documentation into noise.
 describe('unobserved elements', () => {
-  test('leaf elements with neither sources nor packages become one info finding', async () => {
-    const { findings } = await runFixture('unobserved')
+  let unobserved: PipelineResult
+  beforeAll(async () => {
+    unobserved = await runFixture('unobserved')
+  })
+
+  test('leaf elements with neither sources nor packages become one info finding', () => {
+    const { findings } = unobserved
 
     expect(ruleIds(findings)).toEqual(['unobserved-elements'])
     const finding = findingFor(findings, 'unobserved-elements')
@@ -19,8 +25,8 @@ describe('unobserved elements', () => {
     expect(finding?.description).toContain('ghost10')
   })
 
-  test('the listed ids are capped, the count is not', async () => {
-    const { findings } = await runFixture('unobserved')
+  test('the listed ids are capped, the count is not', () => {
+    const { findings } = unobserved
 
     const finding = findingFor(findings, 'unobserved-elements')
     expect(finding?.description).toContain('+2 more')
@@ -29,8 +35,8 @@ describe('unobserved elements', () => {
   })
 
   // A parent whose children carry the claims is structural, not unobserved.
-  test('parents of owned children are not listed', async () => {
-    const { findings } = await runFixture('unobserved')
+  test('parents of owned children are not listed', () => {
+    const { findings } = unobserved
 
     const finding = findingFor(findings, 'unobserved-elements')
     expect(finding?.description).not.toContain('fixture')
@@ -51,7 +57,7 @@ describe('unobserved elements', () => {
   })
 
   test('advisory by default, promotable to a gate failure', async () => {
-    expect(exitCodeFor(await runFixture('unobserved'))).toBe(0)
+    expect(exitCodeFor(unobserved)).toBe(0)
 
     const promoted = await runFixture('unobserved', {
       validate: [architectureRules({ severity: { 'unobserved-elements': 'error' } })],
