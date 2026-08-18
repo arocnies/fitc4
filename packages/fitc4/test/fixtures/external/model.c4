@@ -1,0 +1,35 @@
+specification {
+  element system
+  element container
+  element component
+}
+
+model {
+  demo = system 'Demo' {
+    app = container 'App' {
+      core = component 'Core' {
+        metadata {
+          sources 'src/**'
+        }
+      }
+    }
+
+    external = container 'Managed services' {
+      payments = component 'Payments gateway' {
+        description 'Third-party payments API; description-only, owns no sources'
+      }
+
+      queue = component 'Message queue' {
+        description 'Managed message broker; description-only, owns no sources'
+      }
+    }
+  }
+
+  demo.app.core -> demo.external.queue
+}
+
+views {
+  view index of demo {
+    include *
+  }
+}

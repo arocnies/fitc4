@@ -24,6 +24,11 @@ export {
   type AiScanOptions,
 } from './scan.ts'
 export {
+  aiResolve,
+  PROVIDER_ID as AI_RESOLVE_PROVIDER_ID,
+  type AiResolveOptions,
+} from './resolve.ts'
+export {
   aiOwnershipAdvisor,
   PROVIDER_ID as AI_OWNERSHIP_ADVISOR_PROVIDER_ID,
   type OwnershipAdvisorOptions,
