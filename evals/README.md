@@ -60,3 +60,15 @@ One row per provider, because the provider is the unit of judgment. **hits** are
 **[`exploratory/`](fixtures/exploratory/)** — exploration: the same `agentScan`, now in its least predictable mode, and this is the fixture whose live mode exercises read-only agentic exploration (no `focus`, `agentic: true` — the request carries only prose instructions and a file listing, and the agent walks the repository to earn its answer). The domain is a directory of markdown runbooks, one service per `docs/runbooks/<name>/`, and the facts are deliberately spread across files so no single prefilled excerpt could answer: each runbook documents the services its own service touches, and the runbook file stands in for the service wherever a fact needs a file. Three documented dependencies — `gateway → worker`, `worker → store`, `worker → alerts` — are declared and pass; the alerts runbook's planted fallback of querying the store directly is forbidden by the model and must surface as a `missing-relationship` error. The expectations also pin the coverage attestation: `examined[]` must name all four runbooks (including the store runbook, which contributes no edges), and the scan must report the forbidden edge honestly rather than tidying it away.
 
 The progression is the point: the deterministic gate carries a greenfield project alone; agents extend it over a brownfield's judgment calls; prose instructions extend it over domains with no parser at all; and exploration extends *those* over domains too spread out to prefill — which is where a proven domain graduates to a small deterministic provider, per [`docs/agent-providers.md`](../docs/agent-providers.md).
+
+## Measured results
+
+First live measurements, 2026-08-18, one run per model over all four fixtures (12 provider rows; reruns replay the cache, so a fresh measurement needs a fixture edit or a cleared `evals/.cache/`):
+
+| exec · model | rows perfect | divergences |
+|---|---|---|
+| claude · sonnet | 12/12 | none — matched the ideal-agent expectations exactly |
+| codex · gpt-5.6-luna | 12/12 | none — matched exactly (after two codex-adapter fixes this run surfaced, see below) |
+| claude · haiku | 9/12 | two precision failures, zero misses: the semantic reviewer flagged the healthy `mono.ui` (brownfield), and exploration emitted a reversed `alerts → worker` edge the deterministic rules correctly rejected (exploratory, one extra on two rows) |
+
+Two readings worth keeping. First, every divergence measured so far is an **extra, never a miss** — cheap models over-report rather than under-report, and for a gate that is the right failure direction: an extra surfaces for a human to dismiss, a miss would be silence. Second, the harness paid for itself on its first live outing: the codex path's first real execution found two adapter bugs (OpenAI strict mode demands every property `required` — optionals now travel as required-but-nullable and are stripped on reply — and rejects array-rooted schemas, which now travel in an object envelope). Both were invisible to stub mode by design; both failed closed as `provider-failure` errors rather than thinning the run silently.
