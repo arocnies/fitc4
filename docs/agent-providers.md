@@ -172,6 +172,10 @@ Judgment about how load-bearing to make this belongs to the user, and the dials 
 - **Decisions bound the resolve bill.** `agentResolve`'s call size scales with distinct (element, package) questions, not with import sites: adding the hundredth import of an already-offered package changes nothing the model sees, so the cached reply replays.
 - **Graduate proven domains.** Once a domain stabilizes — you know exactly which files matter and what shape the facts take — replace the `agentScan` instance with a small deterministic provider (a compose parser is an afternoon). Same envelope, same kinds, same resolve and validate phases; the report's provider line shows the swap. Prose is for exploring a domain, not for running one forever.
 
+## Evals
+
+[`evals/`](../evals/) at the repository root is the opt-in harness that measures these providers against fixtures with planted ground truth — `npm run eval` scores the recorded ideal-agent replies for free (and is the harness's own regression test), `npm run eval -- --exec claude` measures a live model on your own CLI and billing. It never runs in CI or under `npm test`. The fixtures double as checked-in end-to-end examples, and the `non-ts` fixture is the worked non-TypeScript `agentScan` example: a docker-compose domain, scanned in focused one-shot mode, judged by the stock deterministic rules. See [`evals/README.md`](../evals/README.md).
+
 ## Design note: a code-graph provider fits the same seams
 
 A future code-graph-RAG-style provider — one that answers from a prebuilt symbol/call graph rather than raw file reads — needs nothing new from the plugin surface:
