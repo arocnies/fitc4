@@ -19,6 +19,11 @@ export { codexCli, type CodexCliOptions } from './codex-cli.ts'
 export { cached, type CacheOptions } from './cache.ts'
 
 export {
+  aiScan,
+  PROVIDER_ID as AI_SCAN_PROVIDER_ID,
+  type AiScanOptions,
+} from './scan.ts'
+export {
   aiOwnershipAdvisor,
   PROVIDER_ID as AI_OWNERSHIP_ADVISOR_PROVIDER_ID,
   type OwnershipAdvisorOptions,

@@ -1,0 +1,86 @@
+# The `ai-scan` provider
+
+`aiScan` (from `fitc4/ai`) is a scan provider driven by prose instead of a parser. The TypeScript scanner sees imports; it cannot see that `docker-compose.yml` wires one service to another, that a runbook names a component, or that an OpenAPI file declares a dependency between systems. `aiScan` lets a user enforce those model domains anyway: describe in prose what to observe, and the AI explores the repository read-only and reports standard `Observation`s that feed the same deterministic resolve and validate phases as any other scanner's.
+
+This is the prototyping story for new model domains: an agent (human or otherwise) writes instructions, the deterministic rules judge whatever comes back, and a domain that proves its worth graduates to a purpose-built deterministic provider.
+
+## How it works
+
+- **Deterministic prefilled context.** The provider enumerates the files under `roots` (default: the repository root; bounded by `maxFiles`, default 300) and prefills the request with that listing plus the user's instructions. If the listing is truncated, the context says so — the model must know its map is partial. Because the context is a pure function of the repository and the options, the request composes with `cached()` unchanged: a rerun with unchanged inputs replays the recorded reply, free and identical.
+- **Read-only exploration.** The request sets `agentic: true`, so the exec layer permits read-only repository access (`claude` gets `Read,Grep,Glob`; `codex` runs in a read-only sandbox). The reply must still come back as a single JSON value matching the reply schema.
+- **Standard observations out.** Replies carry observations (`kind`, `subject`, optional `target`, optional `evidence`) plus a required `examined: string[]` — the files the model actually read. Each examined path becomes a standard `scan-root` observation: the coverage attestation the rules use to know what the code sample was. Observation kinds outside the standard set are legal; the `unknown-observation-kind` rule reports them at `info` rather than dropping them.
+
+## The fail-closed contract
+
+`aiScan` is deliberately stricter than the AI validate providers. Those are advisory enrichment — every deterministic finding still stands when they degrade to an `ai-unavailable` warning. A scanner is load-bearing: its observations *are* the coverage the rules judge, so an absent scanner must never look like a clean scan. Concretely, each of these **throws**, and the pipeline reports one `provider-failure` error finding attributed to the provider:
+
+- the exec fails (missing CLI, logged out, timeout, non-zero exit);
+- the reply is off-schema — parsing is not conforming;
+- `examined` is empty — a scan that read nothing observed nothing, and zero observations must not read as a clean domain;
+- any path in `subject`/`target`/`evidence`/`examined` is absolute, escapes the repository root, or does not exist on disk. A hallucinated path is a claim about code that is not there; it fails the run visibly rather than being silently dropped, because dropping it would let the rest of the reply pass as trustworthy.
+
+A failed provider contributes nothing — no half-scan — and the other providers still run.
+
+## A worked config
+
+```ts
+import { defineConfig, defaultValidate, typescriptImports, TYPESCRIPT_IMPORTS_PROVIDER_ID } from 'fitc4'
+import { aiScan, cached, claudeCli } from 'fitc4/ai'
+
+const exec = cached(claudeCli({ model: 'sonnet' }))
+
+export default defineConfig({
+  version: 1,
+  repositoryRoot: '.',
+  model: 'arch',
+  scanRoots: ['src'],
+  tsconfig: 'tsconfig.json',
+  // Present replaces: spread the deterministic scanner back in explicitly.
+  scan: [
+    {
+      id: TYPESCRIPT_IMPORTS_PROVIDER_ID,
+      run: typescriptImports({ tsconfigPath: 'tsconfig.json', roots: ['src'] }),
+    },
+    aiScan({
+      exec,
+      id: 'compose',
+      roots: ['deploy'],
+      instructions:
+        'Read docker-compose.yml and emit one dependency observation for each ' +
+        'service-to-service link (depends_on, links, and connection strings in ' +
+        'environment). Subject and target are refs of kind "service" named after ' +
+        'the compose service. Cite the file and line as evidence.',
+    }),
+    aiScan({
+      exec,
+      id: 'docs',
+      roots: ['docs'],
+      instructions:
+        'For every markdown file that names a source file, emit a dependency ' +
+        'observation from the doc (kind "file") to that source file (kind "file").',
+    }),
+  ],
+  validate: [...defaultValidate],
+})
+```
+
+Two instances coexist because `id` suffixes the provider id (`ai-scan:compose`, `ai-scan:docs`): the pipeline namespaces every observation id with the provider id it was composed under, so distinct suffixes are what keep two instances' attestations from colliding.
+
+## Cost and nondeterminism
+
+Judgment about how load-bearing to make this belongs to the user, and the dials are the usual ones:
+
+- **Advisory-first prototyping.** New domains start cheap: private observation kinds surface as `info` findings (`unknown-observation-kind`), so a first draft of the instructions costs a visible nudge, not a broken build. Wire the domain into the model (ownership metadata, declared relationships, or a custom validate rule that reads your kinds) once the observations look right.
+- **`cached()` is the cost model.** The context is deterministic, so steady-state CI runs replay the recorded reply for free. A live call happens only when the instructions, the file listing, or the exec's fingerprint change. Note the boundary honestly: with `agentic: true` the model may read file *contents* the listing does not carry, so an edit that changes no listed path can replay a stale reply until the cache is cleared — acceptable for prototyping, and one reason proven domains should graduate.
+- **Graduate proven domains.** Once a domain stabilizes — you know exactly which files matter and what shape the facts take — replace the `aiScan` instance with a small deterministic provider (a compose parser is an afternoon). Same envelope, same kinds, same resolve and validate phases; the report's provider line shows the swap. Prose is for exploring a domain, not for running one forever.
+
+## Design note: a code-graph provider fits the same seams
+
+A future code-graph-RAG-style provider — one that answers from a prebuilt symbol/call graph rather than raw file reads — needs nothing new from the plugin surface:
+
+- **Same `AiExec` + `agentic` exploration.** The exec contract already distinguishes "answer from the prefilled context" from "explore read-only"; a graph provider is just one that prefills better. Where `aiScan` prefills a file listing, a graph provider prefills the relevant graph slice — deterministic context extracted from an index, exactly like the listing is extracted from the filesystem.
+- **Same Observation envelope.** Graph-derived facts are `dependency` observations with `symbol` refs (the ref kind is already reserved in the vocabulary) and file/line evidence. Nothing downstream changes: resolve maps them onto the model, validate judges them, unknown kinds are reported.
+- **Same attestation contract.** `examined` generalizes cleanly: the graph provider attests to the index slices it consulted (files, or index shards named as paths), and an empty attestation fails the same way — a graph nobody consulted must not read as a clean graph.
+- **Same cache seam.** The graph index version belongs in the exec `fingerprint` or the prefilled context, so `cached()` keys on it and a rebuilt index invalidates replies recorded against the old one.
+
+The only genuinely new work is the index itself and the deterministic extraction step that turns it into context. The provider surface — `NamedProvider<ScanProvider>`, the fail-closed contract, natural-key ids, `scan-root` attestations — carries over unchanged.
