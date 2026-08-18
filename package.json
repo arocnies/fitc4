@@ -4,11 +4,13 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "example"
+    "example",
+    "evals"
   ],
   "scripts": {
     "verify": "npm run check --workspaces",
-    "smoke": "bash scripts/smoke.sh"
+    "smoke": "bash scripts/smoke.sh",
+    "eval": "node evals/run.ts"
   },
   "devDependencies": {
     "typescript": "7.0.2",
