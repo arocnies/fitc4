@@ -12,8 +12,9 @@ import path from 'node:path'
 import { afterAll, afterEach, describe, expect, test } from 'vitest'
 
 import { claudeCli } from '../src/agent/claude-cli.ts'
-import { codexCli } from '../src/agent/codex-cli.ts'
+import { codexCli, strictSchema } from '../src/agent/codex-cli.ts'
 import { extractJson, finishReply, schemaMismatch } from '../src/agent/exec.ts'
+import type { JsonObject, JsonValue } from '../src/types.ts'
 
 const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-fake-agent-'))
 afterAll(() => fs.rmSync(workDir, { recursive: true, force: true }))
@@ -190,6 +191,62 @@ describe('codexCli', () => {
     expect(stdin).toContain('## Task\n\njudge this')
   })
 
+  test('the written schema satisfies strict mode; optional-key nulls are stripped from the reply', async () => {
+    captureTo('codex-nulls.json')
+    const schema: JsonObject = {
+      type: 'object',
+      required: ['files'],
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['path', 'element'],
+            properties: {
+              path: { type: 'string' },
+              element: { type: ['string', 'null'] },
+              reason: { type: 'string' },
+            },
+          },
+        },
+      },
+    }
+    // The strict transform makes `reason` required-but-nullable, so the model
+    // answers null where the plain schema lets it omit the key. `element` is
+    // required and legitimately nullable: its null must survive.
+    process.env['FAKE_RESULT'] = JSON.stringify({
+      files: [{ path: 'a.ts', element: null, reason: null }],
+    })
+
+    const reply = await codexCli({ binary: fakeCodex }).run({ prompt: 'x', schema })
+
+    expect(reply).toMatchObject({ ok: true, value: { files: [{ path: 'a.ts', element: null }] } })
+    if (reply.ok) {
+      const files = (reply.value as { files: JsonObject[] }).files
+      expect(files[0]).not.toHaveProperty('reason')
+      // The stripped value passes the provider-side check against the
+      // ORIGINAL schema, where `reason` is optional and non-nullable.
+      expect(schemaMismatch(reply.value, schema)).toBeUndefined()
+      // The raw text is the model's, nulls and all — what a cache records.
+      expect(reply.raw).toContain('"reason":null')
+    }
+    expectStrictObjectNodes(JSON.parse(readCapture().schema ?? '') as JsonValue)
+  })
+
+  test('a null on a required non-nullable key still fails the schema check', async () => {
+    const schema: JsonObject = {
+      type: 'object',
+      required: ['matches'],
+      properties: { matches: { type: 'boolean' } },
+    }
+    process.env['FAKE_RESULT'] = JSON.stringify({ matches: null })
+
+    const reply = await codexCli({ binary: fakeCodex }).run({ prompt: 'x', schema })
+
+    expect(reply.ok).toBe(false)
+    if (!reply.ok) expect(reply.error).toContain('$.matches')
+  })
+
   test('object schemas are pinned closed for strict structured output', async () => {
     captureTo('codex-schema.json')
 
@@ -225,6 +282,145 @@ describe('codexCli', () => {
     const reply = await codexCli({ binary: slowBinary, timeoutMs: 200 }).run({ prompt: 'x' })
 
     expect(!reply.ok && reply.error).toContain('timed out')
+  })
+})
+
+/**
+ * OpenAI strict mode's rule, asserted recursively: every object node with
+ * `properties` pins `additionalProperties: false` and lists EVERY property
+ * key in `required`.
+ */
+function expectStrictObjectNodes(node: JsonValue): void {
+  if (Array.isArray(node)) {
+    for (const entry of node) expectStrictObjectNodes(entry)
+    return
+  }
+  if (node === null || typeof node !== 'object') return
+
+  const properties = node['properties']
+  if (properties !== null && typeof properties === 'object' && !Array.isArray(properties)) {
+    expect(node['additionalProperties']).toBe(false)
+    expect([...(node['required'] as string[])].sort()).toEqual(Object.keys(properties).sort())
+    for (const schema of Object.values(properties)) expectStrictObjectNodes(schema)
+  }
+  for (const [key, value] of Object.entries(node)) {
+    if (key !== 'properties') expectStrictObjectNodes(value)
+  }
+}
+
+describe('strictSchema', () => {
+  test('optional plain-typed properties become required-but-nullable', () => {
+    const strict = strictSchema({
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['candidateId', 'elementId'],
+        properties: {
+          candidateId: { type: 'string' },
+          elementId: { type: 'string' },
+          reason: { type: 'string' },
+        },
+      },
+    }) as { items: { required: string[]; additionalProperties: boolean; properties: JsonObject } }
+
+    expect(strict.items.additionalProperties).toBe(false)
+    expect([...strict.items.required].sort()).toEqual(['candidateId', 'elementId', 'reason'])
+    expect(strict.items.properties['candidateId']).toEqual({ type: 'string' })
+    expect(strict.items.properties['reason']).toEqual({ type: ['string', 'null'] })
+    expectStrictObjectNodes(strict as unknown as JsonValue)
+  })
+
+  test('an all-required object changes only by additionalProperties; nullable unions stay put', () => {
+    const strict = strictSchema({
+      type: 'object',
+      required: ['path', 'element'],
+      properties: { path: { type: 'string' }, element: { type: ['string', 'null'] } },
+    })
+
+    expect(strict).toEqual({
+      type: 'object',
+      required: ['path', 'element'],
+      properties: { path: { type: 'string' }, element: { type: ['string', 'null'] } },
+      additionalProperties: false,
+    })
+  })
+
+  test('structured optionals union with null via anyOf, and nesting recurses throughout', () => {
+    const strict = strictSchema({
+      type: 'object',
+      required: ['kind'],
+      properties: {
+        kind: { type: 'string' },
+        target: {
+          type: 'object',
+          required: ['kind', 'id'],
+          properties: { kind: { type: 'string' }, id: { type: 'string' } },
+        },
+        evidence: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['path'],
+            properties: { path: { type: 'string' }, line: { type: 'integer' } },
+          },
+        },
+      },
+    }) as { properties: JsonObject; required: string[] }
+
+    expect([...strict.required].sort()).toEqual(['evidence', 'kind', 'target'])
+    expect(strict.properties['target']).toEqual({
+      anyOf: [
+        {
+          type: 'object',
+          required: ['kind', 'id'],
+          properties: { kind: { type: 'string' }, id: { type: 'string' } },
+          additionalProperties: false,
+        },
+        { type: 'null' },
+      ],
+    })
+    const evidence = strict.properties['evidence'] as { anyOf: JsonObject[] }
+    expect(evidence.anyOf[1]).toEqual({ type: 'null' })
+    expect(evidence.anyOf[0]).toEqual({
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['path', 'line'],
+        properties: { path: { type: 'string' }, line: { type: ['integer', 'null'] } },
+        additionalProperties: false,
+      },
+    })
+    expectStrictObjectNodes(strict as unknown as JsonValue)
+  })
+
+  test('every provider reply schema shape passes the strict rules', () => {
+    // The scan reply schema is the deepest shape a provider requests: nested
+    // objects, arrays of objects, optionals at three levels.
+    const strict = strictSchema({
+      type: 'object',
+      required: ['observations', 'examined'],
+      properties: {
+        observations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['kind', 'subject'],
+            properties: {
+              kind: { type: 'string' },
+              subject: {
+                type: 'object',
+                required: ['kind', 'id'],
+                properties: { kind: { type: 'string' }, id: { type: 'string' } },
+              },
+              description: { type: 'string' },
+            },
+          },
+        },
+        examined: { type: 'array', items: { type: 'string' } },
+      },
+    })
+
+    expectStrictObjectNodes(strict)
   })
 })
 
