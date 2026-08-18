@@ -136,5 +136,11 @@ export function init(directory: string): InitResult {
     result.notes.push(`scanRoots is ["src"] but src/ does not exist — create it or edit scanRoots`)
   }
 
+  // A pointer, not a copied file: .claude/ is the user's directory to curate.
+  result.notes.push(
+    `Claude Code users: the package ships a fitc4 skill — ` +
+      `copy node_modules/fitc4/skills/fitc4/ into .claude/skills/fitc4/`,
+  )
+
   return result
 }

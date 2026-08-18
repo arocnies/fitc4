@@ -42,7 +42,8 @@
   },
   "files": [
     "dist",
-    "schema"
+    "schema",
+    "skills"
   ],
   "scripts": {
     "check": "npm run model:validate && npm run format:check && npm run typecheck && npm run build && npm run test && npm run fitc4",

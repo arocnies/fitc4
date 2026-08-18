@@ -1,0 +1,84 @@
+---
+name: fitc4
+description: Check code against the project's LikeC4 architecture model with fitc4. Use when running or interpreting the architecture gate, when a fitc4 finding appears in a build or report, or when asked whether a change fits the architecture.
+---
+
+# fitc4: fit the code to the model
+
+The LikeC4 model (`.c4` files, usually under `arch/`) is a contract: which
+elements exist, which files each owns (`sources` metadata), and which may
+depend on which (`->` relationships). fitc4 scans the code, maps every file
+and import onto that model, and fails where the two disagree.
+
+## Run the gate
+
+- `npx fitc4` — report to stdout; exits 1 when any finding has severity
+  `error`.
+- `npx fitc4 --json` — the full structured result instead of the report
+  (the `PipelineResult` type in `node_modules/fitc4/dist/index.d.ts`).
+- `npx fitc4 --config <path>` — use a specific config instead of discovery.
+
+Run the gate before handing off changes. Exit 1 is an architecture violation,
+not a flaky tool.
+
+## Read the findings
+
+Every finding carries a rule id and a severity:
+
+- **error** fails the build: code crosses a boundary the model does not
+  declare (`missing-relationship`) or crosses it against the declared
+  direction (`relationship-direction`); two elements claim one file or
+  package (`ambiguous-source`, `ambiguous-package`); or the model's own
+  metadata is broken (`invalid-sources`, `unmatched-sources`,
+  `invalid-packages`, `unmatched-packages`).
+- **warning** passes but wants action: a file no element owns
+  (`unmapped-source`), an import nothing can resolve (`unresolved-import`),
+  a stale drift edge (`unused-drift`).
+- **info** is counted, not blocking: exercised drift (`drift-relationship`),
+  elements nothing checks (`unobserved-elements`).
+
+Severities are project-tunable, so trust the severity in the run you are
+reading over the defaults above. Full rule reference:
+`node_modules/fitc4/README.md#rules`.
+
+## Fix the code, not the contract
+
+A finding means the code and the contract disagree, and fixing the code is
+the default path:
+
+- `missing-relationship` / `relationship-direction`: remove or reroute the
+  offending import so the dependency flows the way the model declares.
+- `unmapped-source`: new code needs an owner — put the file under a directory
+  an element's `sources` already covers, or extend the right element's
+  `sources` (assigning ownership of new code is normal, not silencing).
+
+Editing the model is a design decision, legitimate only when the architecture
+genuinely changed — a new component, a dependency the design now accepts.
+Call any model change out explicitly when handing off. Never:
+
+- edit the model merely to make a finding go away;
+- delete `sources` metadata or a declared relationship to silence a finding —
+  that removes code from architecture control entirely;
+- add a `#drift` tag to get a new dependency past the gate (see below).
+
+## Drift etiquette
+
+Relationships tagged `#drift` are tolerated-but-counted debt: dependencies
+that really exist, declared honestly so brownfield code passes while the
+report counts the debt down.
+
+- Each exercised drift edge is one `drift-relationship` info finding; the
+  fix is deleting the offending code path, then the tagged relationship.
+- An `unused-drift` warning means no code exercises the edge anymore — the
+  only fix is deleting the stale relationship from the model, never
+  resurrecting code to keep it.
+- Never add a drift tag to pass the gate. Drift declares debt that already
+  existed, not debt being created.
+
+## Package claims
+
+`packages` metadata on an element claims exact npm package names (`pg`,
+`@aws-sdk/client-s3`); imports of a claimed package resolve onto the claiming
+element and are boundary-checked like any file dependency. An error on a
+claimed package import means route the code through the claiming element —
+not delete the claim.

@@ -231,6 +231,10 @@ The one norm an agent cannot infer from the CLI: **the model is the contract, an
   `npx fitc4 --json`.
 ```
 
+`npx fitc4 init` scaffolds an `AGENTS.md` carrying these norms; the block above is for merging them into a file you already have.
+
+The package also ships a Claude Code skill at `skills/fitc4/` — the full fit workflow: reading severities, when a model edit is legitimate, drift etiquette. Copy it into your project's `.claude/skills/fitc4/`, or reference it in place from `node_modules/fitc4/skills/fitc4/`.
+
 ## Links
 
 Source, issues, a full worked example, and the provider contract live in the [GitHub repository](https://github.com/arocnies/fitc4) — see [`example/`](https://github.com/arocnies/fitc4/tree/main/example) and [`docs/providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/providers.md). Checking JavaScript or mixed JS/TS projects? The companion package [`fitc4-dependency-cruiser`](https://www.npmjs.com/package/fitc4-dependency-cruiser) wraps dependency-cruiser as a scan provider — install both and compose it in config.
