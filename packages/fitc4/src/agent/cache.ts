@@ -1,7 +1,7 @@
 /**
- * Response caching for `AiExec`.
+ * Response caching for `AgentExec`.
  *
- * The cache is what reconciles an AI provider with a deterministic gate: the
+ * The cache is what reconciles an agent provider with a deterministic gate: the
  * key is everything the model saw — adapter identity (which carries the
  * model), the adapter's `fingerprint` (its fixed prompt-and-flags surface),
  * prompt, context, schema, agentic flag — so a rerun with unchanged inputs
@@ -22,25 +22,25 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { schemaMismatch } from './exec.ts'
-import type { AiExec, AiRequest } from './exec.ts'
+import type { AgentExec, AgentRequest } from './exec.ts'
 import type { JsonValue } from '../types.ts'
 
 export interface CacheOptions {
   /**
-   * Cache directory. Default: `node_modules/.cache/fitc4-ai` under the
+   * Cache directory. Default: `node_modules/.cache/fitc4-agent` under the
    * working directory — inside an ignored tree, so nothing lands in git.
    */
   directory?: string
 }
 
-export function cached(exec: AiExec, options: CacheOptions = {}): AiExec {
+export function cached(exec: AgentExec, options: CacheOptions = {}): AgentExec {
   const directory =
-    options.directory ?? path.join(process.cwd(), 'node_modules', '.cache', 'fitc4-ai')
+    options.directory ?? path.join(process.cwd(), 'node_modules', '.cache', 'fitc4-agent')
 
   return {
     id: exec.id,
     fingerprint: exec.fingerprint,
-    async run(request: AiRequest) {
+    async run(request: AgentRequest) {
       const key = createHash('sha256')
         .update(
           JSON.stringify({

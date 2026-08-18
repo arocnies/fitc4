@@ -1,7 +1,7 @@
 /**
- * The AI execution contract (`fitc4/ai`).
+ * The agent execution contract (`fitc4/agent`).
  *
- * An `AiExec` adapts one locally installed agent CLI — the user's own install,
+ * An `AgentExec` adapts one locally installed agent CLI — the user's own install,
  * login, and billing — into a function providers can call. FitC4 never holds
  * an API key: authentication and model access belong entirely to the CLI.
  *
@@ -11,8 +11,8 @@
  * read-only repository exploration for questions that genuinely need it.
  *
  * A reply is a value, never an exception: adapters return `{ ok: false }` and
- * the calling provider decides what an unavailable or malformed AI means for
- * its findings. Adapters do not retry — a retry is another billed call, and
+ * the calling provider decides what an unavailable CLI or malformed reply
+ * means for its findings. Adapters do not retry — a retry is another billed call, and
  * whether one is worth it is the provider's judgment, not the transport's.
  */
 
@@ -21,7 +21,7 @@ import { spawn } from 'node:child_process'
 import { messageOf } from '../errors.ts'
 import type { JsonObject, JsonValue } from '../types.ts'
 
-export interface AiRequest {
+export interface AgentRequest {
   /** The task, stated imperatively. */
   prompt: string
   /** Prefilled context the tool must treat as its entire world. */
@@ -35,11 +35,11 @@ export interface AiRequest {
   timeoutMs?: number
 }
 
-export type AiReply =
+export type AgentReply =
   | { ok: true; value: JsonValue; raw: string }
   | { ok: false; error: string }
 
-export interface AiExec {
+export interface AgentExec {
   /** Stable identity for cache keys and finding provenance; includes the model. */
   id: string
   /**
@@ -49,7 +49,7 @@ export interface AiExec {
    * the model bumps this string instead of replaying stale replies.
    */
   readonly fingerprint?: string
-  run(request: AiRequest): Promise<AiReply>
+  run(request: AgentRequest): Promise<AgentReply>
 }
 
 /**
@@ -59,7 +59,7 @@ export interface AiExec {
  * limit — and because one document makes the call reproducible: the same bytes
  * in are the cache key and the whole story of what the model saw.
  */
-export function composeInput(request: AiRequest): string {
+export function composeInput(request: AgentRequest): string {
   const parts: string[] = []
   if (request.context !== undefined && request.context !== '') {
     parts.push(`## Context\n\n${request.context}`)
@@ -103,8 +103,8 @@ export function extractJson(text: string): JsonValue | undefined {
   }
 }
 
-/** Turn a CLI's reply text into an `AiReply`, honouring the requested schema. */
-export function finishReply(request: AiRequest, text: string): AiReply {
+/** Turn a CLI's reply text into an `AgentReply`, honouring the requested schema. */
+export function finishReply(request: AgentRequest, text: string): AgentReply {
   if (request.schema === undefined) return { ok: true, value: text, raw: text }
 
   const value = extractJson(text)

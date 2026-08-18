@@ -1,11 +1,11 @@
 /**
- * The `ai-ownership-advisor` validate provider.
+ * The `agent-ownership-advisor` validate provider.
  *
- * For every file the resolve phase left unowned, ask the AI which existing
+ * For every file the resolve phase left unowned, ask the agent which existing
  * element should own it — or whether the model is missing an element. Pure
  * enrichment of the deterministic `unmapped-source` warning: findings default
  * to `info`, the file list and element catalog are prefilled, and one batched
- * call covers every unowned file, so a clean repository costs zero AI calls.
+ * call covers every unowned file, so a clean repository costs zero agent calls.
  *
  * Suggestions naming an element that does not exist are reported as exactly
  * that — a hallucinated element must not read like a fix.
@@ -20,13 +20,13 @@ import type {
   ValidateContext,
   ValidateProvider,
 } from '../types.ts'
-import type { AiExec } from './exec.ts'
-import { aiTruncated, aiUnavailable, elementCatalog, fileExcerpts } from './findings.ts'
+import type { AgentExec } from './exec.ts'
+import { agentTruncated, agentUnavailable, elementCatalog, fileExcerpts } from './findings.ts'
 
-export const PROVIDER_ID = 'ai-ownership-advisor'
+export const PROVIDER_ID = 'agent-ownership-advisor'
 
 export interface OwnershipAdvisorOptions {
-  exec: AiExec
+  exec: AgentExec
   /**
    * The severity of this provider's suggestions — how load-bearing its
    * judgment is. Default 'info' (advisory); 'error' makes it part of the
@@ -63,7 +63,7 @@ const PROMPT =
   'should own it, or null if no existing element fits. Base the judgment on what the file ' +
   'does, not on its path. Keep each rationale to one sentence.'
 
-export function aiOwnershipAdvisor(
+export function agentOwnershipAdvisor(
   options: OwnershipAdvisorOptions,
 ): NamedProvider<ValidateProvider> {
   const severity = options.severity ?? 'info'
@@ -77,7 +77,7 @@ export function aiOwnershipAdvisor(
     const findings: Finding[] = []
     const sent = files.slice(0, maxFiles)
     if (files.length > sent.length) {
-      findings.push(aiTruncated(PROVIDER_ID, files.length - sent.length, 'unowned files', severity))
+      findings.push(agentTruncated(PROVIDER_ID, files.length - sent.length, 'unowned files', severity))
     }
     if (sent.length === 0) return findings
 
@@ -88,7 +88,7 @@ export function aiOwnershipAdvisor(
       cwd: context.repositoryRoot,
     })
     if (!reply.ok) {
-      findings.push(aiUnavailable(PROVIDER_ID, options.exec.id, reply.error, severity))
+      findings.push(agentUnavailable(PROVIDER_ID, options.exec.id, reply.error, severity))
       return findings
     }
 
@@ -111,7 +111,7 @@ export function aiOwnershipAdvisor(
         related: entry.element !== null && knownElements.has(entry.element)
           ? [{ kind: 'element', id: entry.element }]
           : undefined,
-        data: { ai: options.exec.id },
+        data: { agent: options.exec.id },
         provider: PROVIDER_ID,
       })
     }
@@ -122,7 +122,7 @@ export function aiOwnershipAdvisor(
     const unanswered = sent.filter((filePath) => !answered.has(filePath))
     if (unanswered.length > 0 && severity === 'error') {
       findings.push(
-        aiUnavailable(
+        agentUnavailable(
           PROVIDER_ID,
           options.exec.id,
           `the reply omitted ${unanswered.length} of ${sent.length} requested files`,
@@ -184,7 +184,7 @@ function describe(entry: Suggestion, knownElements: Set<string>): string {
     return `${entry.path} fits no existing element; the model may be missing one${rationale}`
   }
   if (!knownElements.has(entry.element)) {
-    return `${entry.path}: the AI suggested '${entry.element}', which is not in the model${rationale}`
+    return `${entry.path}: the agent suggested '${entry.element}', which is not in the model${rationale}`
   }
   return `${entry.path} may belong to ${entry.element}${rationale}`
 }

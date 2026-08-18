@@ -1,16 +1,16 @@
 /**
- * The `ai-scan` scan provider.
+ * The `agent-scan` scan provider.
  *
  * Lets a user enforce model domains the TypeScript scanner cannot see — docs,
  * configs, infra files, anything — by describing in prose what to observe. The
- * user writes instructions, the AI explores the repository read-only
+ * user writes instructions, the agent explores the repository read-only
  * (`agentic: true`), and its observations feed the same deterministic resolve
  * and validate phases as any other scanner's. The prefilled context is
  * deterministic — the instructions plus a bounded file listing — so `cached()`
  * replays a rerun with unchanged inputs byte for byte.
  *
  * **Fail-closed, deliberately stricter than the advisory validate providers.**
- * The AI validate providers degrade to a visible `ai-unavailable` finding
+ * The agent validate providers degrade to a visible `agent-unavailable` finding
  * because their judgment is an enrichment: every deterministic finding still
  * stands without them. A scanner is load-bearing — its observations are the
  * coverage the rules judge — so an absent scanner must never look like a clean
@@ -30,12 +30,12 @@ import path from 'node:path'
 
 import type { Evidence, JsonObject, NamedProvider, Observation, Ref, ScanContext, ScanProvider } from '../types.ts'
 import { schemaMismatch, truncate } from './exec.ts'
-import type { AiExec } from './exec.ts'
+import type { AgentExec } from './exec.ts'
 
-export const PROVIDER_ID = 'ai-scan'
+export const PROVIDER_ID = 'agent-scan'
 
-export interface AiScanOptions {
-  exec: AiExec
+export interface AgentScanOptions {
+  exec: AgentExec
   /**
    * What to observe, in prose — e.g. "read docker-compose.yml and emit a
    * dependency observation for each service-to-service link".
@@ -49,7 +49,7 @@ export interface AiScanOptions {
    */
   roots?: string[]
   /**
-   * Suffix for the provider id: `ai-scan:<id>` instead of `ai-scan`.
+   * Suffix for the provider id: `agent-scan:<id>` instead of `agent-scan`.
    *
    * The pipeline namespaces every observation id with the provider id it was
    * composed under, so two instances with different instructions coexist only
@@ -118,12 +118,12 @@ const PROMPT =
   'An empty `examined` is treated as a failed scan.'
 
 /**
- * An AI-driven scan provider: prose instructions in, standard observations out.
+ * An agent-driven scan provider: prose instructions in, standard observations out.
  *
  * See the module JSDoc for the fail-closed contract. Compose the exec with
  * `cached()` to make reruns with unchanged instructions and listing free.
  */
-export function aiScan(options: AiScanOptions): NamedProvider<ScanProvider> {
+export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider> {
   const providerId = options.id === undefined ? PROVIDER_ID : `${PROVIDER_ID}:${options.id}`
   const roots = options.roots ?? ['.']
   const maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES
@@ -142,7 +142,7 @@ export function aiScan(options: AiScanOptions): NamedProvider<ScanProvider> {
     })
 
     if (!reply.ok) {
-      throw new Error(`AI scan was unavailable (${options.exec.id}): ${reply.error}`)
+      throw new Error(`Agent scan was unavailable (${options.exec.id}): ${reply.error}`)
     }
 
     // The exec layer already enforced the schema on a live reply, but this
@@ -151,7 +151,7 @@ export function aiScan(options: AiScanOptions): NamedProvider<ScanProvider> {
     // flow malformed entries into the pipeline as observations.
     const mismatch = schemaMismatch(reply.value, REPLY_SCHEMA)
     if (mismatch !== undefined) {
-      throw new Error(`AI scan reply did not match the requested schema: ${mismatch}`)
+      throw new Error(`Agent scan reply did not match the requested schema: ${mismatch}`)
     }
 
     const parsed = reply.value as unknown as {
@@ -166,7 +166,7 @@ export function aiScan(options: AiScanOptions): NamedProvider<ScanProvider> {
     const examined = [...new Set(parsed.examined.map((entry) => guard(entry, 'examined')))].sort()
     if (examined.length === 0) {
       throw new Error(
-        `AI scan (${options.exec.id}) attested to examining no files — an absent scan must not look like a clean one`,
+        `Agent scan (${options.exec.id}) attested to examining no files — an absent scan must not look like a clean one`,
       )
     }
 
@@ -180,8 +180,8 @@ export function aiScan(options: AiScanOptions): NamedProvider<ScanProvider> {
         id,
         kind: 'scan-root',
         subject: { kind: 'file', id: filePath },
-        description: `${filePath} was examined by the AI scan`,
-        data: { ai: options.exec.id },
+        description: `${filePath} was examined by the agent scan`,
+        data: { agent: options.exec.id },
         provider: providerId,
       })
     }
@@ -220,7 +220,7 @@ function toObservation(
   providerId: string,
 ): Observation {
   if (entry.kind.trim() === '') {
-    throw new Error('AI scan reply contained an observation with an empty kind')
+    throw new Error('Agent scan reply contained an observation with an empty kind')
   }
 
   const subject = guardedRef(entry.subject, guard, 'subject')
@@ -248,7 +248,7 @@ function toObservation(
     subject,
     ...(target === undefined ? {} : { target }),
     ...(evidence === undefined || evidence.length === 0 ? {} : { evidence }),
-    data: { ai: execId },
+    data: { agent: execId },
     provider: providerId,
   }
 }
@@ -275,7 +275,7 @@ function pathGuard(repositoryRoot: string): PathGuard {
 
   return (candidate, where) => {
     const reject = (reason: string): never => {
-      throw new Error(`AI scan reply named an invalid path in ${where}: '${truncate(candidate, 120)}' ${reason}`)
+      throw new Error(`Agent scan reply named an invalid path in ${where}: '${truncate(candidate, 120)}' ${reason}`)
     }
 
     if (candidate.trim() === '') reject('is empty')
@@ -322,7 +322,7 @@ function composeContext(
  */
 function enumerateFiles(repositoryRoot: string, roots: string[]): string[] {
   if (roots.length === 0) {
-    throw new Error('no roots configured for the AI scan; there is nothing to list')
+    throw new Error('no roots configured for the agent scan; there is nothing to list')
   }
 
   const found: string[] = []
@@ -343,14 +343,14 @@ function enumerateFiles(repositoryRoot: string, roots: string[]): string[] {
   for (const root of roots) {
     const absolute = path.resolve(repositoryRoot, root)
     if (!fs.existsSync(absolute) || !fs.statSync(absolute).isDirectory()) {
-      throw new Error(`AI scan root '${root}' is not a directory`)
+      throw new Error(`Agent scan root '${root}' is not a directory`)
     }
     walk(absolute)
   }
 
   const files = [...new Set(found)].sort()
   if (files.length === 0) {
-    throw new Error('the AI scan roots contain no files; there is nothing to observe')
+    throw new Error('the agent scan roots contain no files; there is nothing to observe')
   }
   return files
 }

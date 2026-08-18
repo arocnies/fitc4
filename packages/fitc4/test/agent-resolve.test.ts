@@ -1,14 +1,14 @@
 /**
- * `aiResolve` tests inject a stub `AiExec` and run the real pipeline over the
+ * `agentResolve` tests inject a stub `AgentExec` and run the real pipeline over the
  * `external` fixture — a repository depending on external packages, checked
  * against a model with description-only elements. Under test: leftover-
  * candidate scoping, context assembly, the fail-closed contract (exec failure,
  * off-schema reply, hallucinated observationId, unknown elementId), the
  * legitimate-abstention paths (empty reply, truncation), cache composition —
- * and the point of the feature: an AI-mapped association is judged by the
+ * and the point of the feature: an agent-mapped association is judged by the
  * standard relationship rules exactly like a deterministic one.
  *
- * No real AI is ever invoked: the exec is an in-process stub.
+ * No real agent CLI is ever invoked: the exec is an in-process stub.
  */
 
 import fs from 'node:fs'
@@ -16,18 +16,18 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, test } from 'vitest'
 
-import { cached } from '../src/ai/cache.ts'
-import type { AiExec, AiReply, AiRequest } from '../src/ai/exec.ts'
-import { aiResolve, PROVIDER_ID as RESOLVE_ID } from '../src/ai/resolve.ts'
+import { cached } from '../src/agent/cache.ts'
+import type { AgentExec, AgentReply, AgentRequest } from '../src/agent/exec.ts'
+import { agentResolve, PROVIDER_ID as RESOLVE_ID } from '../src/agent/resolve.ts'
 import { sourceRoot } from '../src/providers/source-root.ts'
 import type { Finding } from '../src/types.ts'
 import { findingFor, runFixture, SOURCE_ROOT_ID } from './helpers.ts'
 
-function stubExec(replies: AiReply[]): AiExec & { requests: AiRequest[] } {
+function stubExec(replies: AgentReply[]): AgentExec & { requests: AgentRequest[] } {
   const exec = {
     id: 'stub/model',
-    requests: [] as AiRequest[],
-    async run(request: AiRequest): Promise<AiReply> {
+    requests: [] as AgentRequest[],
+    async run(request: AgentRequest): Promise<AgentReply> {
       exec.requests.push(request)
       const reply = replies[Math.min(exec.requests.length, replies.length) - 1]
       if (reply === undefined) throw new Error('stub exhausted')
@@ -37,7 +37,7 @@ function stubExec(replies: AiReply[]): AiExec & { requests: AiRequest[] } {
   return exec
 }
 
-function ok(value: unknown): AiReply {
+function ok(value: unknown): AgentReply {
   return { ok: true, value: value as never, raw: JSON.stringify(value) }
 }
 
@@ -47,16 +47,16 @@ const AMQP_ID = 'typescript-imports/dependency:src/index.ts:2->amqplib'
 const MISSING_ID = 'typescript-imports/dependency:src/index.ts:3->./missing.js'
 
 /** Alongside the default resolver, exactly as the docs compose it. */
-function resolvePhase(exec: AiExec, options: { maxObservations?: number } = {}) {
-  return [{ id: SOURCE_ROOT_ID, run: sourceRoot }, aiResolve({ exec, ...options })]
+function resolvePhase(exec: AgentExec, options: { maxObservations?: number } = {}) {
+  return [{ id: SOURCE_ROOT_ID, run: sourceRoot }, agentResolve({ exec, ...options })]
 }
 
 function providerFailure(findings: Finding[]): Finding | undefined {
   return findingFor(findings, 'provider-failure')
 }
 
-describe('aiResolve end to end', () => {
-  test('an AI-mapped external dependency is judged by the standard relationship rules', async () => {
+describe('agentResolve end to end', () => {
+  test('an agent-mapped external dependency is judged by the standard relationship rules', async () => {
     const exec = stubExec([
       ok([
         // Undeclared in the model → must surface as missing-relationship.
@@ -69,7 +69,7 @@ describe('aiResolve end to end', () => {
     const result = await runFixture('external', { resolve: resolvePhase(exec) })
 
     // The description-only element became reachable by the gate: the standard
-    // rules judged the AI-mapped edge and found it undeclared.
+    // rules judged the agent-mapped edge and found it undeclared.
     const missing = result.findings.filter((finding) => finding.ruleId === 'missing-relationship')
     expect(missing).toHaveLength(1)
     expect(missing[0]?.severity).toBe('error')
@@ -79,7 +79,7 @@ describe('aiResolve end to end', () => {
     // The declared edge passes: mapped, matched to the declared relationship,
     // and no finding — same treatment a deterministic association gets.
     const queueMapping = result.associations.find(
-      (association) => association.observationId === AMQP_ID && association.provider === 'ai-resolve',
+      (association) => association.observationId === AMQP_ID && association.provider === 'agent-resolve',
     )
     expect(queueMapping?.status).toBe('resolved')
     expect(queueMapping?.target).toEqual({ kind: 'element', id: 'demo.external.queue' })
@@ -87,9 +87,9 @@ describe('aiResolve end to end', () => {
 
     // The mapping's provenance and reason ride in data.
     const paymentsMapping = result.associations.find(
-      (association) => association.observationId === STRIPE_ID && association.provider === 'ai-resolve',
+      (association) => association.observationId === STRIPE_ID && association.provider === 'agent-resolve',
     )
-    expect(paymentsMapping?.data).toEqual({ ai: 'stub/model', reason: 'stripe is the payments gateway' })
+    expect(paymentsMapping?.data).toEqual({ agent: 'stub/model', reason: 'stripe is the payments gateway' })
 
     expect(providerFailure(result.findings)).toBeUndefined()
     expect(findingFor(result.findings, 'orphaned-association')).toBeUndefined()
@@ -117,7 +117,26 @@ describe('aiResolve end to end', () => {
     expect(request?.context).not.toContain('truncated')
   })
 
-  test('a repository with no leftover candidates costs zero AI calls', async () => {
+  test('a claimed package is never a candidate — source-root already maps it deterministically', async () => {
+    const exec = stubExec([ok([])])
+
+    // The `packages` fixture claims pg, @aws-sdk/client-s3, and oldpkg via
+    // `packages` metadata; lodash is unclaimed.
+    const result = await runFixture('packages', { resolve: resolvePhase(exec) })
+
+    const context = exec.requests[0]?.context ?? ''
+    expect(exec.requests).toHaveLength(1)
+    // The unclaimed package is offered to the agent.
+    expect(context).toContain('->lodash')
+    // Claimed packages are not — including subpath imports of a claim.
+    expect(context).not.toContain('pg/promises')
+    expect(context).not.toContain('@aws-sdk/client-s3')
+    expect(context).not.toContain('oldpkg')
+
+    expect(providerFailure(result.findings)).toBeUndefined()
+  })
+
+  test('a repository with no leftover candidates costs zero agent calls', async () => {
     const exec = stubExec([])
 
     const result = await runFixture('ok', { resolve: resolvePhase(exec) })
@@ -127,14 +146,14 @@ describe('aiResolve end to end', () => {
   })
 })
 
-describe('aiResolve abstention is legitimate', () => {
+describe('agentResolve abstention is legitimate', () => {
   test('an empty mapping reply is a clean no-op — candidates stay unmapped, not failed', async () => {
     const exec = stubExec([ok([])])
 
     const result = await runFixture('external', { resolve: resolvePhase(exec) })
 
     expect(providerFailure(result.findings)).toBeUndefined()
-    expect(result.associations.filter((a) => a.provider === 'ai-resolve')).toEqual([])
+    expect(result.associations.filter((a) => a.provider === 'agent-resolve')).toEqual([])
     // Unmapped candidates keep their deterministic visibility: no
     // missing-relationship (nothing was mapped), and the unresolvable import
     // still stands as its usual warning.
@@ -164,7 +183,7 @@ describe('aiResolve abstention is legitimate', () => {
   })
 })
 
-describe('aiResolve fails closed', () => {
+describe('agentResolve fails closed', () => {
   test('an exec failure fails the provider — one provider-failure error, not fewer checks', async () => {
     const exec = stubExec([{ ok: false, error: 'not logged in' }])
 
@@ -172,9 +191,9 @@ describe('aiResolve fails closed', () => {
 
     const failure = providerFailure(result.findings)
     expect(failure?.severity).toBe('error')
-    expect(failure?.subject).toEqual({ kind: 'provider', id: 'ai-resolve' })
+    expect(failure?.subject).toEqual({ kind: 'provider', id: 'agent-resolve' })
     expect(failure?.description).toContain('not logged in')
-    expect(result.associations.filter((a) => a.provider === 'ai-resolve')).toEqual([])
+    expect(result.associations.filter((a) => a.provider === 'agent-resolve')).toEqual([])
   })
 
   test('an off-schema reply fails the provider', async () => {
@@ -198,7 +217,7 @@ describe('aiResolve fails closed', () => {
     expect(failure?.severity).toBe('error')
     expect(failure?.description).toContain('observationId it was not given')
     // Nothing from the untrustworthy reply landed — no half-result.
-    expect(result.associations.filter((a) => a.provider === 'ai-resolve')).toEqual([])
+    expect(result.associations.filter((a) => a.provider === 'agent-resolve')).toEqual([])
   })
 
   test('an element that is not in the model fails the provider', async () => {
@@ -227,8 +246,8 @@ describe('aiResolve fails closed', () => {
   })
 })
 
-describe('aiResolve composition', () => {
-  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-ai-resolve-cache-'))
+describe('agentResolve composition', () => {
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-agent-resolve-cache-'))
   afterAll(() => fs.rmSync(cacheDir, { recursive: true, force: true }))
 
   test('works under cached(): the second run replays the reply without a call', async () => {
@@ -252,12 +271,12 @@ describe('aiResolve composition', () => {
     const result = await runFixture('external', {
       resolve: [
         { id: SOURCE_ROOT_ID, run: sourceRoot },
-        aiResolve({ exec, id: 'infra' }),
-        aiResolve({ exec, id: 'apis' }),
+        agentResolve({ exec, id: 'infra' }),
+        agentResolve({ exec, id: 'apis' }),
       ],
     })
 
-    expect(result.providers.resolve).toEqual(['source-root', 'ai-resolve:infra', 'ai-resolve:apis'])
+    expect(result.providers.resolve).toEqual(['source-root', 'agent-resolve:infra', 'agent-resolve:apis'])
     expect(providerFailure(result.findings)).toBeUndefined()
   })
 })
@@ -265,5 +284,5 @@ describe('aiResolve composition', () => {
 // The provider id doubles as the association-id and finding-id namespace; a
 // rename would churn every consumer's baseline, so it is pinned.
 test('the provider id is stable', () => {
-  expect(RESOLVE_ID).toBe('ai-resolve')
+  expect(RESOLVE_ID).toBe('agent-resolve')
 })

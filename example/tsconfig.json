@@ -9,6 +9,6 @@
   },
   "include": [
     "src/**/*.ts",
-    "fitc4.ai.config.ts"
+    "fitc4.agent.config.ts"
   ]
 }

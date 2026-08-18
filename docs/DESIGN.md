@@ -36,12 +36,12 @@ Identifiers are derived from author-controlled names — element FQNs, `source::
 
 The property the whole tool exists for: a check that silently reports nothing is worse than no check, because it looks like success. Most of the rule surface exists because this was violated once. The concrete mechanisms:
 
-- **Coverage attestations.** Scanners emit a `scan-root` observation per root actually walked, and refuse to run with no roots, a missing root, or a root holding no code. Rules judge ownership only where the scan looked. The AI scanner's required `examined[]` is the same attestation: an empty one is a failure, because a scan that read nothing must not read as a clean domain.
+- **Coverage attestations.** Scanners emit a `scan-root` observation per root actually walked, and refuse to run with no roots, a missing root, or a root holding no code. Rules judge ownership only where the scan looked. The agent scanner's required `examined[]` is the same attestation: an empty one is a failure, because a scan that read nothing must not read as a clean domain.
 - **Metadata that matches nothing is an error.** `invalid-sources` / `unmatched-sources` for ownership, `invalid-packages` / `ambiguous-package` / `unmatched-packages` for package claims. A typo'd prefix once turned three architecture errors into a clean exit 0.
 - **Staged provider output.** A provider's items are staged and committed as a unit; one that fails partway (including on a duplicate id) contributes nothing — half a result is a misleading one.
 - **Unknown kinds are reported.** A scanner emitting `import` where the rules read `dependency` would otherwise produce zero findings and exit 0, indistinguishable from a clean repository.
 - **Structural containment.** `orphaned-association` (an association referencing a nonexistent observation), forced-`error` for unrecognized severities, and the JSON-safety walk that rejects what `JSON.stringify` would silently discard.
-- **AI schema enforcement and escalation.** An AI reply that parses but does not match the requested schema is a failure, not a value. Advisory providers degrade to a visible `ai-unavailable` finding; a provider promoted to `severity: 'error'` escalates `ai-unavailable` and `ai-truncated` to errors — a gate whose judge is absent must not pass. The fail-closed scan/resolve providers throw outright (below).
+- **Agent schema enforcement and escalation.** An agent reply that parses but does not match the requested schema is a failure, not a value. Advisory providers degrade to a visible `agent-unavailable` finding; a provider promoted to `severity: 'error'` escalates `agent-unavailable` and `agent-truncated` to errors — a gate whose judge is absent must not pass. The fail-closed scan/resolve providers throw outright (below).
 
 The gate itself is one function: exit 1 when any finding has severity `error`. Severities are per-rule defaults with per-rule overrides (`architectureRules({ severity: {...} })`) — promoting or softening a rule is policy, chosen in the config that owns it.
 
@@ -75,16 +75,16 @@ Resolution ([`source-root.ts`](../packages/fitc4/src/providers/source-root.ts)) 
 
 An element with neither `sources` nor `packages` is legal — an external system, a person, a pure-thought abstraction — but silently unenforced, indistinguishable from a typo'd claim key. One `unobserved-elements` info finding per run lists the leaf elements in that state, so deliberate abstraction stays legal but visible, and chosen rather than accidental. Parents whose children carry claims are structural, not unobserved; only leaves count.
 
-## AI provider tiers
+## Agent provider tiers
 
-`fitc4/ai` is a separate entry point the core never imports; composing an AI provider into a phase is an explicit act in a config file. The exec layer shells out to locally installed agent CLIs (`claude`, `codex`) — the user's login and billing, no API keys — with schema-enforced JSON replies and `cached()` replay keyed on everything the model saw.
+`fitc4/agent` is a separate entry point the core never imports; composing an agent provider into a phase is an explicit act in a config file. The exec layer shells out to locally installed agent CLIs (`claude`, `codex`) — the user's login and billing, no API keys — with schema-enforced JSON replies and `cached()` replay keyed on everything the model saw.
 
 Two tiers, distinguished by what absence looks like:
 
-- **Advisory validate providers** (`aiOwnershipAdvisor`, `aiSemanticReview`): enrichment. Every deterministic finding stands without them, so an unavailable CLI degrades to a visible `ai-unavailable` finding. `severity: 'error'` opts one into the gate, which escalates its failure modes with it.
-- **Fail-closed scan/resolve providers** (`aiScan`, `aiResolve`): load-bearing. An absent scanner looks like a clean scan and a silently failing resolver produces fewer checks — the exact fail-open the project exists to prevent — so any exec failure, off-schema reply, hallucinated path or id, or empty `examined` attestation **throws**, becoming one `provider-failure` error. `aiScan` observes model domains no parser covers, from prose instructions over a deterministic prefilled file listing; `aiResolve` maps leftover observations (external packages, unresolvable specifiers) onto elements, including description-only ones — abstention is legal, hallucination is failure. Per-provider detail: [`ai-providers.md`](ai-providers.md).
+- **Advisory validate providers** (`agentOwnershipAdvisor`, `agentSemanticReview`): enrichment. Every deterministic finding stands without them, so an unavailable CLI degrades to a visible `agent-unavailable` finding. `severity: 'error'` opts one into the gate, which escalates its failure modes with it.
+- **Fail-closed scan/resolve providers** (`agentScan`, `agentResolve`): load-bearing. An absent scanner looks like a clean scan and a silently failing resolver produces fewer checks — the exact fail-open the project exists to prevent — so any exec failure, off-schema reply, hallucinated path or id, or empty `examined` attestation **throws**, becoming one `provider-failure` error. `agentScan` observes model domains no parser covers, from prose instructions over a deterministic prefilled file listing; `agentResolve` maps leftover observations (external packages, unresolvable specifiers) onto elements, including description-only ones — abstention is legal, hallucination is failure. Per-provider detail: [`agent-providers.md`](agent-providers.md).
 
-The intended lifecycle: **agents prototype, determinism graduates.** A new model domain starts as prose instructions to `aiScan`; the deterministic rules judge whatever comes back; once the domain stabilizes, a small deterministic provider replaces the prose — same envelope, same kinds, same downstream phases, and the report's provider line shows the swap.
+The intended lifecycle: **agents prototype, determinism graduates.** A new model domain starts as prose instructions to `agentScan`; the deterministic rules judge whatever comes back; once the domain stabilizes, a small deterministic provider replaces the prose — same envelope, same kinds, same downstream phases, and the report's provider line shows the swap.
 
 ## Companion packages
 

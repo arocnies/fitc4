@@ -1,11 +1,11 @@
 /**
- * Shared pieces of the AI validate providers.
+ * Shared pieces of the agent validate providers.
  *
  * The contract that reconciles a nondeterministic model with a deterministic
- * gate: AI findings are additive — nothing here can suppress or rewrite a
+ * gate: agent findings are additive — nothing here can suppress or rewrite a
  * deterministic finding — and each provider's `severity` option says how
  * load-bearing its judgment is. The defaults are advisory; `'error'` is the
- * user's explicit act of making the AI part of the gate.
+ * user's explicit act of making the agent part of the gate.
  *
  * Choosing `'error'` changes the failure semantics on purpose: a gating
  * provider whose CLI is missing, or whose inputs were truncated, must fail the
@@ -22,24 +22,24 @@ import { normalizeSources, SOURCES_KEY } from '../model.ts'
 import type { Finding, LikeC4Model, Severity } from '../types.ts'
 
 /**
- * The one finding an AI provider emits when its exec fails.
+ * The one finding an agent provider emits when its exec fails.
  *
  * Advisory providers report a `warning` — a logged-out CLI must not fail the
  * build on behalf of a suggestion, but an enrichment that quietly stopped
  * running would look identical to a clean report. A gating provider escalates
  * to `error`: its absence is a hole in the gate, not a missing nicety.
  */
-export function aiUnavailable(
+export function agentUnavailable(
   provider: string,
   execId: string,
   error: string,
   severity: Severity,
 ): Finding {
   return {
-    id: findingId(provider, 'ai-unavailable', execId),
-    ruleId: 'ai-unavailable',
+    id: findingId(provider, 'agent-unavailable', execId),
+    ruleId: 'agent-unavailable',
     severity: severity === 'error' ? 'error' : 'warning',
-    description: `AI assistance was unavailable (${execId}): ${error}`,
+    description: `Agent assistance was unavailable (${execId}): ${error}`,
     subject: { kind: 'provider', id: provider },
     provider,
   }
@@ -49,15 +49,15 @@ export function aiUnavailable(
  * Reported truncation — a silent cap would read as full coverage. Escalates
  * for a gating provider: inputs it never judged are inputs that bypassed it.
  */
-export function aiTruncated(
+export function agentTruncated(
   provider: string,
   dropped: number,
   what: string,
   severity: Severity,
 ): Finding {
   return {
-    id: findingId(provider, 'ai-truncated', what),
-    ruleId: 'ai-truncated',
+    id: findingId(provider, 'agent-truncated', what),
+    ruleId: 'agent-truncated',
     severity: severity === 'error' ? 'error' : 'info',
     description: `${dropped} ${what} beyond the configured limit were not reviewed.`,
     subject: { kind: 'provider', id: provider },

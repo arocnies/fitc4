@@ -12,7 +12,7 @@
  */
 
 import { composeInput, finishReply, runCliProcess, truncate } from './exec.ts'
-import type { AiExec, AiReply, AiRequest } from './exec.ts'
+import type { AgentExec, AgentReply, AgentRequest } from './exec.ts'
 
 export const DEFAULT_CLAUDE_MODEL = 'haiku'
 
@@ -38,7 +38,7 @@ const READ_ONLY_TOOLS = 'Read,Grep,Glob'
  */
 const FINGERPRINT = 'claude-cli/system-prompt-v1/flags-v1'
 
-export function claudeCli(options: ClaudeCliOptions = {}): AiExec {
+export function claudeCli(options: ClaudeCliOptions = {}): AgentExec {
   const model = options.model ?? DEFAULT_CLAUDE_MODEL
   const binary = options.binary ?? 'claude'
   const defaultTimeoutMs = options.timeoutMs ?? 120_000
@@ -46,7 +46,7 @@ export function claudeCli(options: ClaudeCliOptions = {}): AiExec {
   return {
     id: `claude-cli/${model}`,
     fingerprint: FINGERPRINT,
-    async run(request: AiRequest): Promise<AiReply> {
+    async run(request: AgentRequest): Promise<AgentReply> {
       const args = [
         '--print',
         '--output-format',

@@ -12,4 +12,4 @@ This directory is a consumer project under architecture control — the checked-
 ## This example in particular
 
 - `README.md` here walks two deliberate failure exercises (`src/core/bad.ts`, `src/util.ts`). Those files are teaching props — they must not be committed.
-- `fitc4.ai.config.ts` shells out to a locally installed `claude` CLI on the user's own billing. Do not run `npm run fitc4:ai` unless asked.
+- `fitc4.agent.config.ts` shells out to a locally installed `claude` CLI on the user's own billing. Do not run `npm run fitc4:agent` unless asked.

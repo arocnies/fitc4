@@ -78,7 +78,7 @@ error (1)
 
 `--json` emits the full result instead of the report. `--config <path>` overrides discovery, which otherwise checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json` — in the working directory, then under `.fitc4/`, repeating up each ancestor. Two configs in one directory is an error rather than a silent choice.
 
-The module forms default-export the same fields (wrap them in `defineConfig` for editor types) plus optional provider arrays — which is how the AI providers below are composed in. They load as ES modules: in a CommonJS package (no `"type": "module"`), name the config `fitc4.config.mts`. If your tsconfig typechecks the config file, keep `skipLibCheck: true` — LikeC4's own declarations do not pass a strict lib check.
+The module forms default-export the same fields (wrap them in `defineConfig` for editor types) plus optional provider arrays — which is how the agent providers below are composed in. They load as ES modules: in a CommonJS package (no `"type": "module"`), name the config `fitc4.config.mts`. If your tsconfig typechecks the config file, keep `skipLibCheck: true` — LikeC4's own declarations do not pass a strict lib check.
 
 ## Rules
 
@@ -181,17 +181,17 @@ expect(exitCodeFor(result)).toBe(0)
 
 Providers are plain functions — `ScanProvider`, `ResolveProvider`, `ValidateProvider` — composed into phase arrays. `pipelineConfig` is the batteries-included default; to swap a scanner, build your own `PipelineConfig` and pass it to `runPipeline`.
 
-## AI-assisted providers
+## Agent providers
 
-`fitc4/ai` adds providers that shell out to your locally installed agent CLIs (`claude`, `codex`) — your login, your billing, no API keys in fitc4. `aiOwnershipAdvisor` suggests an owner for every file the model leaves unowned; `aiSemanticReview` judges whether an element's implementation still matches its declared description. AI findings are additive, and each provider takes a `severity`: advisory by default, part of the gate when you choose `'error'` — at which point a missing or logged-out CLI fails the build instead of being a `warning` nudge. `cached()` makes reruns with unchanged inputs free and identical.
+`fitc4/agent` adds providers that shell out to your locally installed agent CLIs (`claude`, `codex`) — your login, your billing, no API keys in fitc4. `agentOwnershipAdvisor` suggests an owner for every file the model leaves unowned; `agentSemanticReview` judges whether an element's implementation still matches its declared description. Agent findings are additive, and each provider takes a `severity`: advisory by default, part of the gate when you choose `'error'` — at which point a missing or logged-out CLI fails the build instead of being a `warning` nudge. `cached()` makes reruns with unchanged inputs free and identical.
 
 A complete `fitc4.config.ts`:
 
 ```ts
 import { defineConfig, defaultValidate } from 'fitc4'
-import { aiOwnershipAdvisor, aiSemanticReview, cached, claudeCli } from 'fitc4/ai'
+import { agentOwnershipAdvisor, agentSemanticReview, cached, claudeCli } from 'fitc4/agent'
 
-const ai = cached(claudeCli({ model: 'haiku' }))
+const agent = cached(claudeCli({ model: 'haiku' }))
 
 export default defineConfig({
   version: 1,
@@ -200,14 +200,14 @@ export default defineConfig({
   scanRoots: ['src'],
   tsconfig: 'tsconfig.json',
   // A phase that is present replaces the defaults; spreading them back in
-  // keeps the deterministic rules and adds the AI on top.
-  validate: [...defaultValidate, aiOwnershipAdvisor({ exec: ai }), aiSemanticReview({ exec: ai })],
+  // keeps the deterministic rules and adds the agent providers on top.
+  validate: [...defaultValidate, agentOwnershipAdvisor({ exec: agent }), agentSemanticReview({ exec: agent })],
 })
 ```
 
 The advisor makes zero calls on a clean repository; the review makes one call per described element (cached after the first run).
 
-The same entry point also ships `aiScan` and `aiResolve` — a scan provider driven by prose instructions (enforce model domains no parser covers: compose files, runbooks, OpenAPI) and a resolve provider that maps external and unresolvable dependencies onto model elements, including description-only ones like an external system. Unlike the advisory validate providers these are load-bearing, so they fail closed: any exec failure, off-schema reply, or hallucinated path is a `provider-failure` error, never a quietly thinner run. They are the prototyping path for new model domains — prose explores, and a proven domain graduates to a small deterministic provider. Details: [`docs/ai-providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/ai-providers.md).
+The same entry point also ships `agentScan` and `agentResolve` — a scan provider driven by prose instructions (enforce model domains no parser covers: compose files, runbooks, OpenAPI) and a resolve provider that maps external and unresolvable dependencies onto model elements, including description-only ones like an external system. Unlike the advisory validate providers these are load-bearing, so they fail closed: any exec failure, off-schema reply, or hallucinated path is a `provider-failure` error, never a quietly thinner run. They are the prototyping path for new model domains — prose explores, and a proven domain graduates to a small deterministic provider. Details: [`docs/agent-providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/agent-providers.md).
 
 ## For AI agents
 

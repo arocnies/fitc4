@@ -108,15 +108,15 @@ validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
 
 Any rule id from the rules table can be promoted or softened; the standard severities apply where no override is given. The drift ratchet is tuned the same way — `{ 'drift-relationship': 'error' }` forbids tolerated drift, `{ 'unused-drift': 'error' }` makes the ratchet hard — and `architectureRules({ driftTag })` renames the tag itself.
 
-## AI-assisted providers (`fitc4/ai`)
+## Agent providers (`fitc4/agent`)
 
-A separate entry point on purpose: nothing in `fitc4` imports it, the core gate stays deterministic, and composing an AI provider into a phase is an explicit act in your config file. The adapters shell out to **locally installed agent CLIs** — your own `claude` or `codex` install, login, and billing. FitC4 never holds an API key.
+A separate entry point on purpose: nothing in `fitc4` imports it, the core gate stays deterministic, and composing an agent provider into a phase is an explicit act in your config file. The adapters shell out to **locally installed agent CLIs** — your own `claude` or `codex` install, login, and billing. FitC4 never holds an API key.
 
-`fitc4/ai` ships two tiers. This section is the standing contract for the **advisory validate providers** (`aiOwnershipAdvisor`, `aiSemanticReview`) and the exec layer they all share. The **fail-closed scan and resolve providers** (`aiScan`, `aiResolve`) are load-bearing — an absent scanner or resolver must not look like a clean run, so they throw into `provider-failure` instead of degrading — and are documented per provider in [`ai-providers.md`](ai-providers.md).
+`fitc4/agent` ships two tiers. This section is the standing contract for the **advisory validate providers** (`agentOwnershipAdvisor`, `agentSemanticReview`) and the exec layer they all share. The **fail-closed scan and resolve providers** (`agentScan`, `agentResolve`) are load-bearing — an absent scanner or resolver must not look like a clean run, so they throw into `provider-failure` instead of degrading — and are documented per provider in [`agent-providers.md`](agent-providers.md).
 
 ```ts
 import { defineConfig, defaultValidate } from 'fitc4'
-import { cached, claudeCli, aiOwnershipAdvisor, aiSemanticReview } from 'fitc4/ai'
+import { cached, claudeCli, agentOwnershipAdvisor, agentSemanticReview } from 'fitc4/agent'
 
 const cheap = cached(claudeCli({ model: 'haiku' }))
 const strong = cached(claudeCli({ model: 'sonnet' }))
@@ -129,21 +129,21 @@ export default defineConfig({
   tsconfig: 'tsconfig.json',
   validate: [
     ...defaultValidate,
-    aiOwnershipAdvisor({ exec: cheap }),
-    aiSemanticReview({ exec: strong }),
+    agentOwnershipAdvisor({ exec: cheap }),
+    agentSemanticReview({ exec: strong }),
   ],
 })
 ```
 
-**The standing contract.** AI findings are additive — nothing an AI says can suppress or rewrite a deterministic finding — and each provider's `severity` option says how load-bearing its judgment is (`info` for the advisor, `warning` for the review; advisory either way). Setting `severity: 'error'` is the explicit act of making that provider part of the gate. Nondeterminism is fine when it is chosen. An unavailable or logged-out CLI is one visible `ai-unavailable` finding — a `warning` behind an advisory provider, but an `error` behind a gating one, because a gate whose judge is absent must not pass. Truncated inputs escalate the same way, and so do mumbled verdicts: a reply that parses as JSON but does not match the requested schema is a failure, not a value, and a gating advisor whose reply skips files it was asked about fails rather than letting them pass unjudged.
+**The standing contract.** Agent findings are additive — nothing an agent says can suppress or rewrite a deterministic finding — and each provider's `severity` option says how load-bearing its judgment is (`info` for the advisor, `warning` for the review; advisory either way). Setting `severity: 'error'` is the explicit act of making that provider part of the gate. Nondeterminism is fine when it is chosen. An unavailable or logged-out CLI is one visible `agent-unavailable` finding — a `warning` behind an advisory provider, but an `error` behind a gating one, because a gate whose judge is absent must not pass. Truncated inputs escalate the same way, and so do mumbled verdicts: a reply that parses as JSON but does not match the requested schema is a failure, not a value, and a gating advisor whose reply skips files it was asked about fails rather than letting them pass unjudged.
 
-**The exec layer.** `AiExec` is the one interface: `claudeCli()` runs `claude --print` isolated (no user settings, no MCP servers, and — by default — no tools, so the reply can only come from the prefilled context); `codexCli()` runs `codex exec` ephemeral with a read-only sandbox and schema-enforced JSON output. `agentic: true` on a request permits read-only exploration. A custom adapter is ~40 lines: implement `id` and `run`, return `{ ok, value }` — plus an optional `fingerprint` naming any fixed prompt or flag surface the request itself does not carry, so the cache key covers it.
+**The exec layer.** `AgentExec` is the one interface: `claudeCli()` runs `claude --print` isolated (no user settings, no MCP servers, and — by default — no tools, so the reply can only come from the prefilled context); `codexCli()` runs `codex exec` ephemeral with a read-only sandbox and schema-enforced JSON output. `agentic: true` on a request permits read-only exploration. A custom adapter is ~40 lines: implement `id` and `run`, return `{ ok, value }` — plus an optional `fingerprint` naming any fixed prompt or flag surface the request itself does not carry, so the cache key covers it.
 
-**Determinism and cost.** `cached()` keys on everything the model saw — adapter id and fingerprint, prompt, context, schema — and validates a hit exactly like a live reply (a corrupted or off-schema entry is a miss, not a value), so a rerun with unchanged inputs replays the recorded reply, free and identical (default cache: `node_modules/.cache/fitc4-ai`). Both providers are trigger-driven: the advisor only runs when unowned files exist, the review only over elements with descriptions, so a clean steady-state run makes zero AI calls. Cheap model for extraction-shaped work, strong model for judgment, chosen per instance.
+**Determinism and cost.** `cached()` keys on everything the model saw — adapter id and fingerprint, prompt, context, schema — and validates a hit exactly like a live reply (a corrupted or off-schema entry is a miss, not a value), so a rerun with unchanged inputs replays the recorded reply, free and identical (default cache: `node_modules/.cache/fitc4-agent`). Both providers are trigger-driven: the advisor only runs when unowned files exist, the review only over elements with descriptions, so a clean steady-state run makes zero agent calls. Cheap model for extraction-shaped work, strong model for judgment, chosen per instance.
 
 | Rule | Severity | Meaning |
 |---|---|---|
-| `ownership-suggestion` | the provider's `severity` (default info) | An unowned file, with the element the AI thinks should own it |
+| `ownership-suggestion` | the provider's `severity` (default info) | An unowned file, with the element the agent thinks should own it |
 | `description-drift` | the provider's `severity` (default warning) | An element's implementation may not match its declared description |
-| `ai-unavailable` | warning; error when the provider gates | The CLI failed, was missing or logged out, or replied off-schema; the provider's judgment is absent |
-| `ai-truncated` | info; error when the provider gates | Inputs beyond a configured limit were not reviewed |
+| `agent-unavailable` | warning; error when the provider gates | The CLI failed, was missing or logged out, or replied off-schema; the provider's judgment is absent |
+| `agent-truncated` | info; error when the provider gates | Inputs beyond a configured limit were not reviewed |

@@ -59,13 +59,13 @@ warning (1)
 
 Still exit 0 — unowned code is a nudge by default, promotable to an error with `architectureRules({ severity: { 'unmapped-source': 'error' } })` in a `.ts` config.
 
-This is also the state where the AI variant has something to say. With a logged-in `claude` CLI:
+This is also the state where the agent variant has something to say. With a logged-in `claude` CLI:
 
 ```bash
-npm run fitc4:ai -w example
+npm run fitc4:agent -w example
 ```
 
-runs the same gate plus [`fitc4.ai.config.ts`](fitc4.ai.config.ts): the ownership advisor reads `src/util.ts` and suggests which element should own it — or says the model is missing one — and the semantic review judges each described component against its actual code. Without the CLI the run still passes and prints an `ai-unavailable` note instead. Delete `util.ts` when done.
+runs the same gate plus [`fitc4.agent.config.ts`](fitc4.agent.config.ts): the ownership advisor reads `src/util.ts` and suggests which element should own it — or says the model is missing one — and the semantic review judges each described component against its actual code. Without the CLI the run still passes and prints an `agent-unavailable` note instead. Delete `util.ts` when done.
 
 ## Exercise 3: declare drift and burn it down
 
@@ -117,7 +117,7 @@ That is the ratchet: a drift edge the code stopped exercising cannot quietly sti
 ```text
 arch/model.c4        the contract: elements, sources ownership, allowed dependencies
 fitc4.config.json    where things are — the config CI discovers and runs
-fitc4.ai.config.ts   the same gate plus advisory AI providers, run on demand
+fitc4.agent.config.ts   the same gate plus advisory agent providers, run on demand
 AGENTS.md            norms for AI agents working here — the model is the contract
 src/                 the implementation being checked
 ```

@@ -3,18 +3,18 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, test } from 'vitest'
 
-import { cached } from '../src/ai/cache.ts'
-import type { AiExec, AiReply } from '../src/ai/exec.ts'
+import { cached } from '../src/agent/cache.ts'
+import type { AgentExec, AgentReply } from '../src/agent/exec.ts'
 
-const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-ai-cache-'))
+const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-agent-cache-'))
 afterAll(() => fs.rmSync(cacheDir, { recursive: true, force: true }))
 
-function countingExec(reply: AiReply, identity?: { id?: string; fingerprint?: string }): AiExec & { calls: number } {
+function countingExec(reply: AgentReply, identity?: { id?: string; fingerprint?: string }): AgentExec & { calls: number } {
   const exec = {
     id: identity?.id ?? 'stub/model',
     fingerprint: identity?.fingerprint,
     calls: 0,
-    async run(): Promise<AiReply> {
+    async run(): Promise<AgentReply> {
       exec.calls += 1
       return reply
     },

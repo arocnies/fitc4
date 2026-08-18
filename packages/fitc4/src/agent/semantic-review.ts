@@ -1,5 +1,5 @@
 /**
- * The `ai-semantic-review` validate provider.
+ * The `agent-semantic-review` validate provider.
  *
  * Judges whether each element's implementation still matches its declared
  * description — the drift relationships cannot express: the "read-only
@@ -9,7 +9,7 @@
  *
  * One call per element rather than one batch, so a response cache keyed on
  * inputs re-reviews only the elements whose files actually changed. Calls run
- * sequentially, and the first exec failure stops the run — one `ai-unavailable`
+ * sequentially, and the first exec failure stops the run — one `agent-unavailable`
  * finding, not one per element against a dead CLI.
  */
 
@@ -23,13 +23,13 @@ import type {
   ValidateContext,
   ValidateProvider,
 } from '../types.ts'
-import type { AiExec } from './exec.ts'
-import { aiTruncated, aiUnavailable, elementText, fileExcerpts } from './findings.ts'
+import type { AgentExec } from './exec.ts'
+import { agentTruncated, agentUnavailable, elementText, fileExcerpts } from './findings.ts'
 
-export const PROVIDER_ID = 'ai-semantic-review'
+export const PROVIDER_ID = 'agent-semantic-review'
 
 export interface SemanticReviewOptions {
-  exec: AiExec
+  exec: AgentExec
   /**
    * The severity of a drift finding — how load-bearing this review is.
    * Default 'warning' (advisory); 'error' makes it part of the gate, and an
@@ -55,7 +55,7 @@ const REPLY_SCHEMA: JsonObject = {
 
 const ISSUE_LIMIT = 5
 
-export function aiSemanticReview(options: SemanticReviewOptions): NamedProvider<ValidateProvider> {
+export function agentSemanticReview(options: SemanticReviewOptions): NamedProvider<ValidateProvider> {
   const severity = options.severity ?? 'warning'
   const maxElements = options.maxElements ?? 10
   const maxFilesPerElement = options.maxFilesPerElement ?? 8
@@ -69,7 +69,7 @@ export function aiSemanticReview(options: SemanticReviewOptions): NamedProvider<
     const reviewed = reviewable.slice(0, maxElements)
     if (reviewable.length > reviewed.length) {
       findings.push(
-        aiTruncated(PROVIDER_ID, reviewable.length - reviewed.length, 'described elements', severity),
+        agentTruncated(PROVIDER_ID, reviewable.length - reviewed.length, 'described elements', severity),
       )
     }
 
@@ -87,7 +87,7 @@ export function aiSemanticReview(options: SemanticReviewOptions): NamedProvider<
       })
 
       if (!reply.ok) {
-        findings.push(aiUnavailable(PROVIDER_ID, options.exec.id, reply.error, severity))
+        findings.push(agentUnavailable(PROVIDER_ID, options.exec.id, reply.error, severity))
         break
       }
 
@@ -107,7 +107,7 @@ export function aiSemanticReview(options: SemanticReviewOptions): NamedProvider<
           (issues.length > 0 ? `: ${issues[0]}` : '.'),
         subject: { kind: 'element', id: element.id },
         evidence: issues.map((issue): Evidence => ({ detail: issue })),
-        data: { ai: options.exec.id },
+        data: { agent: options.exec.id },
         provider: PROVIDER_ID,
       })
     }

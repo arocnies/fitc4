@@ -97,7 +97,7 @@ type SeverityOf = (rule: ArchitectureRuleId, standard: Severity) => Severity
 
 /**
  * Returns a `NamedProvider`, ready to drop into a config's `validate` array —
- * the same shape the AI providers return, so
+ * the same shape the agent providers return, so
  * `validate: [architectureRules({ ... })]` works without a hand-built wrapper.
  */
 export function architectureRules(

@@ -1,6 +1,6 @@
 /**
  * Adapter tests run against fake CLI binaries — tiny scripts that record their
- * argv and stdin and print a canned reply. No real AI is ever invoked here:
+ * argv and stdin and print a canned reply. No real agent CLI is ever invoked here:
  * what these tests pin down is the exec contract (isolation flags, stdin
  * composition, envelope parsing, failure shapes), which is exactly the part a
  * real model cannot make deterministic.
@@ -11,11 +11,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterAll, afterEach, describe, expect, test } from 'vitest'
 
-import { claudeCli } from '../src/ai/claude-cli.ts'
-import { codexCli } from '../src/ai/codex-cli.ts'
-import { extractJson, finishReply, schemaMismatch } from '../src/ai/exec.ts'
+import { claudeCli } from '../src/agent/claude-cli.ts'
+import { codexCli } from '../src/agent/codex-cli.ts'
+import { extractJson, finishReply, schemaMismatch } from '../src/agent/exec.ts'
 
-const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-fake-ai-'))
+const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-fake-agent-'))
 afterAll(() => fs.rmSync(workDir, { recursive: true, force: true }))
 
 const FAKE_ENV = ['FAKE_CAPTURE', 'FAKE_RESULT', 'FAKE_ENVELOPE', 'FAKE_EXIT', 'FAKE_NO_REPLY']

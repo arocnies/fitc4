@@ -33,9 +33,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./ai": {
-      "types": "./dist/ai/index.d.ts",
-      "default": "./dist/ai/index.js"
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "default": "./dist/agent/index.js"
     },
     "./schema/fitc4.config.schema.json": "./schema/fitc4.config.schema.json",
     "./package.json": "./package.json"

@@ -18,7 +18,7 @@ import path from 'node:path'
 
 import type { JsonValue } from '../types.ts'
 import { composeInput, finishReply, runCliProcess } from './exec.ts'
-import type { AiExec, AiReply, AiRequest } from './exec.ts'
+import type { AgentExec, AgentReply, AgentRequest } from './exec.ts'
 
 export interface CodexCliOptions {
   /** Model name; omitted, the CLI's own default applies. */
@@ -54,15 +54,15 @@ export function strictSchema(node: JsonValue): JsonValue {
  */
 const FINGERPRINT = 'codex-cli/flags-v1'
 
-export function codexCli(options: CodexCliOptions = {}): AiExec {
+export function codexCli(options: CodexCliOptions = {}): AgentExec {
   const binary = options.binary ?? 'codex'
   const defaultTimeoutMs = options.timeoutMs ?? 120_000
 
   return {
     id: `codex-cli/${options.model ?? 'default'}`,
     fingerprint: FINGERPRINT,
-    async run(request: AiRequest): Promise<AiReply> {
-      const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-ai-'))
+    async run(request: AgentRequest): Promise<AgentReply> {
+      const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-agent-'))
       try {
         const replyFile = path.join(workDir, 'reply.txt')
         const args = [

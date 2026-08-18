@@ -1,12 +1,12 @@
 /**
- * `aiScan` tests inject a stub `AiExec` and run the real pipeline over the
+ * `agentScan` tests inject a stub `AgentExec` and run the real pipeline over the
  * fixture repositories. Under test is everything except the model: listing
  * enumeration and truncation announcement, prompt and context assembly, the
  * fail-closed contract (exec failure, off-schema reply, empty attestation,
  * hallucinated paths all become one provider-failure error), attestation
  * conversion, id minting, cache composition, and multi-instance coexistence.
  *
- * No real AI is ever invoked: the exec is an in-process stub, and the
+ * No real agent CLI is ever invoked: the exec is an in-process stub, and the
  * fail-closed semantics are exactly what makes that safe to rely on.
  */
 
@@ -15,17 +15,17 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, test } from 'vitest'
 
-import { cached } from '../src/ai/cache.ts'
-import type { AiExec, AiReply, AiRequest } from '../src/ai/exec.ts'
-import { aiScan, PROVIDER_ID as SCAN_ID } from '../src/ai/scan.ts'
+import { cached } from '../src/agent/cache.ts'
+import type { AgentExec, AgentReply, AgentRequest } from '../src/agent/exec.ts'
+import { agentScan, PROVIDER_ID as SCAN_ID } from '../src/agent/scan.ts'
 import type { Finding, Observation } from '../src/types.ts'
 import { findingFor, runFixture } from './helpers.ts'
 
-function stubExec(replies: AiReply[]): AiExec & { requests: AiRequest[] } {
+function stubExec(replies: AgentReply[]): AgentExec & { requests: AgentRequest[] } {
   const exec = {
     id: 'stub/model',
-    requests: [] as AiRequest[],
-    async run(request: AiRequest): Promise<AiReply> {
+    requests: [] as AgentRequest[],
+    async run(request: AgentRequest): Promise<AgentReply> {
       exec.requests.push(request)
       const reply = replies[Math.min(exec.requests.length, replies.length) - 1]
       if (reply === undefined) throw new Error('stub exhausted')
@@ -35,12 +35,12 @@ function stubExec(replies: AiReply[]): AiExec & { requests: AiRequest[] } {
   return exec
 }
 
-function ok(value: unknown): AiReply {
+function ok(value: unknown): AgentReply {
   return { ok: true, value: value as never, raw: JSON.stringify(value) }
 }
 
 /** A well-formed reply against the `violations` fixture. */
-function goodReply(): AiReply {
+function goodReply(): AgentReply {
   return ok({
     observations: [
       {
@@ -71,20 +71,20 @@ function providerFailure(findings: Finding[]): Finding | undefined {
   return findingFor(findings, 'provider-failure')
 }
 
-describe('aiScan happy path', () => {
+describe('agentScan happy path', () => {
   test('observations and scan-root attestations flow through a real pipeline run', async () => {
     const exec = stubExec([goodReply()])
 
     const result = await runFixture('violations', {
-      scan: [aiScan({ exec, instructions: 'read the docs and report what they claim about the code' })],
+      scan: [agentScan({ exec, instructions: 'read the docs and report what they claim about the code' })],
     })
 
     // The reply became namespaced standard observations plus one scan-root
     // attestation per examined file.
     const ids = observationIds(result.observations)
-    expect(ids).toContain('ai-scan/scan-root:docs/notes.md')
-    expect(ids).toContain('ai-scan/file:docs/notes.md')
-    expect(ids).toContain('ai-scan/dependency:docs/notes.md->src/core/health.ts')
+    expect(ids).toContain('agent-scan/scan-root:docs/notes.md')
+    expect(ids).toContain('agent-scan/file:docs/notes.md')
+    expect(ids).toContain('agent-scan/dependency:docs/notes.md->src/core/health.ts')
 
     const attestation = result.observations.find((o) => o.kind === 'scan-root')
     expect(attestation?.subject).toEqual({ kind: 'file', id: 'docs/notes.md' })
@@ -107,7 +107,7 @@ describe('aiScan happy path', () => {
     const exec = stubExec([goodReply()])
 
     await runFixture('violations', {
-      scan: [aiScan({ exec, instructions: 'trace doc-to-code links' })],
+      scan: [agentScan({ exec, instructions: 'trace doc-to-code links' })],
     })
 
     const request = exec.requests[0]
@@ -125,7 +125,7 @@ describe('aiScan happy path', () => {
     const exec = stubExec([goodReply()])
 
     await runFixture('violations', {
-      scan: [aiScan({ exec, instructions: 'x', roots: ['src'], maxFiles: 2 })],
+      scan: [agentScan({ exec, instructions: 'x', roots: ['src'], maxFiles: 2 })],
     })
 
     const context = exec.requests[0]?.context ?? ''
@@ -138,27 +138,27 @@ describe('aiScan happy path', () => {
   })
 })
 
-describe('aiScan fails closed', () => {
+describe('agentScan fails closed', () => {
   test('an exec failure fails the provider — one provider-failure error, not a clean scan', async () => {
     const exec = stubExec([{ ok: false, error: 'not logged in' }])
 
     const result = await runFixture('violations', {
-      scan: [aiScan({ exec, instructions: 'x' })],
+      scan: [agentScan({ exec, instructions: 'x' })],
     })
 
     const failure = providerFailure(result.findings)
     expect(failure?.severity).toBe('error')
-    expect(failure?.subject).toEqual({ kind: 'provider', id: 'ai-scan' })
+    expect(failure?.subject).toEqual({ kind: 'provider', id: 'agent-scan' })
     expect(failure?.description).toContain('not logged in')
     // The failed provider contributed nothing — no half-scan.
-    expect(result.observations.filter((o) => o.provider === 'ai-scan')).toEqual([])
+    expect(result.observations.filter((o) => o.provider === 'agent-scan')).toEqual([])
   })
 
   test('an off-schema reply fails the provider', async () => {
     const exec = stubExec([ok({ observations: 'lots of them', examined: ['docs/notes.md'] })])
 
     const result = await runFixture('violations', {
-      scan: [aiScan({ exec, instructions: 'x' })],
+      scan: [agentScan({ exec, instructions: 'x' })],
     })
 
     const failure = providerFailure(result.findings)
@@ -170,7 +170,7 @@ describe('aiScan fails closed', () => {
     const exec = stubExec([ok({ observations: [], examined: [] })])
 
     const result = await runFixture('violations', {
-      scan: [aiScan({ exec, instructions: 'x' })],
+      scan: [agentScan({ exec, instructions: 'x' })],
     })
 
     const failure = providerFailure(result.findings)
@@ -214,7 +214,7 @@ describe('aiScan fails closed', () => {
     for (const reply of hallucinated) {
       const exec = stubExec([reply])
       const result = await runFixture('violations', {
-        scan: [aiScan({ exec, instructions: 'x' })],
+        scan: [agentScan({ exec, instructions: 'x' })],
       })
 
       const failure = providerFailure(result.findings)
@@ -233,7 +233,7 @@ describe('aiScan fails closed', () => {
     for (const reply of escapes) {
       const exec = stubExec([reply])
       const result = await runFixture('violations', {
-        scan: [aiScan({ exec, instructions: 'x' })],
+        scan: [agentScan({ exec, instructions: 'x' })],
       })
 
       const failure = providerFailure(result.findings)
@@ -257,11 +257,11 @@ describe('aiScan fails closed', () => {
     ])
 
     const result = await runFixture('violations', {
-      scan: [aiScan({ exec, instructions: 'x' })],
+      scan: [agentScan({ exec, instructions: 'x' })],
     })
 
     expect(providerFailure(result.findings)).toBeUndefined()
-    expect(observationIds(result.observations)).toContain('ai-scan/dependency:api->db')
+    expect(observationIds(result.observations)).toContain('agent-scan/dependency:api->db')
   })
 
   test('duplicate claims get ordinal ids instead of tripping the duplicate-id check', async () => {
@@ -273,23 +273,23 @@ describe('aiScan fails closed', () => {
     const exec = stubExec([ok({ observations: [claim, claim], examined: ['docs/notes.md'] })])
 
     const result = await runFixture('violations', {
-      scan: [aiScan({ exec, instructions: 'x' })],
+      scan: [agentScan({ exec, instructions: 'x' })],
     })
 
     expect(providerFailure(result.findings)).toBeUndefined()
     const ids = observationIds(result.observations)
-    expect(ids).toContain('ai-scan/dependency:docs/notes.md->src/core/health.ts')
-    expect(ids).toContain('ai-scan/dependency:docs/notes.md->src/core/health.ts#1')
+    expect(ids).toContain('agent-scan/dependency:docs/notes.md->src/core/health.ts')
+    expect(ids).toContain('agent-scan/dependency:docs/notes.md->src/core/health.ts#1')
   })
 })
 
-describe('aiScan composition', () => {
-  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-ai-scan-cache-'))
+describe('agentScan composition', () => {
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-agent-scan-cache-'))
   afterAll(() => fs.rmSync(cacheDir, { recursive: true, force: true }))
 
   test('works under cached(): the second run replays the reply without a call', async () => {
     const exec = stubExec([goodReply()])
-    const provider = aiScan({
+    const provider = agentScan({
       exec: cached(exec, { directory: cacheDir }),
       instructions: 'read the docs',
     })
@@ -321,25 +321,25 @@ describe('aiScan composition', () => {
 
     const result = await runFixture('violations', {
       scan: [
-        aiScan({ exec: docsExec, instructions: 'scan the docs', id: 'docs' }),
-        aiScan({ exec: srcExec, instructions: 'scan the source', id: 'src' }),
+        agentScan({ exec: docsExec, instructions: 'scan the docs', id: 'docs' }),
+        agentScan({ exec: srcExec, instructions: 'scan the source', id: 'src' }),
       ],
     })
 
-    expect(result.providers.scan).toEqual(['ai-scan:docs', 'ai-scan:src'])
+    expect(result.providers.scan).toEqual(['agent-scan:docs', 'agent-scan:src'])
     expect(providerFailure(result.findings)).toBeUndefined()
     expect(findingFor(result.findings, 'duplicate-id')).toBeUndefined()
 
     const ids = observationIds(result.observations)
-    expect(ids).toContain('ai-scan:docs/scan-root:docs/notes.md')
-    expect(ids).toContain('ai-scan:src/scan-root:docs/notes.md')
-    expect(ids).toContain('ai-scan:docs/file:docs/notes.md')
-    expect(ids).toContain('ai-scan:src/file:src/core/health.ts')
+    expect(ids).toContain('agent-scan:docs/scan-root:docs/notes.md')
+    expect(ids).toContain('agent-scan:src/scan-root:docs/notes.md')
+    expect(ids).toContain('agent-scan:docs/file:docs/notes.md')
+    expect(ids).toContain('agent-scan:src/file:src/core/health.ts')
   })
 })
 
 // The provider id doubles as the finding-id and observation-id namespace; a
 // rename would churn every consumer's baseline, so it is pinned.
 test('the provider id is stable', () => {
-  expect(SCAN_ID).toBe('ai-scan')
+  expect(SCAN_ID).toBe('agent-scan')
 })

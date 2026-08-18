@@ -43,10 +43,10 @@ model {
         }
       }
 
-      ai = component 'AI Providers' {
-        description 'AI-assisted providers over local agent CLIs (fitc4/ai entry point)'
+      agent = component 'Agent Providers' {
+        description 'Providers that shell out to local agent CLIs (fitc4/agent entry point)'
         metadata {
-          sources 'src/ai/**'
+          sources 'src/agent/**'
         }
       }
     }
@@ -59,7 +59,7 @@ model {
 
   fitc4.lib.core -> fitc4.lib.providers 'composes and re-exports (defaults.ts, index.ts)'
   fitc4.lib.providers -> fitc4.lib.core 'reads the shared contracts (types, model, ids, kinds)'
-  fitc4.lib.ai -> fitc4.lib.core 'reads the shared contracts; nothing in core imports it back'
+  fitc4.lib.agent -> fitc4.lib.core 'reads the shared contracts; nothing in core imports it back'
 }
 
 views {

@@ -1,21 +1,23 @@
 /**
- * The `ai-resolve` resolve provider.
+ * The `agent-resolve` resolve provider.
  *
  * Maps observations the deterministic resolvers cannot map onto model
  * elements: dependencies on external packages, unresolvable specifiers,
  * implied links — anything whose target is not a file under a `sources`
  * prefix. This is what makes description-only "pure thought" elements — an
- * external system, a managed queue — reachable by the gate: the AI reads the
+ * external system, a managed queue — reachable by the gate: the agent reads the
  * element catalog (title, description, ownership) and the leftover
  * observations, and proposes `resolved` associations that the standard
  * relationship rules then judge like any other edge.
  *
  * Composition: used ALONGSIDE the default resolver, never instead of it —
- * `resolve: [...defaultResolve, aiResolve({ exec })]`. Only observations
+ * `resolve: [...defaultResolve, agentResolve({ exec })]`. Only observations
  * `source-root` cannot map are sent: `unresolved-dependency` observations and
- * `dependency` observations with a module/external target, and only where the
- * subject file has an unambiguous owning element (without one there is no
- * source end to hang a judgeable association on).
+ * `dependency` observations with a module/external target whose package no
+ * element claims via `packages` metadata (a claimed package is deterministically
+ * mapped by `source-root`, so offering it here would be redundant), and only
+ * where the subject file has an unambiguous owning element (without one there
+ * is no source end to hang a judgeable association on).
  *
  * **Fail-closed, deliberately unlike the advisory validate providers.** A
  * resolver that silently fails produces fewer associations, which means fewer
@@ -38,7 +40,13 @@
  * listing — so the provider composes with `cached()` unchanged.
  */
 
-import { declaredRelationships, hasRelationship, ownershipPrefixes } from '../model.ts'
+import {
+  declaredRelationships,
+  hasRelationship,
+  ownershipPrefixes,
+  packageClaims,
+  packageNameOf,
+} from '../model.ts'
 import type { OwnershipPrefix } from '../model.ts'
 import type {
   Association,
@@ -48,20 +56,20 @@ import type {
   ResolveContext,
   ResolveProvider,
 } from '../types.ts'
-import type { AiExec } from './exec.ts'
+import type { AgentExec } from './exec.ts'
 import { schemaMismatch, truncate } from './exec.ts'
 import { elementCatalog } from './findings.ts'
 
-export const PROVIDER_ID = 'ai-resolve'
+export const PROVIDER_ID = 'agent-resolve'
 
-export interface AiResolveOptions {
-  exec: AiExec
+export interface AgentResolveOptions {
+  exec: AgentExec
   /**
    * Optional mapping guidance in prose — e.g. "requests to payments.internal
    * belong to the payments-gateway element".
    */
   instructions?: string
-  /** Suffix for the provider id: `ai-resolve:<id>` instead of `ai-resolve`. */
+  /** Suffix for the provider id: `agent-resolve:<id>` instead of `agent-resolve`. */
   id?: string
   /**
    * Candidates sent per run. The rest are announced as truncated in the
@@ -94,7 +102,7 @@ const PROMPT =
   'you are not confident about — an omitted candidate simply stays unmapped. ' +
   'Keep each reason to one sentence.'
 
-export function aiResolve(options: AiResolveOptions): NamedProvider<ResolveProvider> {
+export function agentResolve(options: AgentResolveOptions): NamedProvider<ResolveProvider> {
   const providerId = options.id === undefined ? PROVIDER_ID : `${PROVIDER_ID}:${options.id}`
   const maxObservations = options.maxObservations ?? DEFAULT_MAX_OBSERVATIONS
 
@@ -113,7 +121,7 @@ export function aiResolve(options: AiResolveOptions): NamedProvider<ResolveProvi
     })
 
     if (!reply.ok) {
-      throw new Error(`AI resolve was unavailable (${options.exec.id}): ${reply.error}`)
+      throw new Error(`Agent resolve was unavailable (${options.exec.id}): ${reply.error}`)
     }
 
     // The exec layer enforced the schema on a live reply, but a custom adapter
@@ -121,7 +129,7 @@ export function aiResolve(options: AiResolveOptions): NamedProvider<ResolveProvi
     // malformed mappings into the pipeline as associations.
     const mismatch = schemaMismatch(reply.value, REPLY_SCHEMA)
     if (mismatch !== undefined) {
-      throw new Error(`AI resolve reply did not match the requested schema: ${mismatch}`)
+      throw new Error(`Agent resolve reply did not match the requested schema: ${mismatch}`)
     }
 
     const mappings = reply.value as unknown as {
@@ -144,19 +152,19 @@ export function aiResolve(options: AiResolveOptions): NamedProvider<ResolveProvi
       const candidate = byObservationId.get(mapping.observationId)
       if (candidate === undefined) {
         throw new Error(
-          `AI resolve reply named an observationId it was not given: '${truncate(mapping.observationId, 160)}'`,
+          `Agent resolve reply named an observationId it was not given: '${truncate(mapping.observationId, 160)}'`,
         )
       }
       if (mapped.has(mapping.observationId)) {
         throw new Error(
-          `AI resolve reply mapped '${truncate(mapping.observationId, 160)}' more than once`,
+          `Agent resolve reply mapped '${truncate(mapping.observationId, 160)}' more than once`,
         )
       }
       mapped.add(mapping.observationId)
 
       if (!knownElements.has(mapping.elementId)) {
         throw new Error(
-          `AI resolve reply named an element that is not in the model: '${truncate(mapping.elementId, 160)}'`,
+          `Agent resolve reply named an element that is not in the model: '${truncate(mapping.elementId, 160)}'`,
         )
       }
 
@@ -170,9 +178,9 @@ export function aiResolve(options: AiResolveOptions): NamedProvider<ResolveProvi
         source: { kind: 'element', id: candidate.sourceElementId },
         target: { kind: 'element', id: mapping.elementId },
         ...(match === undefined ? {} : { relationship: { kind: 'relationship', id: match.id } }),
-        description: `${candidate.sourceElementId} → ${mapping.elementId} (AI-mapped from ${targetName})`,
+        description: `${candidate.sourceElementId} → ${mapping.elementId} (agent-mapped from ${targetName})`,
         data: {
-          ai: options.exec.id,
+          agent: options.exec.id,
           ...(mapping.reason === undefined ? {} : { reason: mapping.reason }),
         },
         provider: providerId,
@@ -200,15 +208,28 @@ interface Candidate {
  * specifier), with a subject file owned by exactly one element: dependencies
  * with file targets are `source-root`'s job, and a subject without an
  * unambiguous owner has no source end for a resolved association.
+ *
+ * External dependencies whose package an element claims via `packages`
+ * metadata are also excluded, mirroring `source-root`'s claim resolution:
+ * `source-root` already maps them deterministically, so offering them to the
+ * agent would be redundant.
  */
 function leftoverCandidates(context: ResolveContext): Candidate[] {
   const { prefixes } = ownershipPrefixes(context.model)
+  const claimed = new Set(packageClaims(context.model).claims.map((claim) => claim.name))
   const candidates: Candidate[] = []
 
   for (const observation of context.observations) {
     if (observation.kind !== 'dependency' && observation.kind !== 'unresolved-dependency') continue
     if (observation.target === undefined || observation.target.kind === 'file') continue
     if (observation.subject?.kind !== 'file') continue
+    if (
+      observation.kind === 'dependency' &&
+      observation.target.kind === 'module' &&
+      claimed.has(packageNameOf(observation.target.id))
+    ) {
+      continue
+    }
 
     const owner = unambiguousOwner(observation.subject.id, prefixes)
     if (owner === undefined) continue

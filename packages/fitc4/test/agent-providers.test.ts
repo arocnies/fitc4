@@ -1,5 +1,5 @@
 /**
- * Provider tests inject a stub `AiExec` and run the real pipeline over the
+ * Provider tests inject a stub `AgentExec` and run the real pipeline over the
  * fixture repositories, so what is under test is everything except the model:
  * unowned-file discovery, prompt and context assembly, reply shape-checking,
  * hallucination guards, severity capping, and the unavailable/truncated paths.
@@ -7,17 +7,17 @@
 
 import { describe, expect, test } from 'vitest'
 
-import type { AiExec, AiReply, AiRequest } from '../src/ai/exec.ts'
-import { aiOwnershipAdvisor, PROVIDER_ID as ADVISOR_ID } from '../src/ai/ownership-advisor.ts'
-import { aiSemanticReview, PROVIDER_ID as REVIEW_ID } from '../src/ai/semantic-review.ts'
+import type { AgentExec, AgentReply, AgentRequest } from '../src/agent/exec.ts'
+import { agentOwnershipAdvisor, PROVIDER_ID as ADVISOR_ID } from '../src/agent/ownership-advisor.ts'
+import { agentSemanticReview, PROVIDER_ID as REVIEW_ID } from '../src/agent/semantic-review.ts'
 import { renderReport } from '../src/report.ts'
 import { findingFor, ruleIds, runFixture } from './helpers.ts'
 
-function stubExec(replies: AiReply[]): AiExec & { requests: AiRequest[] } {
+function stubExec(replies: AgentReply[]): AgentExec & { requests: AgentRequest[] } {
   const exec = {
     id: 'stub/model',
-    requests: [] as AiRequest[],
-    async run(request: AiRequest): Promise<AiReply> {
+    requests: [] as AgentRequest[],
+    async run(request: AgentRequest): Promise<AgentReply> {
       exec.requests.push(request)
       const reply = replies[Math.min(exec.requests.length, replies.length) - 1]
       if (reply === undefined) throw new Error('stub exhausted')
@@ -27,11 +27,11 @@ function stubExec(replies: AiReply[]): AiExec & { requests: AiRequest[] } {
   return exec
 }
 
-function ok(value: unknown): AiReply {
+function ok(value: unknown): AgentReply {
   return { ok: true, value: value as never, raw: JSON.stringify(value) }
 }
 
-describe('aiOwnershipAdvisor', () => {
+describe('agentOwnershipAdvisor', () => {
   test('suggests an owner for the unowned file, from a prefilled catalog and excerpt', async () => {
     const exec = stubExec([
       ok({
@@ -45,7 +45,7 @@ describe('aiOwnershipAdvisor', () => {
       }),
     ])
 
-    const result = await runFixture('violations', { validate: [aiOwnershipAdvisor({ exec })] })
+    const result = await runFixture('violations', { validate: [agentOwnershipAdvisor({ exec })] })
 
     expect(ruleIds(result.findings)).toEqual(['ownership-suggestion'])
     const finding = findingFor(result.findings, 'ownership-suggestion')
@@ -66,7 +66,7 @@ describe('aiOwnershipAdvisor', () => {
       ok({ files: [{ path: 'src/orphan/thing.ts', element: 'fixture.app.nope', rationale: 'guess' }] }),
     ])
 
-    const result = await runFixture('violations', { validate: [aiOwnershipAdvisor({ exec })] })
+    const result = await runFixture('violations', { validate: [agentOwnershipAdvisor({ exec })] })
 
     const finding = findingFor(result.findings, 'ownership-suggestion')
     expect(finding?.description).toContain("not in the model")
@@ -78,7 +78,7 @@ describe('aiOwnershipAdvisor', () => {
       ok({ files: [{ path: 'src/orphan/thing.ts', element: null, rationale: 'nothing fits' }] }),
     ])
 
-    const result = await runFixture('violations', { validate: [aiOwnershipAdvisor({ exec })] })
+    const result = await runFixture('violations', { validate: [agentOwnershipAdvisor({ exec })] })
 
     expect(findingFor(result.findings, 'ownership-suggestion')?.description).toContain(
       'fits no existing element',
@@ -88,9 +88,9 @@ describe('aiOwnershipAdvisor', () => {
   test('an unavailable exec behind an advisory provider is a warning, not a failed build', async () => {
     const exec = stubExec([{ ok: false, error: 'not logged in' }])
 
-    const result = await runFixture('violations', { validate: [aiOwnershipAdvisor({ exec })] })
+    const result = await runFixture('violations', { validate: [agentOwnershipAdvisor({ exec })] })
 
-    const finding = findingFor(result.findings, 'ai-unavailable')
+    const finding = findingFor(result.findings, 'agent-unavailable')
     expect(finding?.severity).toBe('warning')
     expect(finding?.description).toContain('not logged in')
     expect(renderReport(result).exitCode).toBe(0)
@@ -100,32 +100,32 @@ describe('aiOwnershipAdvisor', () => {
     const exec = stubExec([{ ok: false, error: 'down' }])
 
     const result = await runFixture('violations', {
-      validate: [aiOwnershipAdvisor({ exec, severity: 'error' })],
+      validate: [agentOwnershipAdvisor({ exec, severity: 'error' })],
     })
 
     // A gating provider whose CLI is down is a hole in the gate, not a nudge.
-    expect(findingFor(result.findings, 'ai-unavailable')?.severity).toBe('error')
+    expect(findingFor(result.findings, 'agent-unavailable')?.severity).toBe('error')
   })
 
   test("severity: 'error' escalates truncation too — unjudged inputs bypassed the gate", async () => {
     const exec = stubExec([])
 
     const result = await runFixture('violations', {
-      validate: [aiOwnershipAdvisor({ exec, severity: 'error', maxFiles: 0 })],
+      validate: [agentOwnershipAdvisor({ exec, severity: 'error', maxFiles: 0 })],
     })
 
-    expect(findingFor(result.findings, 'ai-truncated')?.severity).toBe('error')
+    expect(findingFor(result.findings, 'agent-truncated')?.severity).toBe('error')
   })
 
   test("severity: 'error' fails the build when the reply omits asked files", async () => {
     const exec = stubExec([ok({ files: [] })])
 
     const result = await runFixture('violations', {
-      validate: [aiOwnershipAdvisor({ exec, severity: 'error' })],
+      validate: [agentOwnershipAdvisor({ exec, severity: 'error' })],
     })
 
     // A file the judge never ruled on is a file that bypassed the gate.
-    const finding = findingFor(result.findings, 'ai-unavailable')
+    const finding = findingFor(result.findings, 'agent-unavailable')
     expect(finding?.severity).toBe('error')
     expect(finding?.description).toContain('omitted 1 of 1')
   })
@@ -134,10 +134,10 @@ describe('aiOwnershipAdvisor', () => {
     const exec = stubExec([ok({ files: [] })])
 
     const result = await runFixture('violations', {
-      validate: [aiOwnershipAdvisor({ exec })],
+      validate: [agentOwnershipAdvisor({ exec })],
     })
 
-    expect(findingFor(result.findings, 'ai-unavailable')).toBeUndefined()
+    expect(findingFor(result.findings, 'agent-unavailable')).toBeUndefined()
   })
 
   test('a chosen severity is what suggestions report at', async () => {
@@ -146,7 +146,7 @@ describe('aiOwnershipAdvisor', () => {
     ])
 
     const result = await runFixture('violations', {
-      validate: [aiOwnershipAdvisor({ exec, severity: 'warning' })],
+      validate: [agentOwnershipAdvisor({ exec, severity: 'warning' })],
     })
 
     expect(findingFor(result.findings, 'ownership-suggestion')?.severity).toBe('warning')
@@ -156,18 +156,18 @@ describe('aiOwnershipAdvisor', () => {
     const exec = stubExec([])
 
     const result = await runFixture('violations', {
-      validate: [aiOwnershipAdvisor({ exec, maxFiles: 0 })],
+      validate: [agentOwnershipAdvisor({ exec, maxFiles: 0 })],
     })
 
     expect(exec.requests).toHaveLength(0)
-    expect(findingFor(result.findings, 'ai-truncated')?.description).toContain('1 unowned files')
+    expect(findingFor(result.findings, 'agent-truncated')?.description).toContain('1 unowned files')
   })
 
-  test('a clean repository costs zero AI calls', async () => {
+  test('a clean repository costs zero agent calls', async () => {
     const exec = stubExec([])
 
     const result = await runFixture('ok', {
-      validate: [aiOwnershipAdvisor({ exec })],
+      validate: [agentOwnershipAdvisor({ exec })],
     })
 
     expect(exec.requests).toHaveLength(0)
@@ -175,7 +175,7 @@ describe('aiOwnershipAdvisor', () => {
   })
 })
 
-describe('aiSemanticReview', () => {
+describe('agentSemanticReview', () => {
   test('a mismatch verdict becomes a capped drift finding with the issues as evidence', async () => {
     // Elements are reviewed in id order: demo.core mismatches, demo.extra matches.
     const exec = stubExec([
@@ -183,7 +183,7 @@ describe('aiSemanticReview', () => {
       ok({ matches: true, issues: [] }),
     ])
 
-    const result = await runFixture('described', { validate: [aiSemanticReview({ exec })] })
+    const result = await runFixture('described', { validate: [agentSemanticReview({ exec })] })
 
     expect(result.findings).toHaveLength(1)
     expect(ruleIds(result.findings)).toEqual(['description-drift'])
@@ -201,15 +201,15 @@ describe('aiSemanticReview', () => {
   test('a matching verdict is silence', async () => {
     const exec = stubExec([ok({ matches: true, issues: [] })])
 
-    const result = await runFixture('described', { validate: [aiSemanticReview({ exec })] })
+    const result = await runFixture('described', { validate: [agentSemanticReview({ exec })] })
 
     expect(result.findings).toEqual([])
   })
 
-  test('elements without descriptions cost zero AI calls', async () => {
+  test('elements without descriptions cost zero agent calls', async () => {
     const exec = stubExec([])
 
-    const result = await runFixture('violations', { validate: [aiSemanticReview({ exec })] })
+    const result = await runFixture('violations', { validate: [agentSemanticReview({ exec })] })
 
     expect(exec.requests).toHaveLength(0)
     expect(result.findings).toEqual([])
@@ -220,37 +220,37 @@ describe('aiSemanticReview', () => {
   test('the first exec failure stops the run with one finding', async () => {
     const exec = stubExec([{ ok: false, error: 'CLI missing' }])
 
-    const result = await runFixture('described', { validate: [aiSemanticReview({ exec })] })
+    const result = await runFixture('described', { validate: [agentSemanticReview({ exec })] })
 
     expect(exec.requests).toHaveLength(1)
     expect(result.findings).toHaveLength(1)
-    expect(ruleIds(result.findings)).toEqual(['ai-unavailable'])
-    expect(findingFor(result.findings, 'ai-unavailable')?.severity).toBe('warning')
+    expect(ruleIds(result.findings)).toEqual(['agent-unavailable'])
+    expect(findingFor(result.findings, 'agent-unavailable')?.severity).toBe('warning')
   })
 })
 
 // The provider ids double as finding-id namespaces; a rename would churn every
 // consumer's baseline, so they are pinned.
 test('provider ids are stable', () => {
-  expect(ADVISOR_ID).toBe('ai-ownership-advisor')
-  expect(REVIEW_ID).toBe('ai-semantic-review')
+  expect(ADVISOR_ID).toBe('agent-ownership-advisor')
+  expect(REVIEW_ID).toBe('agent-semantic-review')
 })
 
 describe('provider composition visibility', () => {
   test('the result and report name who judged the run', async () => {
     const exec = stubExec([ok({ files: [] })])
 
-    const result = await runFixture('violations', { validate: [aiOwnershipAdvisor({ exec })] })
+    const result = await runFixture('violations', { validate: [agentOwnershipAdvisor({ exec })] })
 
     expect(result.providers).toEqual({
       scan: ['typescript-imports'],
       resolve: ['source-root'],
-      validate: ['ai-ownership-advisor'],
+      validate: ['agent-ownership-advisor'],
     })
     // The report shows a replaced phase — this run has no architecture-rules,
     // and the line says so.
     expect(renderReport(result).text).toContain(
-      'scan typescript-imports · resolve source-root · validate ai-ownership-advisor',
+      'scan typescript-imports · resolve source-root · validate agent-ownership-advisor',
     )
   })
 })

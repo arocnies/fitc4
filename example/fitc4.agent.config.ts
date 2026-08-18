@@ -1,22 +1,22 @@
 /**
- * The same gate as `fitc4.config.json`, plus AI assistance — run it with:
+ * The same gate as `fitc4.config.json`, plus agent assistance — run it with:
  *
- *   fitc4 --config fitc4.ai.config.ts
+ *   fitc4 --config fitc4.agent.config.ts
  *
- * (which this repository wires up as `npm run fitc4:ai`).
+ * (which this repository wires up as `npm run fitc4:agent`).
  *
  * Kept out of the default `check` on purpose: the deterministic gate is what
- * CI runs, and the AI providers are advisory enrichment you invoke when you
+ * CI runs, and the agent providers are advisory enrichment you invoke when you
  * want a second opinion. They shell out to your locally installed `claude`
  * CLI (your login, your billing); if it is missing or logged out, the run
- * still passes with a visible `ai-unavailable` note.
+ * still passes with a visible `agent-unavailable` note.
  */
 
 import { defineConfig, defaultValidate } from 'fitc4'
-import { aiOwnershipAdvisor, aiSemanticReview, cached, claudeCli } from 'fitc4/ai'
+import { agentOwnershipAdvisor, agentSemanticReview, cached, claudeCli } from 'fitc4/agent'
 
 // Cheap model; `cached` makes reruns with unchanged inputs free and identical.
-const ai = cached(claudeCli({ model: 'haiku' }))
+const agent = cached(claudeCli({ model: 'haiku' }))
 
 export default defineConfig({
   version: 1,
@@ -28,14 +28,14 @@ export default defineConfig({
   // back in through the spread. scan and resolve stay default.
   validate: [
     ...defaultValidate,
-    // Suggests an owner for any file no element claims. Zero AI calls when
+    // Suggests an owner for any file no element claims. Zero agent calls when
     // the repository is clean. `severity: 'error'` would make either provider
     // part of the gate instead of advisory.
-    aiOwnershipAdvisor({ exec: ai }),
+    agentOwnershipAdvisor({ exec: agent }),
     // Judges each described element's implementation against its description.
     // Unlike the advisor, this calls the CLI once per described element even
     // when the repository is clean (two calls here); `cached` makes every
     // rerun with unchanged files free.
-    aiSemanticReview({ exec: ai }),
+    agentSemanticReview({ exec: agent }),
   ],
 })
