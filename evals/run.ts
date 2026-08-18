@@ -32,8 +32,8 @@ import { cached, claudeCli, type AgentExec } from 'fitc4/agent'
 import { perfect, renderScorecard, scoreFixture, type Expectations, type FixtureScore } from './harness/score.ts'
 import { scriptedExec, type ScriptedReply } from './harness/stub.ts'
 
-/** The greenfield → brownfield → beyond-TypeScript progression, in that order. */
-const FIXTURE_ORDER = ['greenfield', 'brownfield', 'non-ts']
+/** The greenfield → brownfield → beyond-TypeScript → exploration progression, in that order. */
+const FIXTURE_ORDER = ['greenfield', 'brownfield', 'non-ts', 'exploratory']
 
 type FixtureSpec = (exec: AgentExec, root: string) => PipelineConfig
 

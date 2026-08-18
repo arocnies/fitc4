@@ -1,0 +1,97 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "subject": { "kind": "element", "id": "ops.alerts" },
+      "related": ["ops.store"],
+      "label": "the runbook-documented alerts → store fallback is forbidden by the model"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unknown-observation-kind",
+      "severity": "info",
+      "descriptionIncludes": "'runbook'",
+      "label": "the domain-specific 'runbook' observations are reported, not dropped"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "scan-root",
+        "subject": "docs/runbooks/gateway/runbook.md",
+        "label": "exploration attests to having read the gateway runbook"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "scan-root",
+        "subject": "docs/runbooks/worker/runbook.md",
+        "label": "exploration attests to having read the worker runbook"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "scan-root",
+        "subject": "docs/runbooks/store/runbook.md",
+        "label": "exploration attests to having read the store runbook, which contributes no edges"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "scan-root",
+        "subject": "docs/runbooks/alerts/runbook.md",
+        "label": "exploration attests to having read the alerts runbook"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "dependency",
+        "subject": "docs/runbooks/gateway/runbook.md",
+        "target": "docs/runbooks/worker/runbook.md"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "dependency",
+        "subject": "docs/runbooks/worker/runbook.md",
+        "target": "docs/runbooks/store/runbook.md"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "dependency",
+        "subject": "docs/runbooks/worker/runbook.md",
+        "target": "docs/runbooks/alerts/runbook.md"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "dependency",
+        "subject": "docs/runbooks/alerts/runbook.md",
+        "target": "docs/runbooks/store/runbook.md",
+        "label": "the scan reports the forbidden fallback edge honestly"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "ops.gateway",
+        "target": "ops.worker",
+        "declared": true,
+        "label": "the permitted gateway → worker runbook edge resolves onto the declared relationship"
+      },
+      {
+        "provider": "source-root",
+        "source": "ops.worker",
+        "target": "ops.store",
+        "declared": true,
+        "label": "the permitted worker → store runbook edge resolves onto the declared relationship"
+      },
+      {
+        "provider": "source-root",
+        "source": "ops.worker",
+        "target": "ops.alerts",
+        "declared": true,
+        "label": "the permitted worker → alerts runbook edge resolves onto the declared relationship"
+      }
+    ]
+  }
+}

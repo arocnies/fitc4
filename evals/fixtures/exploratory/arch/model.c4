@@ -1,0 +1,46 @@
+specification {
+  element system
+  element service
+}
+
+model {
+  ops = system 'Operations platform' {
+    gateway = service 'Ingress gateway' {
+      description 'Accepts submissions; hands every accepted job to the worker'
+      metadata {
+        sources 'docs/runbooks/gateway/**'
+      }
+    }
+
+    worker = service 'Job worker' {
+      description 'Executes jobs; the only service allowed to touch the store'
+      metadata {
+        sources 'docs/runbooks/worker/**'
+      }
+    }
+
+    store = service 'Result store' {
+      description 'Durable job results; reachable from the worker only'
+      metadata {
+        sources 'docs/runbooks/store/**'
+      }
+    }
+
+    alerts = service 'Alerting' {
+      description 'Pages the on-call; fed by the worker, never reads the store'
+      metadata {
+        sources 'docs/runbooks/alerts/**'
+      }
+    }
+  }
+
+  ops.gateway -> ops.worker 'submits jobs'
+  ops.worker -> ops.store 'persists results'
+  ops.worker -> ops.alerts 'raises pages'
+}
+
+views {
+  view index of ops {
+    include *
+  }
+}
