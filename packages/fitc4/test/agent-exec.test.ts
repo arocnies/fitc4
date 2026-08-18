@@ -233,6 +233,43 @@ describe('codexCli', () => {
     expectStrictObjectNodes(JSON.parse(readCapture().schema ?? '') as JsonValue)
   })
 
+  test('an array-rooted schema travels in an object envelope and is unwrapped on reply', async () => {
+    captureTo('codex-envelope.json')
+    const schema: JsonObject = {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['candidateId', 'elementId'],
+        properties: {
+          candidateId: { type: 'string' },
+          elementId: { type: 'string' },
+          reason: { type: 'string' },
+        },
+      },
+    }
+    // Strict mode rejects an array root outright, so the wire schema is a
+    // one-key object envelope; the model answers inside it, with the optional
+    // key as an explicit null.
+    process.env['FAKE_RESULT'] = JSON.stringify({
+      items: [{ candidateId: 'c', elementId: 'e', reason: null }],
+    })
+
+    const reply = await codexCli({ binary: fakeCodex }).run({ prompt: 'x', schema })
+
+    expect(reply).toMatchObject({ ok: true, value: [{ candidateId: 'c', elementId: 'e' }] })
+    if (reply.ok) {
+      expect(Array.isArray(reply.value)).toBe(true)
+      expect((reply.value as JsonObject[])[0]).not.toHaveProperty('reason')
+      // The unwrapped, stripped value passes the provider-side check against
+      // the ORIGINAL array-rooted schema.
+      expect(schemaMismatch(reply.value, schema)).toBeUndefined()
+    }
+    const wire = JSON.parse(readCapture().schema ?? '') as JsonObject
+    expect(wire['type']).toBe('object')
+    expect(wire['required']).toEqual(['items'])
+    expectStrictObjectNodes(wire as JsonValue)
+  })
+
   test('a null on a required non-nullable key still fails the schema check', async () => {
     const schema: JsonObject = {
       type: 'object',

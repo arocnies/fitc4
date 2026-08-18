@@ -130,12 +130,31 @@ function withoutNullOptionals(value: JsonValue, schema: JsonValue): JsonValue {
 }
 
 /**
- * The fixed surface the model sees beyond the request: the isolation and
- * sandbox flags above, plus the strictSchema transform applied to a requested
- * schema. Bump when the fixed surface changes, so a response cache stops
- * replaying replies recorded against the old surface.
+ * Strict mode's other structural demand: the root schema must be an object —
+ * `type: "array"` at the root is rejected outright (HTTP 400). An array-rooted
+ * request schema (agent-resolve's) therefore travels inside a one-key object
+ * envelope on the wire, and the reply is unwrapped back to the array before it
+ * meets the original schema. The envelope exists only between here and the
+ * endpoint: the cache records the unwrapped value.
  */
-const FINGERPRINT = 'codex-cli/flags-v2'
+const ENVELOPE_KEY = 'items'
+
+function isArrayRooted(schema: JsonObject): boolean {
+  return schema['type'] === 'array'
+}
+
+function envelope(schema: JsonObject): JsonObject {
+  return { type: 'object', required: [ENVELOPE_KEY], properties: { [ENVELOPE_KEY]: schema } }
+}
+
+/**
+ * The fixed surface the model sees beyond the request: the isolation and
+ * sandbox flags above, plus the strictSchema transform (and, for array-rooted
+ * schemas, the envelope) applied to a requested schema. Bump when the fixed
+ * surface changes, so a response cache stops replaying replies recorded
+ * against the old surface.
+ */
+const FINGERPRINT = 'codex-cli/flags-v3'
 
 export function codexCli(options: CodexCliOptions = {}): AgentExec {
   const binary = options.binary ?? 'codex'
@@ -163,9 +182,11 @@ export function codexCli(options: CodexCliOptions = {}): AgentExec {
         ]
         if (options.model !== undefined) args.push('--model', options.model)
         if (request.cwd !== undefined) args.push('--cd', request.cwd)
+        const enveloped = request.schema !== undefined && isArrayRooted(request.schema)
         if (request.schema !== undefined) {
           const schemaFile = path.join(workDir, 'schema.json')
-          fs.writeFileSync(schemaFile, JSON.stringify(strictSchema(request.schema)))
+          const wireSchema = enveloped ? envelope(request.schema) : request.schema
+          fs.writeFileSync(schemaFile, JSON.stringify(strictSchema(wireSchema)))
           args.push('--output-schema', schemaFile)
         }
         args.push('-')
@@ -188,9 +209,15 @@ export function codexCli(options: CodexCliOptions = {}): AgentExec {
         // The model answered under strictSchema's transform: originally
         // optional keys come back as explicit nulls. Strip them (see
         // withoutNullOptionals) before the reply meets the original schema.
-        const value = extractJson(reply)
+        let value = extractJson(reply)
         if (value === undefined) {
           return { ok: false, error: `reply was not the requested JSON: ${truncate(reply, 200)}` }
+        }
+        if (enveloped) {
+          if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+            return { ok: false, error: `reply was not the enveloped JSON object: ${truncate(reply, 200)}` }
+          }
+          value = (value as JsonObject)[ENVELOPE_KEY] ?? null
         }
         const stripped = withoutNullOptionals(value, request.schema)
         const mismatch = schemaMismatch(stripped, request.schema)
