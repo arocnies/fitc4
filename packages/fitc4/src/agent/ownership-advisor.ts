@@ -4,8 +4,15 @@
  * For every file the resolve phase left unowned, ask the agent which existing
  * element should own it — or whether the model is missing an element. Pure
  * enrichment of the deterministic `unmapped-source` warning: findings default
- * to `info`, the file list and element catalog are prefilled, and one batched
- * call covers every unowned file, so a clean repository costs zero agent calls.
+ * to `info`, the context is prefilled, and one batched call covers every
+ * unowned file, so a clean repository costs zero agent calls.
+ *
+ * The context is a pack: the element catalog, then per file its import
+ * NEIGHBORHOOD — what it imports and what imports it, each neighbor annotated
+ * with its owning element — ahead of a short code-first excerpt. The
+ * neighborhood is the fact ownership actually turns on (a file imported only
+ * by `core` almost certainly belongs near `core`), and the pipeline already
+ * knows it, so the excerpt can stay small.
  *
  * Suggestions naming an element that does not exist are reported as exactly
  * that — a hallucinated element must not read like a fix.
@@ -20,8 +27,15 @@ import type {
   ValidateContext,
   ValidateProvider,
 } from '../types.ts'
+import {
+  assemblePack,
+  buildGraph,
+  DEFAULT_PACK_BUDGET_BYTES,
+  fencedExcerpt,
+  fileNeighborhood,
+} from './context-pack.ts'
 import type { AgentExec } from './exec.ts'
-import { agentTruncated, agentUnavailable, elementCatalog, fileExcerpts } from './findings.ts'
+import { agentTruncated, agentUnavailable, elementCatalog } from './findings.ts'
 
 export const PROVIDER_ID = 'agent-ownership-advisor'
 
@@ -35,7 +49,11 @@ export interface OwnershipAdvisorOptions {
   severity?: Severity
   /** Unowned files reviewed per run; the rest are reported as truncated. */
   maxFiles?: number
-  /** Characters of each file shown to the model. */
+  /**
+   * Characters of each file shown to the model, code-first. Small by
+   * default — the neighborhood lines carry the ownership signal, so the
+   * excerpt only needs to show what kind of code this is.
+   */
   excerptChars?: number
 }
 
@@ -59,16 +77,17 @@ const REPLY_SCHEMA: JsonObject = {
 }
 
 const PROMPT =
-  'For each file excerpted in the context, name the id of the existing model element that ' +
-  'should own it, or null if no existing element fits. Base the judgment on what the file ' +
-  'does, not on its path. Keep each rationale to one sentence.'
+  'For each file in the context, name the id of the existing model element that should own it, ' +
+  'or null if no existing element fits. Base the judgment on what the file does and on its ' +
+  'neighborhood — which elements own the files it imports and the files that import it — not on ' +
+  'its path. Keep each rationale to one sentence.'
 
 export function agentOwnershipAdvisor(
   options: OwnershipAdvisorOptions,
 ): NamedProvider<ValidateProvider> {
   const severity = options.severity ?? 'info'
   const maxFiles = options.maxFiles ?? 20
-  const excerptChars = options.excerptChars ?? 2_000
+  const excerptChars = options.excerptChars ?? 1_000
 
   const run: ValidateProvider = async (context: ValidateContext): Promise<Finding[]> => {
     const files = unownedFiles(context)
@@ -81,9 +100,30 @@ export function agentOwnershipAdvisor(
     }
     if (sent.length === 0) return findings
 
+    const graph = buildGraph(context.model, context.observations, context.associations)
+    const pack = assemblePack(
+      [
+        { header: elementCatalog(context.model), items: [], what: 'element catalog' },
+        ...sent.map((file) => ({
+          header: `### ${file} (unowned)`,
+          items: [
+            `Neighborhood:\n${fileNeighborhood(graph, file)}`,
+            `Excerpt (code-first):\n${fencedExcerpt(context.repositoryRoot, file, excerptChars)}`,
+          ],
+          what: `context blocks for ${file}`,
+        })),
+      ],
+      DEFAULT_PACK_BUDGET_BYTES,
+    )
+    // The byte budget's drops are attested like the file cap above: a judge
+    // that never saw part of its evidence must not read as one that did.
+    for (const drop of pack.dropped) {
+      findings.push(agentTruncated(PROVIDER_ID, drop.count, drop.what, severity))
+    }
+
     const reply = await options.exec.run({
       prompt: PROMPT,
-      context: `${elementCatalog(context.model)}\n\n${fileExcerpts(context.repositoryRoot, sent, excerptChars)}`,
+      context: pack.text,
       schema: REPLY_SCHEMA,
       cwd: context.repositoryRoot,
     })
