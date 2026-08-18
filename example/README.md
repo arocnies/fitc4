@@ -77,4 +77,6 @@ AGENTS.md            norms for AI agents working here — the model is the contr
 src/                 the implementation being checked
 ```
 
+One workspace-ism to not copy: this example's `fitc4.config.json` points `$schema` into the workspace (`../packages/fitc4/schema/...`); in your own project point it at `./node_modules/fitc4/schema/fitc4.config.schema.json`.
+
 `npm run check -w example` chains model validation, typecheck, tests, and the gate. `npm run view -w example` opens the live LikeC4 diagram.

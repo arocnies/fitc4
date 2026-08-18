@@ -13,7 +13,13 @@ import { relationshipId } from './ids.ts'
 /** The native model type, inferred from the installed LikeC4 API. */
 export type LikeC4Model = Awaited<ReturnType<LikeC4['computedModel']>>
 
-/** The metadata key carrying ownership prefixes (POC-DESIGN-v4). */
+/**
+ * The metadata key carrying ownership prefixes.
+ *
+ * Plain LikeC4 metadata rather than a custom DSL extension: the model stays
+ * valid for every other LikeC4 tool, and ownership lives beside the element
+ * it describes.
+ */
 export const SOURCES_KEY = 'sources'
 
 export interface LoadedModel {
@@ -83,10 +89,10 @@ export interface Ownership {
  * Convert `sources` metadata into match prefixes.
  *
  * A source is a repository-relative directory prefix optionally ending in
- * `/**`. General glob semantics are deferred (POC-DESIGN v1), so anything the
- * prefix matcher cannot honour is rejected loudly rather than silently
- * producing a prefix that matches nothing — a silent miss makes the gate
- * fail open.
+ * `/**`. General glob semantics are deliberately not implemented yet, so
+ * anything the prefix matcher cannot honour is rejected loudly rather than
+ * silently producing a prefix that matches nothing — a silent miss makes the
+ * gate fail open.
  */
 export function ownershipPrefixes(model: LikeC4Model): Ownership {
   const prefixes: OwnershipPrefix[] = []
@@ -156,10 +162,10 @@ export interface DeclaredRelationships {
 /**
  * Index declared relationships by their stable id.
  *
- * LikeC4 permits several relationships with the same source, target, and kind,
- * which all collapse onto one stable id. POC-DESIGN-v4 asked the prototype to
- * confirm that rather than design for it, so collisions are counted and
- * reported instead of silently dropped.
+ * LikeC4 permits several relationships with the same source, target, and
+ * kind, which all collapse onto one stable id here. Rather than disambiguate
+ * with an ordinal — which would churn ids on unrelated model edits — the
+ * collisions are counted and reported instead of silently dropped.
  */
 export function declaredRelationships(model: LikeC4Model): DeclaredRelationships {
   const byId = new Map<string, DeclaredRelationship>()

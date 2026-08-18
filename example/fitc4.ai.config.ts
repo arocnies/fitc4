@@ -1,7 +1,9 @@
 /**
  * The same gate as `fitc4.config.json`, plus AI assistance — run it with:
  *
- *   npm run fitc4:ai
+ *   fitc4 --config fitc4.ai.config.ts
+ *
+ * (which this repository wires up as `npm run fitc4:ai`).
  *
  * Kept out of the default `check` on purpose: the deterministic gate is what
  * CI runs, and the AI providers are advisory enrichment you invoke when you

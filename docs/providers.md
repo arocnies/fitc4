@@ -10,11 +10,11 @@ and each phase has one provider type, defined in [`packages/fitc4/src/types.ts`]
 
 | Phase | Type | Receives | Returns |
 |---|---|---|---|
-| scan | `ScanProvider` | `ScanContext` — `repositoryRoot`, the `sources` prefixes declared in the model, `changedPaths` (always empty for now) | `Observation[]` — implementation facts |
-| resolve | `ResolveProvider` | `ResolveContext` — the LikeC4 `model`, all `observations`, `repositoryRoot`, `sources` | `Association[]` — mappings from observations onto the model |
-| validate | `ValidateProvider` | `ValidateContext` — `model`, `observations`, `associations`, `repositoryRoot`, `sources` | `Finding[]` — judgments with a severity |
+| scan | `ScanProvider` | `ScanContext` — `repositoryRoot` | `Observation[]` — implementation facts |
+| resolve | `ResolveProvider` | `ResolveContext` — the LikeC4 `model`, all `observations`, `repositoryRoot` | `Association[]` — mappings from observations onto the model |
+| validate | `ValidateProvider` | `ValidateContext` — `model`, `observations`, `associations`, `repositoryRoot` | `Finding[]` — judgments with a severity |
 
-A scan provider knows nothing about the model beyond the ownership prefixes; a resolve provider maps facts onto the model without judging them; a validate provider judges and never gathers. Deviating from that split works mechanically, but the standard providers assume it.
+A scan provider knows nothing about the model — it observes the repository; a resolve provider maps facts onto the model without judging them; a validate provider judges and never gathers. Deviating from that split works mechanically, but the standard providers assume it.
 
 ## The envelope and `data`
 
@@ -130,9 +130,9 @@ export default defineConfig({
 
 **The standing contract.** AI findings are additive — nothing an AI says can suppress or rewrite a deterministic finding — and each provider's `severity` option says how load-bearing its judgment is (`info` for the advisor, `warning` for the review; advisory either way). Setting `severity: 'error'` is the explicit act of making that provider part of the gate. Nondeterminism is fine when it is chosen. An unavailable or logged-out CLI is one visible `ai-unavailable` finding — a `warning` behind an advisory provider, but an `error` behind a gating one, because a gate whose judge is absent must not pass. Truncated inputs escalate the same way, and so do mumbled verdicts: a reply that parses as JSON but does not match the requested schema is a failure, not a value, and a gating advisor whose reply skips files it was asked about fails rather than letting them pass unjudged.
 
-**The exec layer.** `AiExec` is the one interface: `claudeCli()` runs `claude --print` isolated (no user settings, no MCP servers, and — by default — no tools, so the reply can only come from the prefilled context); `codexCli()` runs `codex exec` ephemeral with a read-only sandbox and schema-enforced JSON output. `agentic: true` on a request permits read-only exploration. A custom adapter is ~40 lines: implement `id` and `run`, return `{ ok, value }`.
+**The exec layer.** `AiExec` is the one interface: `claudeCli()` runs `claude --print` isolated (no user settings, no MCP servers, and — by default — no tools, so the reply can only come from the prefilled context); `codexCli()` runs `codex exec` ephemeral with a read-only sandbox and schema-enforced JSON output. `agentic: true` on a request permits read-only exploration. A custom adapter is ~40 lines: implement `id` and `run`, return `{ ok, value }` — plus an optional `fingerprint` naming any fixed prompt or flag surface the request itself does not carry, so the cache key covers it.
 
-**Determinism and cost.** `cached()` keys on everything the model saw — adapter id, prompt, context, schema — so a rerun with unchanged inputs replays the recorded reply, free and identical (default cache: `node_modules/.cache/fitc4-ai`). Both providers are trigger-driven: the advisor only runs when unowned files exist, the review only over elements with descriptions, so a clean steady-state run makes zero AI calls. Cheap model for extraction-shaped work, strong model for judgment, chosen per instance.
+**Determinism and cost.** `cached()` keys on everything the model saw — adapter id and fingerprint, prompt, context, schema — and validates a hit exactly like a live reply (a corrupted or off-schema entry is a miss, not a value), so a rerun with unchanged inputs replays the recorded reply, free and identical (default cache: `node_modules/.cache/fitc4-ai`). Both providers are trigger-driven: the advisor only runs when unowned files exist, the review only over elements with descriptions, so a clean steady-state run makes zero AI calls. Cheap model for extraction-shaped work, strong model for judgment, chosen per instance.
 
 | Rule | Severity | Meaning |
 |---|---|---|

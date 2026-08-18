@@ -14,23 +14,26 @@
     "repositoryRoot": {
       "type": "string",
       "minLength": 1,
+      "pattern": "\\S",
       "description": "Repository root, relative to this file. Every reported path is relative to it."
     },
     "model": {
       "type": "string",
       "minLength": 1,
+      "pattern": "\\S",
       "description": "Directory holding the LikeC4 workspace."
     },
     "scanRoots": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "minLength": 1 },
-      "description": "Repository-relative directories under architecture control. A missing, misspelled, or source-free root is an error rather than an empty pass; an empty string would put the entire repository under scan and is rejected."
+      "items": { "type": "string", "minLength": 1, "pattern": "\\S" },
+      "description": "Repository-relative directories under architecture control. A missing, misspelled, or source-free root is an error rather than an empty pass; a blank string would put the entire repository under scan and is rejected."
     },
     "tsconfig": {
       "type": "string",
       "minLength": 1,
-      "description": "tsconfig supplying compiler options (paths, baseUrl) for module resolution. The file must exist — point this at your project's real tsconfig."
+      "pattern": "\\S",
+      "description": "tsconfig supplying compiler options (paths, baseUrl) for module resolution. Point this at your project's real tsconfig — a path that cannot be read fails the scan loudly."
     }
   }
 }

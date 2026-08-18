@@ -2,8 +2,8 @@
  * Report rendering and the gate decision.
  *
  * The renderer reads only the common finding envelope. It never interprets a
- * provider's `data` — that stays owned by the provider that emitted it
- * (POC-DESIGN-v4).
+ * provider's `data` — that stays owned by the provider that emitted it, so a
+ * provider can change its private shape without breaking the report.
  */
 
 import { SEVERITIES, isSeverity, type Evidence, type Finding, type Severity } from './types.ts'

@@ -7,8 +7,7 @@
  * Everything a validator needs is expressed through `Association`'s own
  * fields — `source`, `target`, `relationship`, `candidates`, `status`. Nothing
  * is passed through `data`, because a validator must work against the
- * `Association` contract rather than against this provider's private shape
- * (POC-DESIGN-v4).
+ * `Association` contract rather than against this provider's private shape.
  */
 
 import {

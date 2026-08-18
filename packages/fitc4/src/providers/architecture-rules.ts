@@ -7,7 +7,7 @@
  * This provider reads only `Association`'s own fields and the native model
  * from `ValidateContext`. It never reads another provider's `data`, so it works
  * against the contract rather than against one resolve provider's private
- * shape (POC-DESIGN-v4).
+ * shape — any resolve provider that fills the contract feeds these rules.
  */
 
 import { findingId } from '../ids.ts'
@@ -96,7 +96,7 @@ export function architectureRules(
     return [
       ...collector.findings(),
       ...coverageRules(context, observations, severityOf),
-      ...modelHygieneRules(context, severityOf),
+      ...modelHygieneRules(declared, severityOf),
       ...vocabularyRules(context, severityOf),
     ]
   }
@@ -337,12 +337,15 @@ function coverageRules(
 /**
  * Relationships the stable identifier scheme cannot tell apart.
  *
- * POC-DESIGN-v4 asked the prototype to confirm whether LikeC4 permits duplicate
- * source/kind/target triples rather than design an ordinal up front. It does,
- * so the collision is surfaced instead of silently dropped.
+ * LikeC4 permits duplicate source/kind/target triples, which all collapse
+ * onto one stable id, so the collision is surfaced instead of silently
+ * dropped — only the first duplicate is ever referenced by findings.
  */
-function modelHygieneRules(context: ValidateContext, severityOf: SeverityOf): Finding[] {
-  const { duplicates } = declaredRelationships(context.model)
+function modelHygieneRules(
+  declared: ReturnType<typeof declaredRelationships>,
+  severityOf: SeverityOf,
+): Finding[] {
+  const { duplicates } = declared
 
   return [...duplicates].map(([id, count]) => ({
     id: findingId(PROVIDER_ID, 'duplicate-relationship', id),

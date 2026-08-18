@@ -1,9 +1,10 @@
 /**
  * Core domain objects for the architecture control pipeline.
  *
- * Per POC-DESIGN-v3, there are exactly three pipeline result objects, and the
- * LikeC4 model is the only architecture-model representation. Nothing here
- * duplicates a LikeC4 element or relationship.
+ * There are exactly three pipeline result objects — observation, association,
+ * finding — and the LikeC4 model is the only architecture-model
+ * representation. Nothing here duplicates a LikeC4 element or relationship,
+ * so no copy can drift from `model.c4`.
  */
 
 export type JsonPrimitive = string | number | boolean | null
@@ -99,17 +100,12 @@ import type { LikeC4Model } from './model.ts'
 
 export interface ScanContext {
   repositoryRoot: string
-  /** Repository-relative ownership prefixes declared across the model. */
-  sources: string[]
-  /** Deferred with git integration; always empty in the prototype. */
-  changedPaths: string[]
 }
 
 export interface ResolveContext {
   model: LikeC4Model
   observations: Observation[]
   repositoryRoot: string
-  sources: string[]
 }
 
 export interface ValidateContext {
@@ -117,7 +113,6 @@ export interface ValidateContext {
   observations: Observation[]
   associations: Association[]
   repositoryRoot: string
-  sources: string[]
 }
 
 export type ScanProvider = (context: ScanContext) => Promise<Observation[]>

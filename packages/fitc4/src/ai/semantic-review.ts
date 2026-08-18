@@ -14,7 +14,6 @@
  */
 
 import { findingId } from '../ids.ts'
-import { elementText } from './findings.ts'
 import type {
   Evidence,
   Finding,
@@ -25,7 +24,7 @@ import type {
   ValidateProvider,
 } from '../types.ts'
 import type { AiExec } from './exec.ts'
-import { aiTruncated, aiUnavailable, fileExcerpts } from './findings.ts'
+import { aiTruncated, aiUnavailable, elementText, fileExcerpts } from './findings.ts'
 
 export const PROVIDER_ID = 'ai-semantic-review'
 

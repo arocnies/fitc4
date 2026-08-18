@@ -11,8 +11,9 @@
  * observed — and therefore never reported as unowned. Coverage must not depend
  * on import reachability.
  *
- * This uses `typescript@6`, held as a workspace-local dependency because
- * TypeScript 7.0.2 does not expose the classic compiler API (POC-DESIGN-v4).
+ * This depends on `typescript@6`: TypeScript 7 does not expose the classic
+ * compiler API (`createSourceFile`, `resolveModuleName`) this scanner is
+ * built on, so the dependency is pinned to the 6.x line on purpose.
  */
 
 import fs from 'node:fs'
@@ -63,6 +64,10 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
       throw new Error('no scan roots configured; there is nothing under architecture control')
     }
 
+    // Enumerated once per root: the per-root file lists double as the
+    // root-validation evidence and, unioned, as the scan itself.
+    const filesByRoot = new Map<string, string[]>()
+
     for (const root of options.roots) {
       const absolute = path.resolve(context.repositoryRoot, root)
       if (!fs.existsSync(absolute) || !fs.statSync(absolute).isDirectory()) {
@@ -73,6 +78,7 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
       if (files.length === 0) {
         throw new Error(`scan root '${root}' contains no TypeScript source`)
       }
+      filesByRoot.set(root, files)
 
       observations.push({
         id: `scan-root:${root}`,
@@ -84,7 +90,11 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
       })
     }
 
-    for (const relative of enumerateSources(context.repositoryRoot, options.roots)) {
+    // Overlapping roots may enumerate one file twice; the union keeps the
+    // same dedup-and-sort contract as a single enumeration over all roots.
+    const allFiles = [...new Set([...filesByRoot.values()].flat())].sort()
+
+    for (const relative of allFiles) {
       if (isTestPath(relative)) continue
 
       observations.push({

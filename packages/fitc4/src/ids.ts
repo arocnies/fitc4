@@ -1,5 +1,5 @@
 /**
- * Stable identifiers (POC-DESIGN-v4).
+ * Stable identifiers.
  *
  * LikeC4 mints relationship ids as generated hashes (`g8faux`), which churn
  * across unrelated model edits and are meaningless in a report. Every

@@ -12,8 +12,9 @@
  * omission that leaves the run green.
  */
 
+import { messageOf } from './errors.ts'
 import { findingId, namespaced } from './ids.ts'
-import { loadModel, ownershipPrefixes, type LikeC4Model } from './model.ts'
+import { loadModel } from './model.ts'
 import { isSeverity } from './types.ts'
 import type {
   Association,
@@ -75,15 +76,14 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     return { modelErrors: errors, providers, observations: [], associations: [], findings: [] }
   }
 
-  const sources = declaredSources(model)
   const findings: Finding[] = []
 
   const observations = await runPhase('scan', config.scan, findings, (provider) =>
-    provider({ repositoryRoot: config.repositoryRoot, sources, changedPaths: [] }),
+    provider({ repositoryRoot: config.repositoryRoot }),
   )
 
   const associations = await runPhase('resolve', config.resolve, findings, (provider) =>
-    provider({ model, observations, repositoryRoot: config.repositoryRoot, sources }),
+    provider({ model, observations, repositoryRoot: config.repositoryRoot }),
   )
   findings.push(...orphanedAssociations(observations, associations))
 
@@ -93,7 +93,6 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
       observations,
       associations,
       repositoryRoot: config.repositoryRoot,
-      sources,
     }),
   )
   findings.push(...produced)
@@ -105,12 +104,6 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     associations,
     findings: findings.map(withKnownSeverity),
   }
-}
-
-/** Every `sources` prefix declared anywhere in the model. */
-function declaredSources(model: LikeC4Model): string[] {
-  const declared = ownershipPrefixes(model).prefixes.map((entry) => entry.declared)
-  return [...new Set(declared)].sort()
 }
 
 /**
@@ -128,7 +121,7 @@ async function runPhase<TProvider, TItem extends { id: string; provider: string 
   invoke: (provider: TProvider) => Promise<TItem[]>,
 ): Promise<TItem[]> {
   const items: TItem[] = []
-  const seen = new Map<string, string>()
+  const seen = new Set<string>()
 
   for (const provider of providers) {
     // Staged, then committed as a unit. A provider that fails partway
@@ -154,7 +147,7 @@ async function runPhase<TProvider, TItem extends { id: string; provider: string 
       continue
     }
 
-    for (const id of stagedIds) seen.set(id, provider.id)
+    for (const id of stagedIds) seen.add(id)
     items.push(...staged)
   }
 
@@ -183,8 +176,9 @@ function ingest<T extends { id: string; provider: string; data?: JsonObject }>(
  *
  * `JSON.stringify` alone only throws on cycles, BigInt, and throwing getters.
  * Values it silently discards — `undefined`, functions, symbols, Map, Set —
- * would vanish from `--json` output with no error, so the round trip is
- * compared rather than merely attempted.
+ * would vanish from `--json` output with no error, so the walk below rejects
+ * them explicitly; a final `stringify` attempt then catches whatever throws
+ * (a hostile getter, say) rather than letting it surface mid-report.
  */
 function assertJsonSafe(providerId: string, itemId: string, data: JsonObject): void {
   const reject = (reason: string): never => {
@@ -300,8 +294,4 @@ function providerFailure(phase: string, providerId: string, error: unknown): Fin
     subject: { kind: 'provider', id: providerId },
     provider: CORE_PROVIDER_ID,
   }
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }
