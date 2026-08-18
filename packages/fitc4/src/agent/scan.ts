@@ -9,6 +9,14 @@
  * deterministic — the instructions plus a bounded file listing — so `cached()`
  * replays a rerun with unchanged inputs byte for byte.
  *
+ * With `focus`, the provider prefills instead of exploring: the files the
+ * globs match are embedded as code-first excerpts and the request drops
+ * `agentic` entirely — a one-shot call answered from the context alone.
+ * Prefilling also closes the agentic mode's cache-staleness hole: file
+ * *contents* enter the request, so they enter the `cached()` key, and an
+ * edit to a focused file invalidates the recorded reply instead of replaying
+ * a stale one. Exploration only ever keyed on the listing.
+ *
  * **Fail-closed, deliberately stricter than the advisory validate providers.**
  * The agent validate providers degrade to a visible `agent-unavailable` finding
  * because their judgment is an enrichment: every deterministic finding still
@@ -29,6 +37,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import type { Evidence, JsonObject, NamedProvider, Observation, Ref, ScanContext, ScanProvider } from '../types.ts'
+import { assemblePack, DEFAULT_PACK_BUDGET_BYTES, fencedExcerpt } from './context-pack.ts'
 import { schemaMismatch, truncate } from './exec.ts'
 import type { AgentExec } from './exec.ts'
 
@@ -58,9 +67,25 @@ export interface AgentScanOptions {
   id?: string
   /** Files listed in the context; a longer listing is announced as truncated. */
   maxFiles?: number
+  /**
+   * Focus globs over the enumerated listing (`*` within a path segment,
+   * `**` across segments; a bare path matches itself or its directory
+   * subtree, like a `sources` prefix). When set, the matched files are
+   * embedded as code-first excerpts and the request is one-shot — no
+   * `agentic` exploration. Because the file CONTENTS are then part of the
+   * request, they are part of the `cached()` key too, which closes the
+   * agentic mode's staleness hole: an edit to a focused file invalidates the
+   * recorded reply. A focus that matches nothing fails loudly — a scan of
+   * zero files must not look like a clean domain. Matches beyond `maxFiles`
+   * or the byte budget are announced in the context as not shown.
+   */
+  focus?: string[]
+  /** Characters of each focused file embedded in the context, code-first. */
+  excerptChars?: number
 }
 
 const DEFAULT_MAX_FILES = 300
+const DEFAULT_EXCERPT_CHARS = 4_000
 
 /** Never listed, at any depth. */
 const SKIPPED_DIRECTORIES = new Set(['node_modules'])
@@ -128,18 +153,46 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
   const roots = options.roots ?? ['.']
   const maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES
 
+  const excerptChars = options.excerptChars ?? DEFAULT_EXCERPT_CHARS
+
   const run: ScanProvider = async (context: ScanContext): Promise<Observation[]> => {
     const files = enumerateFiles(context.repositoryRoot, roots)
-    const listed = files.slice(0, maxFiles)
-    const dropped = files.length - listed.length
 
-    const reply = await options.exec.run({
-      prompt: PROMPT,
-      context: composeContext(options.instructions, roots, listed, dropped),
-      schema: REPLY_SCHEMA,
-      agentic: true,
-      cwd: context.repositoryRoot,
-    })
+    // Two shapes of request. Without `focus`: the listing plus read-only
+    // exploration, unchanged. With `focus`: the matched files' contents are
+    // embedded and the call is one-shot — no `agentic` flag at all — so the
+    // reply can only come from the prefilled context, and the contents are in
+    // the `cached()` key.
+    const request =
+      options.focus === undefined
+        ? {
+            prompt: PROMPT,
+            context: composeContext(
+              options.instructions,
+              roots,
+              files.slice(0, maxFiles),
+              Math.max(0, files.length - maxFiles),
+            ),
+            schema: REPLY_SCHEMA,
+            agentic: true as const,
+            cwd: context.repositoryRoot,
+          }
+        : {
+            prompt: PROMPT,
+            context: composeFocusedContext(
+              context.repositoryRoot,
+              options.instructions,
+              roots,
+              files,
+              options.focus,
+              maxFiles,
+              excerptChars,
+            ),
+            schema: REPLY_SCHEMA,
+            cwd: context.repositoryRoot,
+          }
+
+    const reply = await options.exec.run(request)
 
     if (!reply.ok) {
       throw new Error(`Agent scan was unavailable (${options.exec.id}): ${reply.error}`)
@@ -309,6 +362,107 @@ function composeContext(
         : ''),
   ]
   return parts.join('\n\n')
+}
+
+/**
+ * The focused, one-shot context: instructions plus code-first excerpts of the
+ * files the focus globs match, assembled as a context pack.
+ *
+ * A focus that matches nothing throws — the fail-closed rule again: a scan
+ * over zero files must not look like a clean domain. Matches beyond
+ * `maxFiles` or the pack's byte budget are announced inline, never silently
+ * thinned; since the one-shot request has no tools, an unexcerpted file is a
+ * file the model genuinely cannot see, and it must know that.
+ */
+function composeFocusedContext(
+  repositoryRoot: string,
+  instructions: string,
+  roots: string[],
+  files: string[],
+  focus: string[],
+  maxFiles: number,
+  excerptChars: number,
+): string {
+  const matches = focusMatcher(focus)
+  const matched = files.filter(matches)
+  if (matched.length === 0) {
+    throw new Error(
+      `Agent scan focus [${focus.join(', ')}] matched no files under the scanned roots — ` +
+        'a scan of nothing must not look like a clean one',
+    )
+  }
+
+  const shown = matched.slice(0, maxFiles)
+  const pack = assemblePack(
+    [
+      { header: `### Scan instructions\n\n${instructions}`, items: [], what: 'instructions' },
+      {
+        header:
+          `### Focused files under ${roots.join(', ')} (repository-relative)\n\n` +
+          'Answer from these excerpts alone; they are your entire view of the repository.',
+        items: shown.map(
+          (file) => `### ${file}\n${fencedExcerpt(repositoryRoot, file, excerptChars)}`,
+        ),
+        what: 'focused files',
+        alreadyDropped: matched.length - shown.length,
+      },
+    ],
+    DEFAULT_PACK_BUDGET_BYTES,
+  )
+  return pack.text
+}
+
+/**
+ * Match focus patterns against listing paths: `*` within a path segment,
+ * `**` across segments, and a bare path matching itself or its directory
+ * subtree — the same prefix semantics `sources` metadata uses, so a focus
+ * reads like the rest of the model's path vocabulary. Deliberately no glob
+ * dependency: this is the whole grammar.
+ */
+function focusMatcher(patterns: string[]): (file: string) => boolean {
+  if (patterns.length === 0) {
+    throw new Error('Agent scan focus is empty; list at least one glob or path')
+  }
+
+  const tests = patterns.map((pattern) => {
+    const normalized = pattern.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '')
+    if (normalized === '') {
+      throw new Error(`Agent scan focus pattern '${pattern}' matches nothing it could name`)
+    }
+    if (!normalized.includes('*')) {
+      return (file: string) => file === normalized || file.startsWith(`${normalized}/`)
+    }
+    const regExp = globToRegExp(normalized)
+    return (file: string) => regExp.test(file)
+  })
+
+  return (file) => tests.some((test) => test(file))
+}
+
+function globToRegExp(glob: string): RegExp {
+  let pattern = ''
+  let index = 0
+  while (index < glob.length) {
+    if (glob.startsWith('**/', index)) {
+      pattern += '(?:[^/]+/)*'
+      index += 3
+      continue
+    }
+    if (glob.startsWith('**', index)) {
+      pattern += '.*'
+      index += 2
+      continue
+    }
+    const char = glob[index] ?? ''
+    if (char === '*') {
+      pattern += '[^/]*'
+      index += 1
+      continue
+    }
+    pattern += /[\\^$.*+?()[\]{}|]/.test(char) ? `\\${char}` : char
+    index += 1
+  }
+  return new RegExp(`^${pattern}$`)
 }
 
 /**

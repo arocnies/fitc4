@@ -19,7 +19,7 @@ import { cached } from '../src/agent/cache.ts'
 import type { AgentExec, AgentReply, AgentRequest } from '../src/agent/exec.ts'
 import { agentScan, PROVIDER_ID as SCAN_ID } from '../src/agent/scan.ts'
 import type { Finding, Observation } from '../src/types.ts'
-import { findingFor, runFixture } from './helpers.ts'
+import { findingFor, fixturePath, runFixture } from './helpers.ts'
 
 function stubExec(replies: AgentReply[]): AgentExec & { requests: AgentRequest[] } {
   const exec = {
@@ -119,6 +119,109 @@ describe('agentScan happy path', () => {
     expect(request?.context).toContain('- src/core/health.ts')
     expect(request?.context).not.toContain('truncated')
     expect(request?.prompt).toContain('examined')
+  })
+
+  test('focus assembles a one-shot request: excerpts embedded, no agentic flag', async () => {
+    const exec = stubExec([goodReply()])
+
+    const result = await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'trace doc-to-code links', focus: ['docs/**'] })],
+    })
+
+    const request = exec.requests[0]
+    expect(exec.requests).toHaveLength(1)
+    // One-shot: the reply can only come from the prefilled context.
+    expect(request?.agentic).toBeUndefined()
+    expect(request?.schema).toBeDefined()
+    // The pack header puts the format semantics in the cache key.
+    expect(request?.context?.startsWith('context-pack v1')).toBe(true)
+    expect(request?.context).toContain('trace doc-to-code links')
+    // The matched file's CONTENT is embedded, not merely listed — which is
+    // also what closes the agentic cache-staleness hole.
+    expect(request?.context).toContain('### docs/notes.md')
+    expect(request?.context).toContain('# notes')
+    // Unmatched files are not excerpted.
+    expect(request?.context).not.toContain('### src/core/health.ts')
+
+    // The reply flows through the pipeline exactly as in agentic mode.
+    expect(providerFailure(result.findings)).toBeUndefined()
+    expect(observationIds(result.observations)).toContain('agent-scan/scan-root:docs/notes.md')
+  })
+
+  test('a focused file edit changes the request — the cache key covers content', async () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-agent-scan-focus-'))
+    try {
+      fs.cpSync(fixturePath('violations'), scratch, { recursive: true })
+
+      const before = stubExec([goodReply()])
+      await agentScan({ exec: before, instructions: 'x', focus: ['docs/**'] }).run({
+        repositoryRoot: scratch,
+      })
+
+      fs.appendFileSync(path.join(scratch, 'docs/notes.md'), '\nedited\n')
+
+      const after = stubExec([goodReply()])
+      await agentScan({ exec: after, instructions: 'x', focus: ['docs/**'] }).run({
+        repositoryRoot: scratch,
+      })
+
+      expect(before.requests[0]?.context).not.toEqual(after.requests[0]?.context)
+      expect(after.requests[0]?.context).toContain('edited')
+    } finally {
+      fs.rmSync(scratch, { recursive: true, force: true })
+    }
+  })
+
+  test('focus supports segment globs and bare directory prefixes', async () => {
+    const exec = stubExec([goodReply()])
+
+    await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'x', focus: ['src/core/*.ts', 'docs'] })],
+    })
+
+    const context = exec.requests[0]?.context ?? ''
+    expect(context).toContain('### src/core/health.ts')
+    expect(context).toContain('### src/core/reverse.ts')
+    expect(context).toContain('### docs/notes.md')
+    expect(context).not.toContain('### src/orphan/thing.ts')
+  })
+
+  test('a truncated focused set is announced — the model must know its view is partial', async () => {
+    const exec = stubExec([goodReply()])
+
+    await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'x', focus: ['src/**'], maxFiles: 2 })],
+    })
+
+    const context = exec.requests[0]?.context ?? ''
+    // 6 files under src match, 2 excerpted, 4 announced as not shown.
+    expect(context).toContain('NOTE: 4 focused files beyond budget not shown')
+  })
+
+  test('a focus that matches nothing fails the provider — never a clean empty scan', async () => {
+    const exec = stubExec([goodReply()])
+
+    const result = await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'x', focus: ['infra/**'] })],
+    })
+
+    expect(exec.requests).toHaveLength(0)
+    const failure = providerFailure(result.findings)
+    expect(failure?.severity).toBe('error')
+    expect(failure?.description).toContain('matched no files')
+  })
+
+  test('without focus the request is unchanged: listing plus agentic exploration', async () => {
+    const exec = stubExec([goodReply()])
+
+    await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'x' })],
+    })
+
+    const request = exec.requests[0]
+    expect(request?.agentic).toBe(true)
+    expect(request?.context?.startsWith('### Scan instructions')).toBe(true)
+    expect(request?.context).not.toContain('context-pack')
   })
 
   test('roots bound the listing, and a truncated listing is announced', async () => {
