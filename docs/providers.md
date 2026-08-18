@@ -28,6 +28,11 @@ Standard observation kinds: `file` (a source file exists and is in scope for own
 
 Standard ref kinds: `element`, `relationship` (the model), `file`, `directory`, `module`, `symbol` (the repository), `observation`, `provider` (the pipeline). `symbol` is reserved: it is in the vocabulary so two providers that want it agree on its name, but nothing emits it yet.
 
+Two pieces of model metadata change what the standard resolve and validate providers do with these kinds, and a provider author should know both:
+
+- **Package claims.** A `dependency` observation whose `target` is a `module` ref is not automatically outside the model: if an element claims that package via `packages` metadata, `source-root` resolves the association onto the claiming element and the standard relationship rules judge it like any file-to-file crossing. A scan provider that emits `module` targets is therefore feeding the boundary check, not just the `unresolved-import` nudge.
+- **Drift tags.** A relationship tagged with the drift tag (default `drift`, configurable via `architectureRules({ driftTag })`) is a declared relationship — associations covered by it count as declared — but `architecture-rules` additionally emits one `drift-relationship` (exercised) or `unused-drift` (unexercised) finding per drift edge, and the report derives its burn-down line from those findings. A validate provider replacing the standard rules takes on that behavior too.
+
 The vocabulary is open — a provider may emit its own kinds, and two providers that understand each other's private kinds may cooperate. What the standard set buys is a default that works: emit these and the standard rules understand you. An observation kind outside the standard set is legal but unread by the standard rules, which report it at `info` severity (`unknown-observation-kind`) rather than passing silently.
 
 The set is versioned with the package: adding a standard kind is a minor version, changing a kind's meaning is a major version.
@@ -101,11 +106,13 @@ import { architectureRules } from 'fitc4'
 validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
 ```
 
-Any rule id from the rules table can be promoted or softened; the standard severities apply where no override is given.
+Any rule id from the rules table can be promoted or softened; the standard severities apply where no override is given. The drift ratchet is tuned the same way — `{ 'drift-relationship': 'error' }` forbids tolerated drift, `{ 'unused-drift': 'error' }` makes the ratchet hard — and `architectureRules({ driftTag })` renames the tag itself.
 
 ## AI-assisted providers (`fitc4/ai`)
 
 A separate entry point on purpose: nothing in `fitc4` imports it, the core gate stays deterministic, and composing an AI provider into a phase is an explicit act in your config file. The adapters shell out to **locally installed agent CLIs** — your own `claude` or `codex` install, login, and billing. FitC4 never holds an API key.
+
+`fitc4/ai` ships two tiers. This section is the standing contract for the **advisory validate providers** (`aiOwnershipAdvisor`, `aiSemanticReview`) and the exec layer they all share. The **fail-closed scan and resolve providers** (`aiScan`, `aiResolve`) are load-bearing — an absent scanner or resolver must not look like a clean run, so they throw into `provider-failure` instead of degrading — and are documented per provider in [`ai-providers.md`](ai-providers.md).
 
 ```ts
 import { defineConfig, defaultValidate } from 'fitc4'

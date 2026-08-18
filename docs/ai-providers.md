@@ -1,6 +1,6 @@
 # AI scan and resolve providers
 
-Two providers from `fitc4/ai` extend the gate into territory the deterministic providers cannot reach, under the same fail-closed discipline: `aiScan` observes model domains no parser covers, and `aiResolve` maps leftover observations onto model elements no `sources` prefix can claim. Both are prototyping tools first — see [Cost and nondeterminism](#cost-and-nondeterminism).
+Two providers from `fitc4/ai` extend the gate into territory the deterministic providers cannot reach, under the same fail-closed discipline: `aiScan` observes model domains no parser covers, and `aiResolve` maps leftover observations onto model elements no `sources` prefix can claim. Both are prototyping tools first — see [Cost and nondeterminism](#cost-and-nondeterminism). The provider contract they implement, the shared exec layer, and the *advisory* validate providers (`aiOwnershipAdvisor`, `aiSemanticReview`) are covered in [`providers.md`](providers.md).
 
 ## The `ai-scan` provider
 

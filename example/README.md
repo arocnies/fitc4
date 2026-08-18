@@ -67,6 +67,51 @@ npm run fitc4:ai -w example
 
 runs the same gate plus [`fitc4.ai.config.ts`](fitc4.ai.config.ts): the ownership advisor reads `src/util.ts` and suggests which element should own it — or says the model is missing one — and the semantic review judges each described component against its actual code. Without the CLI the run still passes and prints an `ai-unavailable` note instead. Delete `util.ts` when done.
 
+## Exercise 3: declare drift and burn it down
+
+Brownfield adoption in miniature. Recreate the Exercise 1 violation — `src/core/bad.ts` importing from Interface — but this time suppose it is legacy code you cannot delete today. Instead of hiding it, declare it.
+
+First, declare the tag at the top of the specification block in [`arch/model.c4`](arch/model.c4) (LikeC4 rejects undeclared tags):
+
+```
+specification {
+  tag drift
+
+  element system
+  element container
+  element component
+}
+```
+
+Then declare the relationship the code actually has, tagged as drift, alongside the existing one in the model block:
+
+```
+example.app.core -> example.app.interface 'legacy reach-around' {
+  #drift
+}
+```
+
+Rerun `npm run fitc4 -w example`. The Exercise 1 error is now an info finding, plus a burn-down line — exit 0:
+
+```text
+info (1)
+  drift-relationship  example.app.core → example.app.interface is declared drift; 1 dependency still rides it. Remove the code path, then delete the tagged relationship from the model.
+    src/core/bad.ts:1  ../interface/index.js
+
+drift: 1 declared · 1 exercised · 0 unused
+```
+
+The debt is permitted, counted, and visible as an edge in the diagram. Now pay it down: delete `src/core/bad.ts` and rerun. The edge flips to a warning demanding its own deletion:
+
+```text
+warning (1)
+  unused-drift  example.app.core → example.app.interface is declared drift, but no code exercises it anymore. Delete the relationship: the model must not keep tolerating what stopped happening.
+
+drift: 1 declared · 0 exercised · 1 unused
+```
+
+That is the ratchet: a drift edge the code stopped exercising cannot quietly stick around as latent permission. Delete the tagged relationship (and the `tag drift` line, since nothing else uses it) and the run is clean again. `severity: { 'unused-drift': 'error' }` in a `.ts` config makes the ratchet hard; `{ 'drift-relationship': 'error' }` forbids tolerated drift entirely.
+
 ## Layout
 
 ```text

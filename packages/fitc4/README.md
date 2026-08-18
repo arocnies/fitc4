@@ -1,8 +1,8 @@
 # FitC4
 
-Check an implementation against a LikeC4 architecture contract.
+Fit the code to the model: check an implementation against a LikeC4 architecture contract.
 
-A [LikeC4](https://likec4.dev) model says which components exist and which may depend on which. `fitc4` scans your TypeScript code, maps every file and import onto that model, and fails the build where the two disagree.
+A [LikeC4](https://likec4.dev) model is a user-defined contract — which components exist and which may depend on which. `fitc4` is the enforcement half of LikeC4: it scans your code, maps every file and import onto that model, and fails the build where the two disagree. TypeScript imports are the built-in evidence, not the limit of the contract — providers extend the same gate to anything observable about the implementation. Brownfield code adopts through [the drift ratchet](#the-drift-ratchet): declare the dependencies that really exist, tagged as drift, and burn them down — the model shows the debt, the report counts it. And agents are held to the same contract through the same CLI — see [For AI agents](#for-ai-agents).
 
 ## Setup
 
@@ -102,7 +102,9 @@ The module forms default-export the same fields (wrap them in `defineConfig` for
 | `orphaned-association` | error | A provider referenced an observation that does not exist |
 | `provider-failure` | error | A provider threw; other providers still ran |
 
-An element with no `sources` is legal — a grouping element, or a component implemented elsewhere. An unowned *file* is a finding; an unowned *element* is not. A relationship declared between two parents covers traffic between their descendants. Test files are excluded from the scan, by filename and by directory.
+An element with no `sources` is legal — a grouping element, or a component implemented elsewhere. An unowned *file* is a finding; an unowned *element* is not. Legal, but not invisible: one `unobserved-elements` info finding per run lists the leaf elements with neither `sources` nor `packages`, so deliberate abstraction stays visible rather than accidental. A relationship declared between two parents covers traffic between their descendants. Test files are excluded from the scan, by filename and by directory.
+
+Above five `unmapped-source` findings the report renders one grouped block — the total, a by-directory breakdown, the first ten paths — because a brownfield repository's unowned files are one adoption fact, not hundreds. `--json` is unchanged and keeps every finding.
 
 The severities above are defaults, not policy. In a `.ts` config:
 
@@ -111,6 +113,58 @@ validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
 ```
 
 promotes new unowned code from a nudge to a gate failure — worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. It also turns a typo'd `sources` metadata key loud: LikeC4 metadata is freeform, so `source` is silently valid and just leaves the element owning nothing.
+
+## The drift ratchet
+
+A brownfield codebase fails a truthful model on day one. The escape hatch is not a baseline file — it is the model: declare the dependencies that really exist and tag them as drift.
+
+```
+specification {
+  tag drift
+
+  element system
+  element container
+  element component
+}
+
+model {
+  // ... elements as above ...
+
+  acme.app.interface -> acme.app.core 'uses'
+
+  acme.app.core -> acme.app.interface 'legacy reach-around' {
+    #drift
+  }
+}
+```
+
+A drift-tagged relationship is a declared relationship, so the code it covers is permitted — but counted. Each exercised drift edge is one `drift-relationship` info finding, and the report carries a burn-down line:
+
+```text
+info (1)
+  drift-relationship  acme.app.core → acme.app.interface is declared drift;
+  1 dependency still rides it. Remove the code path, then delete the tagged
+  relationship from the model.
+
+drift: 1 declared · 1 exercised · 0 unused
+```
+
+When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. That deletion is the ratchet: tolerated debt can shrink, never quietly persist — and it lives in model text, visible in the diagram and reviewed in diffs, not in a generated baseline file. The tag is `drift` by default (`architectureRules({ driftTag })` changes it) and must be declared in the specification — LikeC4 rejects unknown tags. `severity: { 'drift-relationship': 'error' }` forbids tolerated drift entirely; `{ 'unused-drift': 'error' }` makes the ratchet hard.
+
+## Package claims
+
+`sources` covers code the repository owns; `packages` metadata claims the external packages an element stands for:
+
+```
+infra = component 'Infrastructure' {
+  metadata {
+    sources 'src/infra/**'
+    packages 'pg'
+  }
+}
+```
+
+A claim is an exact npm package name — `pg`, `@aws-sdk/client-s3`; string or array like `sources`; imports of any subpath map onto the claim. An import of a claimed package resolves onto the claiming element, and the standard relationship rules then judge the edge exactly like a file-to-file crossing — "only infra may import `pg`" is nothing more than the absence of a declared relationship from anywhere else. Unclaimed packages stay unrestricted, and the claims are fail-closed like `sources`: `invalid-packages`, `ambiguous-package`, and `unmatched-packages` are errors, never silent no-ops.
 
 ## As a library
 
@@ -153,6 +207,8 @@ export default defineConfig({
 
 The advisor makes zero calls on a clean repository; the review makes one call per described element (cached after the first run).
 
+The same entry point also ships `aiScan` and `aiResolve` — a scan provider driven by prose instructions (enforce model domains no parser covers: compose files, runbooks, OpenAPI) and a resolve provider that maps external and unresolvable dependencies onto model elements, including description-only ones like an external system. Unlike the advisory validate providers these are load-bearing, so they fail closed: any exec failure, off-schema reply, or hallucinated path is a `provider-failure` error, never a quietly thinner run. They are the prototyping path for new model domains — prose explores, and a proven domain graduates to a small deterministic provider. Details: [`docs/ai-providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/ai-providers.md).
+
 ## For AI agents
 
 FitC4's agent interface is the CLI itself: run it, read the report, fix what it names. Failing reports link back to the rules table above, and `--json` emits the full pipeline result — the `PipelineResult` type shipped in `dist/index.d.ts` — for structured consumption. FitC4 is the *enforcement* half of the ecosystem's AI story: for querying a LikeC4 model, LikeC4 ships an MCP server (`npx likec4 mcp`), and for writing the DSL there is the LikeC4 agent skill (`npx skills add https://likec4.dev/`).
@@ -177,4 +233,4 @@ The one norm an agent cannot infer from the CLI: **the model is the contract, an
 
 ## Links
 
-Source, issues, a full worked example, and the provider contract live in the [GitHub repository](https://github.com/arocnies/fitc4) — see [`example/`](https://github.com/arocnies/fitc4/tree/main/example) and [`docs/providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/providers.md).
+Source, issues, a full worked example, and the provider contract live in the [GitHub repository](https://github.com/arocnies/fitc4) — see [`example/`](https://github.com/arocnies/fitc4/tree/main/example) and [`docs/providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/providers.md). Checking JavaScript or mixed JS/TS projects? The companion package [`fitc4-dependency-cruiser`](https://www.npmjs.com/package/fitc4-dependency-cruiser) wraps dependency-cruiser as a scan provider — install both and compose it in config.

@@ -1,8 +1,13 @@
 # FitC4
 
-Check an implementation against a LikeC4 architecture contract.
+Fit the code to the model: check an implementation against a LikeC4 architecture contract.
 
-A LikeC4 model says which components exist and which may depend on which. `fitc4` scans the code, maps every file and import onto that model, and fails the build where the two disagree. The model is the source of truth; the code is the thing being checked.
+A [LikeC4](https://likec4.dev) model is a user-defined contract — which components exist and which may depend on which. FitC4 is the enforcement half of that: LikeC4 describes and renders the architecture, `fitc4` scans the code, maps every file and import onto the model, and fails the build where the two disagree. The model is the source of truth; the code is the thing being fitted to it. TypeScript imports are the built-in evidence, not the limit of the contract — providers extend the same gate to anything observable about the implementation.
+
+Two situations the design leans into:
+
+- **Brownfield code.** Declare the dependencies that really exist and tag them as drift: the model shows the debt as edges in the diagram, the report counts it down, and the ratchet only turns one way. See [the drift ratchet](#the-drift-ratchet).
+- **Agent-written code.** Agents are held to the same contract through the same CLI; they can extend the gate with providers; and the AI providers let them prototype new model domains that deterministic providers later graduate.
 
 ## A complete example
 
@@ -114,9 +119,66 @@ The model itself lives wherever `model` points. It is authored architecture docu
 | `orphaned-association` | error | A provider referenced an observation that does not exist |
 | `provider-failure` | error | A provider threw; other providers still ran |
 
-The last six exist so the gate cannot fail open. A typo in `sources` used to make every prefix stop matching, which turned architecture errors into a clean exit 0.
+Everything from `invalid-sources` down exists so the gate cannot fail open. A typo in `sources` used to make every prefix stop matching, which turned architecture errors into a clean exit 0.
 
 The severities are defaults, not policy: in a `.ts` config, `validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]` makes new unowned code fail the gate — worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. Every rule id in the table accepts an override.
+
+Above five `unmapped-source` findings the report renders one grouped block — the total, a by-directory breakdown, the first ten paths — because a brownfield repository's 450 unowned files are one adoption fact, not 450 separate ones. `--json` is unchanged and keeps every finding.
+
+## The drift ratchet
+
+A brownfield codebase fails a truthful model on day one. The escape hatch is not a baseline file — it is the model: declare the dependencies that really exist and tag them as drift.
+
+```
+specification {
+  tag drift
+
+  element system
+  element container
+  element component
+}
+
+model {
+  // ... elements as above ...
+
+  example.app.interface -> example.app.core 'uses'
+
+  example.app.core -> example.app.interface 'legacy reach-around' {
+    #drift
+  }
+}
+```
+
+A drift-tagged relationship is a declared relationship, so the code it covers is permitted — but counted. Each exercised drift edge is one `drift-relationship` info finding, and the report carries a burn-down line:
+
+```text
+info (1)
+  drift-relationship  example.app.core → example.app.interface is declared drift;
+  1 dependency still rides it. Remove the code path, then delete the tagged
+  relationship from the model.
+    src/core/bad.ts:1  ../interface/index.js
+
+drift: 1 declared · 1 exercised · 0 unused
+```
+
+When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. That deletion is the ratchet: tolerated debt can shrink, never quietly persist. And the debt lives in model text rather than machine state — every drift edge is visible in the diagram, added and removed in reviewable diffs, and the counts are recomputed from the code on every run, so there is no baseline file to regenerate or rubber-stamp.
+
+The tag is `drift` by default (`architectureRules({ driftTag })` changes it) and must be declared in the specification — LikeC4 rejects unknown tags. Two promotions tune the policy: `severity: { 'drift-relationship': 'error' }` forbids tolerated drift entirely; `{ 'unused-drift': 'error' }` makes the ratchet hard. [`example/README.md`](example/README.md) walks the full loop as Exercise 3.
+
+## Package claims
+
+`sources` covers code the repository owns; `packages` metadata claims the external packages an element stands for:
+
+```
+infra = component 'Infrastructure' {
+  metadata {
+    sources 'src/infra/**'
+    packages 'pg'
+  }
+}
+```
+
+A claim is an exact npm package name — `pg`, `@aws-sdk/client-s3`; string or array like `sources`; imports of any subpath map onto the claim. An import of a claimed package resolves onto the claiming element, and from there the standard relationship rules judge the edge exactly like a file-to-file crossing — "only infra may import `pg`" is nothing more than the absence of a declared relationship from anywhere else. Unclaimed packages stay unrestricted, and the claims are fail-closed like `sources`: a value that is not an exact package name (`invalid-packages`), a package claimed by two elements (`ambiguous-package`), or a claim no scanned file imports (`unmatched-packages`) is an error, never a silent no-op.
 
 ## The model
 
@@ -124,7 +186,7 @@ The severities are defaults, not policy: in a `.ts` config, `validate: [architec
 
 One trap sits outside the gate's reach: `sources` is a metadata key, and LikeC4 metadata is freeform, so a typo like `source` is silently valid — the element just owns nothing and its files surface as `unmapped-source` warnings. Promoting that rule to `error` is what turns the typo loud.
 
-An element with no `sources` is legal: a grouping element, or a component implemented elsewhere. **An unowned file is a finding; an unowned element is not.** A relationship declared between two parents covers traffic between their descendants, and an element never "crosses a boundary" into its own parent or child — LikeC4 refuses to declare parent-child relationships, so reporting those would leave no fix available.
+An element with no `sources` is legal: a grouping element, or a component implemented elsewhere. **An unowned file is a finding; an unowned element is not.** Legal, but not invisible: one `unobserved-elements` info finding per run lists the leaf elements with neither `sources` nor `packages`, so a deliberately abstract element — an external system, a person — stays visibly unenforced rather than accidentally so. A relationship declared between two parents covers traffic between their descendants, and an element never "crosses a boundary" into its own parent or child — LikeC4 refuses to declare parent-child relationships, so reporting those would leave no fix available.
 
 The scanner walks `scanRoots` on disk rather than a TypeScript `Program`'s file list, so a file nothing imports is still checked for ownership. A root that is missing, misspelled, or holds no TypeScript is an error rather than an empty pass. Test files are excluded, by filename and by directory.
 
@@ -143,7 +205,9 @@ expect(exitCodeFor(result)).toBe(0)
 
 Providers are plain functions — `ScanProvider`, `ResolveProvider`, `ValidateProvider` — composed into phase arrays. `pipelineConfig` is the batteries-included default; a caller wanting a different scanner builds its own `PipelineConfig` and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system.
 
-The `fitc4/ai` entry point adds AI-assisted validate providers over locally installed agent CLIs (`claude`, `codex`) — additive only, cached on their inputs, and never imported by the core. Each takes a `severity`: advisory by default, part of the gate when you choose `'error'`. Extending a phase spreads the defaults back in — `validate: [...defaultValidate, myProvider]` — and every report names the providers that composed each phase. See [`docs/providers.md`](docs/providers.md).
+The `fitc4/ai` entry point adds AI providers over locally installed agent CLIs (`claude`, `codex`) — cached on their inputs, and never imported by the core. They come in two tiers. The validate providers (ownership advice, semantic review) are advisory: additive findings, `severity` per provider, part of the gate only when you choose `'error'`. The scan and resolve providers (`aiScan`, `aiResolve`) are load-bearing and therefore fail closed — `aiScan` observes model domains no parser covers from prose instructions, `aiResolve` maps external and unresolvable dependencies onto elements the code cannot reach, including description-only ones, and any failure or off-schema reply is a `provider-failure` error rather than a quietly thinner run. They are also the prototyping path: prose explores a new domain, and a domain that proves out graduates to a small deterministic provider — same envelope, same rules. See [`docs/ai-providers.md`](docs/ai-providers.md).
+
+Extending a phase spreads the defaults back in — `validate: [...defaultValidate, myProvider]` — and every report names the providers that composed each phase. See [`docs/providers.md`](docs/providers.md) for the provider contract.
 
 ## The provider vocabulary
 
@@ -174,10 +238,13 @@ Kinds stay open: a provider may emit its own, and two that understand each other
 ## Developing
 
 ```text
-packages/fitc4/   the library and CLI
-example/           a project it checks
-docs/              design history
+packages/fitc4/                     the library and CLI
+packages/fitc4-dependency-cruiser/  companion package: dependency-cruiser as a scan provider
+example/                            a project it checks
+docs/                               the design of record and provider references
 ```
+
+`fitc4-dependency-cruiser` wraps dependency-cruiser's `cruise()` as a scan provider for JavaScript and mixed JS/TS projects. It is a separate npm package with its own [README](packages/fitc4-dependency-cruiser/README.md) so the `fitc4` core keeps zero runtime dependencies beyond TypeScript and LikeC4; consumers install both and compose it in config. It is also the template for further companion packages: the provider contract is the whole integration surface.
 
 ```bash
 npm install
@@ -202,4 +269,4 @@ FitC4 is also self-hosting: [`packages/fitc4/arch/model.c4`](packages/fitc4/arch
 
 The package is ready to publish but unpublished; `fitc4` is currently unregistered on npm.
 
-The design history is in [`docs/`](docs); [`POC-DESIGN-v4.md`](docs/POC-DESIGN-v4.md) is the design of record.
+[`docs/DESIGN.md`](docs/DESIGN.md) is the design of record; the proof-of-concept design history is preserved in [`docs/history/`](docs/history).

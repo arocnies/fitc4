@@ -1,3 +1,5 @@
+> **Historical design document**, superseded by [../DESIGN.md](../DESIGN.md); kept as the record of how the design evolved.
+
 # Architecture Control Proof of Concept — Version 4
 
 Status: implementation-ready amendment. This file is untracked.
