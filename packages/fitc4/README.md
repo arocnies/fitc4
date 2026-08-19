@@ -164,7 +164,7 @@ info (1)
 drift: 1 declared · 1 exercised · 0 unused
 ```
 
-When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. That deletion is the ratchet: tolerated debt can shrink, never quietly persist — and it lives in model text, visible in the diagram and reviewed in diffs, not in a generated baseline file. The ratchet turns on edges, not volumes: a drift relationship is one finding whether one import rides it or forty, so what can only shrink is the set of tolerated edges — the per-edge dependency count in the finding is informational, not gated. The tag is `drift` by default (`architectureRules({ driftTag })` changes it) and must be declared in the specification — LikeC4 rejects unknown tags. `severity: { 'drift-relationship': 'error' }` forbids tolerated drift entirely; `{ 'unused-drift': 'error' }` makes the ratchet hard.
+When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. That deletion is the ratchet: the set of tolerated edges can shrink, never quietly persist — and it lives in model text, visible in the diagram and reviewed in diffs, not in a generated baseline file. The edge is the unit: a drift relationship is one finding whether one import rides it or forty, so the dependency count it reports is informational, not gated. The tag is `drift` by default (`architectureRules({ driftTag })` changes it) and must be declared in the specification — LikeC4 rejects unknown tags. `severity: { 'drift-relationship': 'error' }` forbids tolerated drift entirely; `{ 'unused-drift': 'error' }` makes the ratchet hard.
 
 ## Package claims
 
