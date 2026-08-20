@@ -74,13 +74,20 @@ const AGENTS_TEMPLATE = `# Agent instructions
   LikeC4 architecture model. Exit 1 is an architecture violation, not a flaky
   tool.
 - A finding means the code and the contract disagree. Fixing the code is the
-  default. Editing the model is a design decision — legitimate when the
-  architecture genuinely changed, never merely to silence a finding — and any
-  model change must be called out explicitly when handing off.
+  default. Editing the model is a design decision. It is legitimate when the
+  architecture genuinely changed, never merely to silence a finding. Call out
+  any model change explicitly when handing off.
 - Never delete \`sources\` metadata or a declared relationship to make a finding
-  go away: that removes code from architecture control entirely.
+  go away. That removes code from architecture control entirely.
 - Rule reference: \`node_modules/fitc4/README.md#rules\`. Structured output:
   \`npx fitc4 --json\`.
+
+## Agent setup
+
+- Claude Code: the package ships a fitc4 skill. Install it with
+  \`mkdir -p .claude/skills && cp -R node_modules/fitc4/skills/fitc4 .claude/skills/fitc4\`
+- To query the architecture model while you work, register the LikeC4 MCP
+  server: \`claude mcp add likec4 -- npx likec4 mcp --stdio\`
 `
 
 export function init(directory: string): InitResult {
@@ -119,7 +126,7 @@ export function init(directory: string): InitResult {
   if (fs.existsSync(agentsPath)) {
     result.skipped.push(AGENTS_FILENAME)
     result.notes.push(
-      `AGENTS.md already exists — merge the fitc4 norms into it yourself: ` +
+      `AGENTS.md already exists. Merge the fitc4 norms into it yourself; ` +
         `the copy-paste block is at node_modules/fitc4/README.md#for-ai-agents`,
     )
   } else {
@@ -129,17 +136,21 @@ export function init(directory: string): InitResult {
 
   if (!fs.existsSync(path.join(target, 'tsconfig.json'))) {
     result.notes.push(
-      `no tsconfig.json here — create one, or point the config's 'tsconfig' at your real one`,
+      `no tsconfig.json here. Create one, or point the config's 'tsconfig' at your real one`,
     )
   }
   if (!fs.existsSync(path.join(target, 'src'))) {
-    result.notes.push(`scanRoots is ["src"] but src/ does not exist — create it or edit scanRoots`)
+    result.notes.push(`scanRoots is ["src"] but src/ does not exist. Create it or edit scanRoots`)
   }
 
-  // A pointer, not a copied file: .claude/ is the user's directory to curate.
+  // Commands, not copied files: .claude/ and the MCP registry are the user's to curate.
   result.notes.push(
-    `Claude Code users: the package ships a fitc4 skill — ` +
-      `copy node_modules/fitc4/skills/fitc4/ into .claude/skills/fitc4/`,
+    `Claude Code users: install the shipped fitc4 skill with ` +
+      `mkdir -p .claude/skills && cp -R node_modules/fitc4/skills/fitc4 .claude/skills/fitc4`,
+  )
+  result.notes.push(
+    `to let an agent query the architecture model while it works, register the ` +
+      `LikeC4 MCP server: claude mcp add likec4 -- npx likec4 mcp --stdio`,
   )
 
   return result

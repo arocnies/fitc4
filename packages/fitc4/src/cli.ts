@@ -114,7 +114,7 @@ function unknownArgument(what: string, argument: string, known: string[]): strin
   const suggestion = closestName(argument, known)
   return (
     `unknown ${what} '${argument}'` +
-    (suggestion === undefined ? '' : ` — did you mean '${suggestion}'?`)
+    (suggestion === undefined ? '' : `, did you mean '${suggestion}'?`)
   )
 }
 
@@ -125,8 +125,8 @@ function runInit(): void {
     ...result.skipped.map((file) => `kept ${file} (already exists)`),
     ...result.notes.map((note) => `note: ${note}`),
     '',
-    `Next: put your elements in arch/model.c4 — 'sources' says what each owns,`,
-    `'->' declares a permitted dependency — then run: npx fitc4`,
+    `Next: put your elements in arch/model.c4. 'sources' says what each owns,`,
+    `'->' declares a permitted dependency. Then run: npx fitc4`,
   ]
   process.stdout.write(`${lines.join('\n')}\n`)
 }

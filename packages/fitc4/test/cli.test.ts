@@ -103,7 +103,7 @@ describe('unknown arguments', () => {
     const { status, stderr, stdout } = runCli(['--josn'])
 
     expect(status).toBe(1)
-    expect(stderr).toContain("fitc4: unknown option '--josn' — did you mean '--json'?")
+    expect(stderr).toContain("fitc4: unknown option '--josn', did you mean '--json'?")
     expect(stdout).toBe('')
   })
 
@@ -119,7 +119,7 @@ describe('unknown arguments', () => {
     const { status, stderr, stdout } = runCli(['innit'])
 
     expect(status).toBe(1)
-    expect(stderr).toContain("fitc4: unknown command 'innit' — did you mean 'init'?")
+    expect(stderr).toContain("fitc4: unknown command 'innit', did you mean 'init'?")
     expect(stdout).toBe('')
   })
 })

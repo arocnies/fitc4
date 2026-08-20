@@ -36,6 +36,11 @@ describe('init', () => {
     // guessing a project's TypeScript setup wrong is worse than asking.
     expect(result.notes.join('\n')).toContain('tsconfig.json')
     expect(result.notes.join('\n')).toContain('src/')
+    // Agent setup ships as copy-paste commands, not prose.
+    expect(result.notes.join('\n')).toContain(
+      'mkdir -p .claude/skills && cp -R node_modules/fitc4/skills/fitc4 .claude/skills/fitc4',
+    )
+    expect(result.notes.join('\n')).toContain('claude mcp add likec4 -- npx likec4 mcp --stdio')
 
     const config = loadConfig(path.join(root, 'fitc4.config.json'))
     expect(config.scanRoots).toEqual(['src'])
@@ -90,6 +95,11 @@ describe('init', () => {
     // contract, never edited merely to make a finding go away.
     expect(content).toContain('never merely to silence a finding')
     expect(content).toContain('node_modules/fitc4/README.md#rules')
+    // And the setup commands an agent arriving after init can run itself.
+    expect(content).toContain(
+      'mkdir -p .claude/skills && cp -R node_modules/fitc4/skills/fitc4 .claude/skills/fitc4',
+    )
+    expect(content).toContain('claude mcp add likec4 -- npx likec4 mcp --stdio')
   })
 
   test('keeps an existing AGENTS.md untouched and points at the README block', () => {
