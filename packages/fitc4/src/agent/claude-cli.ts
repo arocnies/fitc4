@@ -3,8 +3,8 @@
  *
  * Runs `claude --print` as an isolated one-shot: no user or project settings
  * (`--setting-sources ''`), no MCP servers (`--strict-mcp-config` with none
- * configured), a replaced system prompt, and — unless the request is agentic —
- * no tools at all, so the reply can only come from the prefilled context.
+ * configured), a replaced system prompt, and no tools at all unless the
+ * request is agentic, so the reply can only come from the prefilled context.
  *
  * The model defaults to Haiku deliberately: extraction-shaped provider work is
  * high-volume and cheap-model-friendly, and a caller doing judgment-shaped
@@ -32,9 +32,9 @@ const SYSTEM_PROMPT =
 const READ_ONLY_TOOLS = 'Read,Grep,Glob'
 
 /**
- * The fixed surface the model sees beyond the request: SYSTEM_PROMPT, the
+ * The fixed setup the model sees beyond the request: SYSTEM_PROMPT, the
  * isolation flags, and the tool sets above. Bump when any of them changes, so
- * a response cache stops replaying replies recorded against the old surface.
+ * a response cache stops replaying replies recorded against the old setup.
  */
 const FINGERPRINT = 'claude-cli/system-prompt-v1/flags-v1'
 

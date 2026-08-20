@@ -5,13 +5,14 @@
  * contract: modules become `file` observations, module references become
  * `dependency` / `unresolved-dependency` observations, and each cruised root
  * becomes a `scan-root` coverage attestation. The adapter observes
- * implementation facts only — dependency-cruiser sees the code, the LikeC4
- * model judges it — so it emits no findings and knows nothing about the model.
+ * implementation facts only. dependency-cruiser sees the code and the LikeC4
+ * model judges it, so this adapter emits no findings and knows nothing about
+ * the model.
  *
  * The output mirrors the built-in `typescript-imports` scanner shape for
  * shape: repository-relative POSIX paths, the same observation kinds, the
  * same subject/target ref kinds, natural-key ids, and the same `external`
- * semantics — so the standard resolve and validate providers read this
+ * semantics, so the standard resolve and validate providers read this
  * scanner's output without knowing which scanner ran.
  */
 
@@ -35,7 +36,7 @@ export interface DependencyCruiserOptions {
   /**
    * Repository-relative directories to cruise.
    *
-   * Defaults to the whole scan context — the repository root. These bound
+   * Defaults to the whole scan context, meaning the repository root. These bound
    * what is under architecture control; they are deliberately not derived
    * from the model, because a file can only be reported as unowned if the
    * scanner looked at it in the first place.
@@ -67,7 +68,7 @@ function run(options: DependencyCruiserOptions): ScanProvider {
     const roots = options.roots ?? ['.']
 
     // A scan with no roots observes nothing, every violation disappears, and
-    // the run goes green — the exact fail-open this tool exists to prevent.
+    // the run goes green. That is the fail-open this tool exists to prevent.
     if (roots.length === 0) {
       throw new Error('no scan roots configured; there is nothing under architecture control')
     }
@@ -96,8 +97,8 @@ function run(options: DependencyCruiserOptions): ScanProvider {
       const covered = modules.filter((module) => isUnder(module.source, prefix))
 
       // dependency-cruiser returns an empty module list for a root with
-      // nothing it can parse — indistinguishable from a clean run, so it
-      // fails loudly instead, mirroring the built-in scanner.
+      // nothing it can parse, which is indistinguishable from a clean run, so
+      // it fails loudly instead, mirroring the built-in scanner.
       if (covered.length === 0) {
         throw new Error(`scan root '${root}' contains no modules`)
       }
@@ -224,7 +225,7 @@ async function cruiseRepository(
  * The modules that are this repository's own code.
  *
  * The cruise output also lists synthetic entries for everything the edges
- * point at — node_modules packages, core modules, unresolvable specifiers.
+ * point at: node_modules packages, core modules, unresolvable specifiers.
  * Those stay visible as dependency targets but are not files in scope for
  * ownership.
  */
@@ -304,7 +305,7 @@ function dependencyObservation(
     // is demonstrably not our code: a Node builtin, or a package declared in
     // a manifest between the importing file and the repository root. A broken
     // relative path, a tsconfig alias whose mapping is wrong, and a phantom
-    // package all get flagged instead — classifying them as external would
+    // package all get flagged instead. Classifying them as external would
     // silently drop the dependency from the architecture check.
     const external = isKnownExternal(
       specifier,
@@ -401,8 +402,8 @@ interface DeclaredPackageLookup {
 /**
  * Declared dependencies per directory, read lazily and cached for the run.
  *
- * Walks manifests rather than probing node_modules: a phantom dependency —
- * present on disk through hoisting but declared nowhere — is exactly what
+ * Walks manifests rather than probing node_modules. A phantom dependency,
+ * present on disk through hoisting but declared nowhere, is exactly what
  * must not pass as external.
  */
 function declaredPackageLookup(repositoryRoot: string): DeclaredPackageLookup {

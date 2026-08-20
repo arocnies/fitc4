@@ -2,14 +2,14 @@
  * Shared pieces of the agent validate providers.
  *
  * The contract that reconciles a nondeterministic model with a deterministic
- * gate: agent findings are additive — nothing here can suppress or rewrite a
- * deterministic finding — and each provider's `severity` option says how
+ * gate: agent findings are additive, so nothing here can suppress or rewrite a
+ * deterministic finding, and each provider's `severity` option says how
  * load-bearing its judgment is. The defaults are advisory; `'error'` is the
  * user's explicit act of making the agent part of the gate.
  *
  * Choosing `'error'` changes the failure semantics on purpose: a gating
  * provider whose CLI is missing, or whose inputs were truncated, must fail the
- * build — otherwise the gate passes exactly when its judge is absent, the
+ * build. Otherwise the gate passes exactly when its judge is absent, the
  * fail-open this tool exists to prevent. Advisory providers degrade to a
  * visible nudge instead.
  */
@@ -21,7 +21,7 @@ import type { Finding, LikeC4Model, Severity } from '../types.ts'
 /**
  * The one finding an agent provider emits when its exec fails.
  *
- * Advisory providers report a `warning` — a logged-out CLI must not fail the
+ * Advisory providers report a `warning`. A logged-out CLI must not fail the
  * build on behalf of a suggestion, but an enrichment that quietly stopped
  * running would look identical to a clean report. A gating provider escalates
  * to `error`: its absence is a hole in the gate, not a missing nicety.
@@ -43,8 +43,9 @@ export function agentUnavailable(
 }
 
 /**
- * Reported truncation — a silent cap would read as full coverage. Escalates
- * for a gating provider: inputs it never judged are inputs that bypassed it.
+ * Reported truncation, because a silent cap would read as full coverage.
+ * Escalates for a gating provider: inputs it never judged are inputs that
+ * bypassed it.
  */
 export function agentTruncated(
   provider: string,

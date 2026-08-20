@@ -1,8 +1,8 @@
 /**
  * Core domain objects for the architecture control pipeline.
  *
- * There are exactly three pipeline result objects — observation, association,
- * finding — and the LikeC4 model is the only architecture-model
+ * The pipeline has exactly three result objects: observation, association,
+ * finding. The LikeC4 model is the only architecture-model
  * representation. Nothing here duplicates a LikeC4 element or relationship,
  * so no copy can drift from `model.c4`.
  */
@@ -15,7 +15,7 @@ export type JsonObject = { [key: string]: JsonValue }
  * A reference to something the pipeline can talk about.
  *
  * `kind` is typed as `string` rather than `RefKind` because the vocabulary is
- * open by design — a provider may name things the standard set does not cover.
+ * open by design. A provider may name things the standard set does not cover.
  * The standard kinds, and what emitting them buys, are in `kinds.ts`.
  */
 export interface Ref {

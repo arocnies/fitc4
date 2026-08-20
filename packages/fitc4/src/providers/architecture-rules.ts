@@ -2,12 +2,12 @@
  * The `architecture-rules` validate provider.
  *
  * Every finding is expressed in terms of model elements, relationships, or
- * ownership — generic code smells are out of scope by design.
+ * ownership. Generic code smells are out of scope by design.
  *
  * This provider reads only `Association`'s own fields and the native model
  * from `ValidateContext`. It never reads another provider's `data`, so it works
  * against the contract rather than against one resolve provider's private
- * shape — any resolve provider that fills the contract feeds these rules.
+ * shape. Any resolve provider that fills the contract feeds these rules.
  */
 
 import { findingId } from '../ids.ts'
@@ -70,15 +70,15 @@ export interface ArchitectureRulesOptions {
    * Per-rule severity overrides.
    *
    * The standard severities assume adoption: new unowned code is a `warning`
-   * nudge, not a broken build. A team done adopting promotes it —
-   * `{ 'unmapped-source': 'error' }` — and unowned code then fails the gate
+   * nudge, not a broken build. A team done adopting promotes it with
+   * `{ 'unmapped-source': 'error' }`, and unowned code then fails the gate
    * instead of slipping past it, since dependencies from unowned files are
    * never boundary-checked. Softening works the same way during a migration.
    *
-   * The drift ratchet is tuned the same way: `{ 'drift-relationship': 'error' }`
-   * forbids all tolerated drift, `{ 'unused-drift': 'error' }` makes the
-   * ratchet hard — a drift edge the code stopped exercising fails the gate
-   * until it is deleted from the model.
+   * Declared drift is tuned the same way: `{ 'drift-relationship': 'error' }`
+   * forbids all tolerated drift, and `{ 'unused-drift': 'error' }` means a
+   * drift edge the code no longer exercises fails the gate until it is deleted
+   * from the model, so declared drift can only shrink.
    */
   severity?: Partial<Record<ArchitectureRuleId, Severity>>
   /**
@@ -87,7 +87,7 @@ export interface ArchitectureRulesOptions {
    * A relationship carrying this tag is permitted but counted: dependencies it
    * covers stay legal while the `drift-relationship` finding keeps the edge
    * visible in every report. The tag must be declared in the LikeC4
-   * specification (`tag drift`) — LikeC4 itself rejects unknown tags.
+   * specification (`tag drift`), since LikeC4 itself rejects unknown tags.
    */
   driftTag?: string
 }
@@ -96,8 +96,8 @@ export interface ArchitectureRulesOptions {
 type SeverityOf = (rule: ArchitectureRuleId, standard: Severity) => Severity
 
 /**
- * Returns a `NamedProvider`, ready to drop into a config's `validate` array —
- * the same shape the agent providers return, so
+ * Returns a `NamedProvider`, ready to drop into a config's `validate` array.
+ * It is the same shape the agent providers return, so
  * `validate: [architectureRules({ ... })]` works without a hand-built wrapper.
  */
 export function architectureRules(
@@ -188,13 +188,13 @@ class FindingCollector {
 }
 
 /**
- * The drift ratchet: model-native debt, tagged in the model and counted here.
+ * Declared drift: model-native debt, tagged in the model and counted here.
  *
  * A drift-tagged relationship is an ordinary declared relationship, so the
  * dependencies it covers are already permitted; this ledger only makes them
  * visible. Coverage is tested per drift edge rather than read from
  * `association.relationship`, so a dependency also covered by an untagged
- * relationship still counts as exercising the drift edge — the edge is only
+ * relationship still counts as exercising the drift edge. The edge is only
  * `unused-drift` when nothing it covers happens anymore.
  */
 class DriftLedger {
@@ -237,8 +237,8 @@ class DriftLedger {
 
   /**
    * One finding per drift edge: exercised edges at `info` (the burn-down),
-   * unused edges at `warning` (the ratchet's shrink mechanism — the code no
-   * longer does this, so the model must stop tolerating it).
+   * unused edges at `warning`. That warning is how the declared set shrinks.
+   * The code no longer does this, so the model must stop tolerating it.
    */
   findings(severityOf: SeverityOf): Finding[] {
     return [...this.#edges.values()].map(({ relationship, count, evidence }) => {
@@ -399,8 +399,8 @@ function unresolvedImportRule(
 /**
  * Ownership metadata that claims nothing.
  *
- * Without this the gate fails open: a typo in `sources` — a stray `./`, a glob
- * the prefix matcher cannot honour, a renamed directory — silently stops
+ * Without this the gate fails open. A typo in `sources`, a stray `./`, a glob
+ * the prefix matcher cannot honour, or a renamed directory silently stops
  * matching, every dependency becomes unresolvable, and the run goes green with
  * only warnings.
  */
@@ -434,8 +434,8 @@ function coverageRules(
   if (scanned.length === 0) return findings
 
   // Only judge ownership the scan actually covered. A component may own code
-  // outside the scan roots — the same legal state as an element with no
-  // `sources` at all — and reporting that would leave the author no fix but to
+  // outside the scan roots, the same legal state as an element with no
+  // `sources` at all, and reporting that would leave the author no fix but to
   // delete truthful metadata.
   const covered = all
     .filter((observation) => observation.kind === 'scan-root')
@@ -547,8 +547,8 @@ const UNOBSERVED_LIST_LIMIT = 10
 /**
  * Leaf elements nothing observes.
  *
- * An element with neither `sources` nor `packages` is legal — a person, an
- * external system, a pure-thought element — but silently unenforced, which is
+ * An element with neither `sources` nor `packages` is legal, as a person or an
+ * external system or a pure-thought element, but silently unenforced, which is
  * indistinguishable from a typo'd claim key. One `info` finding lists them so
  * the state is chosen, not accidental. A parent whose children carry the
  * claims is structural, not unobserved, so only leaves count.
@@ -590,8 +590,8 @@ function unobservedElementsRule(context: ValidateContext, severityOf: SeverityOf
  * Relationships the stable identifier scheme cannot tell apart.
  *
  * LikeC4 permits duplicate source/kind/target triples, which all collapse
- * onto one stable id, so the collision is surfaced instead of silently
- * dropped — only the first duplicate is ever referenced by findings.
+ * onto one stable id, so this rule reports the collision instead of dropping
+ * it silently. Only the first duplicate is ever referenced by findings.
  */
 function modelHygieneRules(
   declared: ReturnType<typeof declaredRelationships>,
@@ -614,10 +614,10 @@ function modelHygieneRules(
  *
  * Kinds are open on purpose, so an unrecognized kind is not an error. But a
  * scanner that emits `import` where these rules read `dependency` produces no
- * findings and a clean exit — the fail-open this gate exists to prevent, and
- * indistinguishable from a genuinely clean repository. One `info` per kind per
- * provider makes the mismatch visible without punishing providers that
- * legitimately speak to each other in private terms.
+ * findings and a clean exit. That is the fail-open this gate exists to
+ * prevent, and it is indistinguishable from a genuinely clean repository.
+ * One `info` per kind per provider makes the mismatch visible without
+ * punishing providers that legitimately speak to each other in private terms.
  */
 function vocabularyRules(context: ValidateContext, severityOf: SeverityOf): Finding[] {
   const counts = new Map<string, { provider: string; kind: string; count: number }>()

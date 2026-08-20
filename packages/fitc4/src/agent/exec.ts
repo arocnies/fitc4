@@ -1,9 +1,10 @@
 /**
  * The agent execution contract (`fitc4/agent`).
  *
- * An `AgentExec` adapts one locally installed agent CLI — the user's own install,
- * login, and billing — into a function providers can call. FitC4 never holds
- * an API key: authentication and model access belong entirely to the CLI.
+ * An `AgentExec` adapts one locally installed agent CLI into a function
+ * providers can call, on the user's own install, login, and billing. FitC4
+ * never holds an API key: authentication and model access belong entirely to
+ * the CLI.
  *
  * Two modes, one default. With `agentic` unset the tool gets no tools at all
  * and must answer from the prefilled context, which keeps a call cheap,
@@ -12,8 +13,9 @@
  *
  * A reply is a value, never an exception: adapters return `{ ok: false }` and
  * the calling provider decides what an unavailable CLI or malformed reply
- * means for its findings. Adapters do not retry — a retry is another billed call, and
- * whether one is worth it is the provider's judgment, not the transport's.
+ * means for its findings. Adapters do not retry. A retry is another billed
+ * call, and whether one is worth it is the provider's judgment, not the
+ * transport's.
  */
 
 import { spawn } from 'node:child_process'
@@ -43,7 +45,7 @@ export interface AgentExec {
   /** Stable identity for cache keys and finding provenance; includes the model. */
   id: string
   /**
-   * Names the fixed surface the model sees beyond the request itself — a
+   * Names the fixed setup the model sees beyond the request itself: a
    * baked-in system prompt, tool flags, isolation switches. A response cache
    * folds it into the key, so an adapter that changes what it puts in front of
    * the model bumps this string instead of replaying stale replies.
@@ -56,8 +58,8 @@ export interface AgentExec {
  * Compose the single input document an adapter feeds the CLI on stdin.
  *
  * Stdin rather than argv, because context routinely exceeds the argument-size
- * limit — and because one document makes the call reproducible: the same bytes
- * in are the cache key and the whole story of what the model saw.
+ * limit. One document also makes the call reproducible: the same bytes in are
+ * the cache key and the whole story of what the model saw.
  */
 export function composeInput(request: AgentRequest): string {
   const parts: string[] = []
@@ -79,7 +81,7 @@ export function composeInput(request: AgentRequest): string {
  *
  * Models fence and preface JSON no matter how firmly they are told not to, so
  * this strips a fence and, failing that, parses the outermost bracketed span.
- * `undefined` means no JSON was found — distinct from a parsed `null`.
+ * `undefined` means no JSON was found, which is distinct from a parsed `null`.
  */
 export function extractJson(text: string): JsonValue | undefined {
   const unfenced = text
@@ -113,7 +115,7 @@ export function finishReply(request: AgentRequest, text: string): AgentReply {
   }
 
   // Parsing is not conforming. A reply that is JSON but not the requested
-  // shape — `{}` where `matches` was required — would otherwise flow into a
+  // shape, say `{}` where `matches` was required, would otherwise flow into a
   // provider as a value, and a gating provider reading a missing field as
   // absence-of-problem is the gate passing exactly when its judge mumbled.
   const mismatch = schemaMismatch(value, request.schema)
@@ -126,8 +128,8 @@ export function finishReply(request: AgentRequest, text: string): AgentReply {
 /**
  * First structural mismatch between a value and a JSON Schema, or undefined.
  *
- * Deliberately a small hand-rolled subset — `type`, `properties`, `required`,
- * `items`, `enum` — matching what provider reply schemas actually use, rather
+ * Deliberately a small hand-rolled subset of `type`, `properties`, `required`,
+ * `items`, and `enum`, matching what provider reply schemas actually use, rather
  * than a schema-validator dependency. Keywords outside the subset are ignored,
  * so an exotic schema degrades to a laxer check, never a false rejection.
  */
@@ -250,8 +252,8 @@ function runProcess(
 }
 
 /**
- * Run an agent CLI and fold every transport-level failure — spawn error,
- * timeout, non-zero exit — into the adapters' shared `{ ok: false }` shape.
+ * Run an agent CLI and fold every transport-level failure into the adapters'
+ * shared `{ ok: false }` shape: spawn error, timeout, non-zero exit.
  * On success the caller still owns interpreting the output.
  */
 export async function runCliProcess(

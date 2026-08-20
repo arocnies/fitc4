@@ -3,8 +3,8 @@
  *
  * Runs `codex exec` isolated: ephemeral (no session state), user config and
  * rules ignored, sandbox locked to read-only. Codex has no tool-less mode, so
- * every call is effectively agentic-read-only — the prefilled context is still
- * the primary input, the sandbox is what bounds the exploring.
+ * every call is effectively agentic-read-only. The prefilled context is still
+ * the primary input, and the sandbox is what bounds the exploring.
  *
  * Codex enforces JSON replies natively through `--output-schema`, so a schema
  * request round-trips through a temp file instead of prompt discipline. The
@@ -33,10 +33,10 @@ export interface CodexCliOptions {
  *
  * The endpoint behind `--output-schema` demands, on every object node with
  * `properties`, both `additionalProperties: false` and a `required` array
- * naming EVERY property key — a schema with a genuinely optional property is
+ * naming EVERY property key. A schema with a genuinely optional property is
  * rejected outright (HTTP 400). Optionality therefore cannot be expressed by
  * omission: each originally-optional property becomes required-but-nullable,
- * in the forms strict mode accepts — `"type": [..., "null"]` for plain typed
+ * in the forms strict mode accepts, `"type": [..., "null"]` for plain typed
  * schemas, `anyOf` with `{ "type": "null" }` for structured ones (strict mode
  * does not accept every JSON Schema form). The model then answers
  * `"reason": null` where the plain schema would let it omit the key;
@@ -97,12 +97,12 @@ function nullable(schema: JsonValue): JsonValue {
  *
  * The model answers `"reason": null` where the original schema simply allows
  * the key to be absent, and the provider-side check (`schemaMismatch`) judges
- * the reply against that original schema — so null members on originally
+ * the reply against that original schema, so null members on originally
  * OPTIONAL keys are dropped, deeply, guided by the original schema.
  *
  * Assumption this rests on: FitC4 reply schemas never declare an optional
  * property as legitimately nullable, so on an optional key a null can only be
- * strict mode's encoding of omission — dropping it is safe. A null on a
+ * strict mode's encoding of omission, so dropping it is safe. A null on a
  * REQUIRED key is kept: it is either a legitimate value (the ownership
  * advisor's `element: ['string', 'null']`) or a model error the schema check
  * must fail visibly.
@@ -130,8 +130,8 @@ function withoutNullOptionals(value: JsonValue, schema: JsonValue): JsonValue {
 }
 
 /**
- * Strict mode's other structural demand: the root schema must be an object —
- * `type: "array"` at the root is rejected outright (HTTP 400). An array-rooted
+ * Strict mode's other structural demand: the root schema must be an object.
+ * A `type: "array"` at the root is rejected outright (HTTP 400). An array-rooted
  * request schema (agent-resolve's) therefore travels inside a one-key object
  * envelope on the wire, and the reply is unwrapped back to the array before it
  * meets the original schema. The envelope exists only between here and the
@@ -148,11 +148,11 @@ function envelope(schema: JsonObject): JsonObject {
 }
 
 /**
- * The fixed surface the model sees beyond the request: the isolation and
+ * The fixed setup the model sees beyond the request: the isolation and
  * sandbox flags above, plus the strictSchema transform (and, for array-rooted
- * schemas, the envelope) applied to a requested schema. Bump when the fixed
- * surface changes, so a response cache stops replaying replies recorded
- * against the old surface.
+ * schemas, the envelope) applied to a requested schema. Bump when that setup
+ * changes, so a response cache stops replaying replies recorded against the
+ * old one.
  */
 const FINGERPRINT = 'codex-cli/flags-v3'
 

@@ -2,9 +2,9 @@
  * Response caching for `AgentExec`.
  *
  * The cache is what reconciles an agent provider with a deterministic gate: the
- * key is everything the model saw — adapter identity (which carries the
- * model), the adapter's `fingerprint` (its fixed prompt-and-flags surface),
- * prompt, context, schema, agentic flag — so a rerun with unchanged inputs
+ * key is everything the model saw: adapter identity (which carries the
+ * model), the adapter's `fingerprint` (its fixed prompt and flags), prompt,
+ * context, schema, and the agentic flag. A rerun with unchanged inputs
  * replays the recorded reply, byte for byte and for free. Inputs only change
  * when the code or model they were built from changed.
  *
@@ -28,7 +28,7 @@ import type { JsonValue } from '../types.ts'
 export interface CacheOptions {
   /**
    * Cache directory. Default: `node_modules/.cache/fitc4-agent` under the
-   * working directory — inside an ignored tree, so nothing lands in git.
+   * working directory, inside an ignored tree, so nothing lands in git.
    */
   directory?: string
 }
@@ -57,7 +57,7 @@ export function cached(exec: AgentExec, options: CacheOptions = {}): AgentExec {
 
       // A hit is trusted no further than a live reply would be. A truncated
       // write, a hand-edited file, or an entry recorded before the schema
-      // changed shape would otherwise flow into a provider as `undefined` —
+      // changed shape would otherwise flow into a provider as `undefined`,
       // and a gating provider reading a missing field as absence-of-problem
       // is the gate passing exactly when its judge said nothing.
       const hit = readEntry(file)
@@ -81,7 +81,7 @@ export function cached(exec: AgentExec, options: CacheOptions = {}): AgentExec {
   }
 }
 
-/** A structurally sound cache entry, or undefined — a miss, however it broke. */
+/** A structurally sound cache entry, or undefined for a miss, however it broke. */
 function readEntry(file: string): { value: JsonValue; raw: string } | undefined {
   let parsed: unknown
   try {

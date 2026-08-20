@@ -3,14 +3,14 @@
  *
  * Maps observations the deterministic resolvers cannot map onto model
  * elements: dependencies on external packages, unresolvable specifiers,
- * implied links — anything whose target is not a file under a `sources`
- * prefix. This is what makes description-only "pure thought" elements — an
- * external system, a managed queue — reachable by the gate: the agent reads the
- * element catalog (title, description, ownership) and the leftover
+ * implied links, anything whose target is not a file under a `sources`
+ * prefix. This is what makes description-only "pure thought" elements
+ * reachable by the gate, an external system or a managed queue: the agent reads
+ * the element catalog (title, description, ownership) and the leftover
  * observations, and proposes `resolved` associations that the standard
  * relationship rules then judge like any other edge.
  *
- * Composition: used ALONGSIDE the default resolver, never instead of it —
+ * Composition: used ALONGSIDE the default resolver, never instead of it, as in
  * `resolve: [...defaultResolve, agentResolve({ exec })]`. Only observations
  * `source-root` cannot map are sent: `unresolved-dependency` observations and
  * `dependency` observations with a module/external target whose package no
@@ -21,8 +21,8 @@
  *
  * **Fail-closed, deliberately unlike the advisory validate providers.** A
  * resolver that silently fails produces fewer associations, which means fewer
- * checks, which looks like a clean run — the exact fail-open this project
- * exists to prevent. Any exec failure, off-schema reply, hallucinated
+ * checks, which looks like a clean run. That is the exact fail-open this
+ * project exists to prevent. Any exec failure, off-schema reply, hallucinated
  * `observationId`, or unknown `elementId` therefore THROWS, which the
  * pipeline reports as one `provider-failure` error finding attributed to this
  * provider. The core would catch a hallucinated observation id anyway
@@ -31,22 +31,22 @@
  *
  * An *unanswered* candidate is different: mapping zero, some, or all
  * candidates is a legitimate "I don't know", and an unmapped candidate simply
- * keeps its deterministic `unresolved` association — still visible through
+ * keeps its deterministic `unresolved` association, still visible through
  * the existing rules. Candidates beyond `maxObservations` are treated the
  * same way: truncation is announced in the context (so the model knows its
  * list is partial) and the rest stay unmapped, not failed.
  *
  * **Candidates are decisions, not import sites.** Twelve imports of `stripe`
- * from files owned by one element are one question — "which element does that
- * package belong to?" — so leftover observations collapse to distinct
+ * from files owned by one element are one question, "which element does that
+ * package belong to?", so leftover observations collapse to distinct
  * (owning-element, package-or-specifier) decisions, each with a stable
  * `candidateId` and a site count. The reply maps `candidateId → elementId`,
  * and an accepted mapping fans back out to one association per underlying
  * observation, so the standard rules still see every site. `maxObservations`
  * counts decisions.
  *
- * The prefilled context is deterministic — element catalog plus decision
- * listing — so the provider composes with `cached()` unchanged.
+ * The prefilled context is the element catalog plus the decision listing, both
+ * deterministic, so the provider composes with `cached()` unchanged.
  */
 
 import {
@@ -74,17 +74,17 @@ export const PROVIDER_ID = 'agent-resolve'
 export interface AgentResolveOptions {
   exec: AgentExec
   /**
-   * Optional mapping guidance in prose — e.g. "requests to payments.internal
-   * belong to the payments-gateway element".
+   * Optional mapping guidance in prose. For example: "requests to
+   * payments.internal belong to the payments-gateway element".
    */
   instructions?: string
   /** Suffix for the provider id: `agent-resolve:<id>` instead of `agent-resolve`. */
   id?: string
   /**
-   * Candidate *decisions* sent per run — distinct (owning-element, target)
-   * pairs, not import sites. The rest are announced as truncated in the
-   * context and stay unmapped — visible through the existing rules, not a
-   * failure.
+   * Candidate *decisions* sent per run, meaning distinct (owning-element,
+   * target) pairs, not import sites. The context announces the rest as
+   * truncated and they stay unmapped, visible through the existing rules, not
+   * a failure.
    */
   maxObservations?: number
 }
@@ -160,7 +160,7 @@ export function agentResolve(options: AgentResolveOptions): NamedProvider<Resolv
 
     for (const mapping of mappings) {
       // Hard hallucination guards. Ids the reply was never given, and elements
-      // the model does not contain, fail the provider visibly — dropping the
+      // the model does not contain, fail the provider visibly. Dropping the
       // entry would let the rest of an untrustworthy reply pass as clean.
       const decision = byCandidateId.get(mapping.candidateId)
       if (decision === undefined) {
@@ -214,7 +214,7 @@ export function agentResolve(options: AgentResolveOptions): NamedProvider<Resolv
 interface Decision {
   /** Stable id derived from the owner and the target key, never from sites. */
   candidateId: string
-  /** The unambiguous owner of every subject file — the associations' source end. */
+  /** The unambiguous owner of every subject file, the associations' source end. */
   sourceElementId: string
   /** The ref kind of the target ('module', or a provider's own kind). */
   targetKind: string
@@ -222,7 +222,7 @@ interface Decision {
   targetKey: string
   /** True when the key is a package name covering possibly-deeper specifiers. */
   packaged: boolean
-  /** Every underlying observation — the import sites this decision fans out to. */
+  /** Every underlying observation, the import sites this decision fans out to. */
   observations: Observation[]
 }
 
@@ -230,7 +230,7 @@ interface Decision {
  * The observations `source-root` cannot map, collapsed into distinct
  * decisions and sorted by `candidateId`.
  *
- * Recomputed per run from the same inputs `source-root` reads — providers
+ * Recomputed per run from the same inputs `source-root` reads. Providers
  * recompute rather than share state by design. A candidate observation is a
  * dependency whose target is not a repository file (external package,
  * unresolvable specifier), with a subject file owned by exactly one element:
@@ -269,7 +269,7 @@ function leftoverDecisions(context: ResolveContext): Decision[] {
 
     // A resolvable module target keys on its package: `stripe` and
     // `stripe/webhooks` are one decision. An unresolvable specifier keys on
-    // itself — `./missing.js` names no package.
+    // itself, since `./missing.js` names no package.
     const packaged = observation.kind === 'dependency' && observation.target.kind === 'module'
     const targetKey = packaged ? packageNameOf(observation.target.id) : observation.target.id
     const candidateId = `${owner}=>${targetKey}`

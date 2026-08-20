@@ -25,7 +25,7 @@ import type { NamedProvider, ResolveProvider, ValidateProvider } from './types.t
  * The default resolve and validate phases, ready to spread.
  *
  * Exported so a config that extends a phase writes
- * `validate: [...defaultValidate, myProvider]` — additive intent as additive
+ * `validate: [...defaultValidate, myProvider]`, additive intent as additive
  * code. Rebuilding the entries by hand works too, but forgetting to is the
  * config-file way to silently drop the standard rules, and a gate with no
  * rules passes everything. Scan has no array export because its provider is
@@ -43,7 +43,7 @@ export const defaultValidate: NamedProvider<ValidateProvider>[] = [architectureR
  * Compose the providers around a resolved config.
  *
  * A phase array present in the config replaces the defaults for that phase
- * entirely: present replaces, absent defaults — merge semantics are the
+ * entirely: present replaces, absent defaults. Merge semantics are the
  * user's job, in their config file, where they can see them.
  */
 export function pipelineConfig(config: ResolvedConfig): PipelineConfig {

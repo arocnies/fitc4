@@ -1,9 +1,9 @@
 /**
- * `fitc4 init` — scaffold a project into a first green run.
+ * `fitc4 init`: set a project up for a first green run.
  *
  * Drops the files a project needs: a `fitc4.config.json`, a starter
- * `arch/model.c4` whose single element owns `src/**` — so the very first
- * `npx fitc4` is green rather than a wall of unowned files — and an
+ * `arch/model.c4` whose single element owns `src/**`, so the very first
+ * `npx fitc4` is green rather than a wall of unowned files, and an
  * `AGENTS.md` carrying the one norm a coding agent cannot infer from the CLI:
  * the model is the contract, not a knob for silencing findings. The starter
  * model is a placeholder to split, not a suggestion of shape.
@@ -11,8 +11,8 @@
  * Never overwrites: an existing config is an error (running init twice is a
  * mistake worth stopping), an existing model file or AGENTS.md is kept with a
  * note (both are authored documentation, not this tool's property).
- * Prerequisites that cannot be scaffolded — a tsconfig, a source tree —
- * become notes rather than created files, because guessing a project's
+ * Prerequisites this command cannot create for you, a tsconfig or a source
+ * tree, become notes rather than created files, because guessing a project's
  * TypeScript setup wrong is worse than asking.
  */
 
@@ -86,7 +86,7 @@ const AGENTS_TEMPLATE = `# Agent instructions
 export function init(directory: string): InitResult {
   const target = path.resolve(directory)
 
-  // Only this directory blocks init — an ancestor's config governs a parent
+  // Only this directory blocks init. An ancestor's config governs a parent
   // project, and initializing a nested one under it is legitimate.
   for (const location of [target, path.join(target, CONFIG_DIRECTORY)]) {
     for (const name of CONFIG_FILENAMES) {

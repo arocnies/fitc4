@@ -2,20 +2,20 @@
  * The `agent-ownership-advisor` validate provider.
  *
  * For every file the resolve phase left unowned, ask the agent which existing
- * element should own it — or whether the model is missing an element. Pure
+ * element should own it, or whether the model is missing an element. Pure
  * enrichment of the deterministic `unmapped-source` warning: findings default
  * to `info`, the context is prefilled, and one batched call covers every
  * unowned file, so a clean repository costs zero agent calls.
  *
  * The context is a pack: the element catalog, then per file its import
- * NEIGHBORHOOD — what it imports and what imports it, each neighbor annotated
- * with its owning element — ahead of a short code-first excerpt. The
+ * NEIGHBORHOOD, meaning what it imports and what imports it with each neighbor
+ * annotated by its owning element, ahead of a short code-first excerpt. The
  * neighborhood is the fact ownership actually turns on (a file imported only
  * by `core` almost certainly belongs near `core`), and the pipeline already
  * knows it, so the excerpt can stay small.
  *
  * Suggestions naming an element that does not exist are reported as exactly
- * that — a hallucinated element must not read like a fix.
+ * that. A hallucinated element must not read like a fix.
  */
 
 import { findingId } from '../ids.ts'
@@ -42,16 +42,17 @@ export const PROVIDER_ID = 'agent-ownership-advisor'
 export interface OwnershipAdvisorOptions {
   exec: AgentExec
   /**
-   * The severity of this provider's suggestions — how load-bearing its
-   * judgment is. Default 'info' (advisory); 'error' makes it part of the
-   * gate, and an unavailable CLI or truncated input then fails the build.
+   * The severity of this provider's suggestions, which is to say how
+   * load-bearing its judgment is. Default 'info' (advisory); 'error' makes it
+   * part of the gate, and an unavailable CLI or truncated input then fails the
+   * build.
    */
   severity?: Severity
   /** Unowned files reviewed per run; the rest are reported as truncated. */
   maxFiles?: number
   /**
    * Characters of each file shown to the model, code-first. Small by
-   * default — the neighborhood lines carry the ownership signal, so the
+   * default, because the neighborhood lines carry the ownership signal and the
    * excerpt only needs to show what kind of code this is.
    */
   excerptChars?: number
@@ -137,7 +138,7 @@ export function agentOwnershipAdvisor(
     const knownElements = new Set<string>([...context.model.elements()].map((element) => element.id))
 
     for (const entry of suggestions(reply.value)) {
-      // Only files that were actually asked about, once each — the reply is
+      // Only files that were actually asked about, once each. The reply is
       // model output, not something the ids may be built from unchecked.
       if (!askedFor.has(entry.path) || answered.has(entry.path)) continue
       answered.add(entry.path)
@@ -156,9 +157,9 @@ export function agentOwnershipAdvisor(
       })
     }
 
-    // Advisory runs shrug off a lazy reply — the deterministic unmapped-source
-    // warning still stands for every file. A gating run must not: a file the
-    // judge never ruled on is a file that bypassed the gate.
+    // Advisory runs shrug off a lazy reply, since the deterministic
+    // unmapped-source warning still stands for every file. A gating run must
+    // not: a file the judge never ruled on is a file that bypassed the gate.
     const unanswered = sent.filter((filePath) => !answered.has(filePath))
     if (unanswered.length > 0 && severity === 'error') {
       findings.push(

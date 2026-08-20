@@ -1,5 +1,5 @@
 /**
- * `fitc4.config.{ts,js,json}` — the project-specific inputs.
+ * `fitc4.config.{ts,js,json}`: the project-specific inputs.
  *
  * The JSON form holds only what differs between repositories: where the code
  * is, where the model is, and which tsconfig describes module resolution. The
@@ -24,12 +24,12 @@ export const CONFIG_VERSION = 1
  *
  * Order matters only for the error message: two of these in one directory is
  * an error, never a precedence rule. A config that loses a silent tiebreak is
- * a config that is silently ignored — the same fail-open as a config that
+ * a config that is silently ignored, the same fail-open as a config that
  * quietly falls back to defaults.
  *
  * The `.mts`/`.mjs` forms exist for CommonJS packages: a `.ts`/`.js` config
  * loads as an ES module, which a `"type": "module"`-less project cannot
- * satisfy in-band any other way — and Node's own error for that case tells
+ * satisfy in-band any other way. Node's own error for that case tells
  * the author to use exactly these extensions.
  */
 export const CONFIG_FILENAMES = [
@@ -57,9 +57,9 @@ export interface FitC4Config {
  * What a `fitc4.config.ts` / `.js` module's default export must be.
  *
  * The same fields as the JSON config, plus optional provider phase arrays. A
- * phase array that is present replaces the defaults for that phase entirely —
- * see `pipelineConfig` — so a config that extends a phase names every provider
- * it wants, default entries included.
+ * phase array that is present replaces the defaults for that phase entirely.
+ * See `pipelineConfig`. A config that extends a phase therefore names every
+ * provider it wants, default entries included.
  */
 export interface FitC4FileConfig {
   /** Config format version. Always `1`; an unknown version is an error, not a silent default. */
@@ -74,7 +74,7 @@ export interface FitC4FileConfig {
   tsconfig: string
   /**
    * Replaces the default scan phase entirely. The default scanner is built
-   * from `tsconfig` and `scanRoots` — rebuild it with
+   * from `tsconfig` and `scanRoots`. Rebuild it with
    * `typescriptImports({ tsconfigPath, roots })` if you still want import
    * scanning alongside your own provider.
    */
@@ -131,7 +131,7 @@ export function loadConfig(configPath: string): FitC4Config {
  * Load any of the three config forms.
  *
  * A `.json` path behaves exactly like `loadConfig`. A `.ts` or `.js` path is
- * imported and its default export validated with the same strictness — the
+ * imported and its default export validated with the same strictness. The
  * module form does not get a laxer contract just because a compiler already
  * saw it, since nothing forces a config author to typecheck the file. Node
  * strips types natively at this package's engines floor, so importing a `.ts`
@@ -179,7 +179,7 @@ const MODULE_KEYS = ['scan', 'resolve', 'validate']
  * The validation shared by every config form.
  *
  * Deliberately strict and hand-written. A malformed config that quietly falls
- * back to defaults would scan the wrong tree and report a clean pass — the
+ * back to defaults would scan the wrong tree and report a clean pass, the
  * same fail-open the pipeline works hard to avoid everywhere else. Unknown
  * keys are rejected for the same reason: a typo'd `scanRoot` that is silently
  * ignored is a scan of the wrong tree with extra confidence.
@@ -241,7 +241,7 @@ function rejectUnknownKeys(
   }
 }
 
-/** The known name within edit distance 2, if any — enough for the typo case. */
+/** The known name within edit distance 2, if any. Enough for the typo case. */
 export function closestName(key: string, candidates: string[]): string | undefined {
   let best: { name: string; distance: number } | undefined
   for (const name of candidates) {
@@ -274,7 +274,7 @@ function editDistance(a: string, b: string): number {
 /**
  * An optional directory to tuck the config into.
  *
- * The config belongs at the project root, beside `tsconfig.json` — that is
+ * The config belongs at the project root, beside `tsconfig.json`. That is
  * where every other tool in this ecosystem keeps one, and where a reader looks.
  * This exists only for projects that would rather not add another root-level
  * file. It deliberately does not hold the model: `model.c4` is authored
@@ -290,7 +290,7 @@ export const CONFIG_DIRECTORY = '.fitc4'
  * project that hoists its config is never silently overruled by the copy it
  * left behind. Within one directory there is no such precedence: two config
  * files there is an error, because whichever lost a tiebreak would be
- * silently ignored — and an ignored config is a fail-open.
+ * silently ignored, and an ignored config is a fail-open.
  */
 export function findConfig(from: string): string {
   let directory = path.resolve(from)
@@ -334,7 +334,7 @@ function requireString(configPath: string, record: Record<string, unknown>, key:
  * Structural, not behavioral: `run` is checked to be a function, nothing
  * more. What it must return is the pipeline's contract, and the pipeline
  * already contains a misbehaving provider as an error finding. What cannot be
- * deferred is the shape — an entry with no `run` would only surface once the
+ * deferred is the shape. An entry with no `run` would only show up once the
  * pipeline tried to call it, blamed on the wrong layer.
  */
 function requireProviders<T>(
