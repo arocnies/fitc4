@@ -1,23 +1,23 @@
 # Agent scan and resolve providers
 
-Two providers from `fitc4/agent` extend the gate into territory the deterministic providers cannot reach, under the same fail-closed discipline: `agentScan` observes model domains no parser covers, and `agentResolve` maps leftover observations onto model elements no `sources` prefix can claim. Both are prototyping tools first — see [Cost and nondeterminism](#cost-and-nondeterminism). The provider contract they implement, the shared exec layer, and the *advisory* validate providers (`agentOwnershipAdvisor`, `agentSemanticReview`) are covered in [`providers.md`](providers.md); the context-pack layer they all prefill from is described in [Context packs](#context-packs) below.
+Two providers from `fitc4/agent` extend the gate to cases the deterministic providers cannot reach, under the same fail-closed discipline: `agentScan` observes model domains no parser covers, and `agentResolve` maps leftover observations onto model elements no `sources` prefix can claim. Both are prototyping tools first. See [Cost and nondeterminism](#cost-and-nondeterminism). [`providers.md`](providers.md) covers the provider contract they implement, the shared exec layer, and the *advisory* validate providers (`agentOwnershipAdvisor`, `agentSemanticReview`). [Context packs](#context-packs) below describes the layer they all prefill from.
 
 ## Context packs
 
-The pipeline knows far more than early versions of these providers sent: which files import which, who owns each neighbor, what each element declares and owns. The shared context-pack module (`buildGraph`, `fileNeighborhood`, `elementPack`, code-first excerpts, and a byte-budgeted assembler, all exported from `fitc4/agent`) turns that knowledge into deterministic prefilled context — pure functions over what a provider already receives, no persistence, no I/O beyond bounded excerpt reads.
+The pipeline knows far more than early versions of these providers sent: which files import which, who owns each neighbor, what each element declares and owns. The shared context-pack module (`buildGraph`, `fileNeighborhood`, `elementPack`, code-first excerpts, and a byte-budgeted assembler, all exported from `fitc4/agent`) turns that knowledge into deterministic prefilled context. These are pure functions over what a provider already receives, with no persistence and no I/O beyond bounded excerpt reads.
 
 What each provider prefills:
 
-- **`agentOwnershipAdvisor`** — per unowned file, its import *neighborhood* (what it imports and what imports it, each neighbor annotated with its owning element or `unowned`; module imports annotated with their claiming element or `unclaimed`) ahead of a short code-first excerpt (default 1,000 chars). The neighborhood is the fact ownership turns on, so the excerpt stays small.
-- **`agentSemanticReview`** — per element, its *facts* first: description, declared relationships, observed resolved element edges, and the **complete** owned-file list with the excerpted files marked, then code-first excerpts. The model knows what exists even when a file is not excerpted.
-- **`agentScan` with `focus`** — code-first excerpts of the matched files themselves; see [Focused one-shot scans](#focused-one-shot-scans).
-- **`agentResolve`** — the element catalog plus per-decision candidate lines (its context is a bespoke listing, not a pack; see below).
+- **`agentOwnershipAdvisor`** prefills, per unowned file, its import *neighborhood* (what it imports and what imports it, each neighbor annotated with its owning element or `unowned`; module imports annotated with their claiming element or `unclaimed`) ahead of a short code-first excerpt (default 1,000 chars). The neighborhood is the fact ownership turns on, so the excerpt stays small.
+- **`agentSemanticReview`** prefills, per element, its *facts* first: description, declared relationships, observed resolved element edges, and the **complete** owned-file list with the excerpted files marked. Code-first excerpts follow. The model knows what exists even when a file is not excerpted.
+- **`agentScan` with `focus`** prefills code-first excerpts of the matched files themselves. See [Focused one-shot scans](#focused-one-shot-scans).
+- **`agentResolve`** prefills the element catalog plus per-decision candidate lines. Its context is a purpose-built listing, not a pack; see below.
 
 The rules every pack obeys:
 
-- **A versioned header.** Every pack starts with a `context-pack v1` line, so the format's semantics are explicit in the `cached()` key — a change to what a pack means bumps the version instead of replaying replies recorded against the old shape.
-- **Truncation is always announced.** The assembler enforces a byte budget (48 KB by default) and writes an inline `NOTE: N <what> beyond budget not shown` whenever a count cap or the budget drops anything, so the model knows its view is partial. The validate providers additionally attest the same drops as `agent-truncated` findings, escalating to `error` when the provider gates.
-- **Code-first excerpts.** Excerpts deterministically skip a file's leading run of blank lines and C-family comments (never `#` lines, so markdown and YAML survive), and the skip is announced inline (`[code-first: skipped N leading comment lines]`). File heads in this repository measured 53–69% comment; the same budget now buys mostly code.
+- **A versioned header.** Every pack starts with a `context-pack v1` line, so the format's semantics are explicit in the `cached()` key. A change to what a pack means bumps the version instead of replaying replies recorded against the old shape.
+- **Truncation is always announced.** The assembler enforces a byte budget (48 KB by default) and writes an inline `NOTE: N <what> beyond budget not shown` whenever a count cap or the budget drops anything, so the model knows its view is partial. The validate providers also attest the same drops as `agent-truncated` findings, at `error` severity when the provider gates.
+- **Code-first excerpts.** Excerpts deterministically skip a file's leading run of blank lines and C-family comments (never `#` lines, so markdown and YAML survive) and announce the skip inline (`[code-first: skipped N leading comment lines]`). File heads in this repository measured 53–69% comment; the same budget now buys mostly code.
 
 ## The `agent-scan` provider
 
@@ -27,13 +27,13 @@ This is the prototyping story for new model domains: an agent (human or otherwis
 
 ### How it works
 
-- **Deterministic prefilled context.** The provider enumerates the files under `roots` (default: the repository root; bounded by `maxFiles`, default 300) and prefills the request with that listing plus the user's instructions. If the listing is truncated, the context says so — the model must know its map is partial. Because the context is a pure function of the repository and the options, the request composes with `cached()` unchanged: a rerun with unchanged inputs replays the recorded reply, free and identical.
-- **Read-only exploration.** The request sets `agentic: true`, so the exec layer permits read-only repository access (`claude` gets `Read,Grep,Glob`; `codex` runs in a read-only sandbox). The reply must still come back as a single JSON value matching the reply schema. `codexCli` satisfies OpenAI strict-mode schema rules transparently — every object key required, optionals rewritten as nullable and their explicit nulls stripped back out of the reply — so providers keep writing plain schemas.
-- **Standard observations out.** Replies carry observations (`kind`, `subject`, optional `target`, optional `evidence`) plus a required `examined: string[]` — the files the model actually read. Each examined path becomes a standard `scan-root` observation: the coverage attestation the rules use to know what the code sample was. Observation kinds outside the standard set are legal; the `unknown-observation-kind` rule reports them at `info` rather than dropping them.
+- **Deterministic prefilled context.** The provider enumerates the files under `roots` (default: the repository root; bounded by `maxFiles`, default 300) and prefills the request with that listing plus the user's instructions. If the listing is truncated, the context says so. The model must know its map is partial. Because the context is a pure function of the repository and the options, the request composes with `cached()` unchanged: a rerun with unchanged inputs replays the recorded reply, free and identical.
+- **Read-only exploration.** The request sets `agentic: true`, so the exec layer permits read-only repository access (`claude` gets `Read,Grep,Glob`; `codex` runs in a read-only sandbox). The reply must still come back as a single JSON value matching the reply schema. `codexCli` satisfies OpenAI strict-mode schema rules on its own, so providers keep writing plain schemas. It marks every object key required, rewrites optionals as nullable, and strips their explicit nulls back out of the reply.
+- **Standard observations out.** Replies carry observations (`kind`, `subject`, optional `target`, optional `evidence`) plus a required `examined: string[]`, the files the model actually read. Each examined path becomes a standard `scan-root` observation: the coverage attestation the rules use to know what the code sample was. Observation kinds outside the standard set are legal; the `unknown-observation-kind` rule reports them at `info` rather than dropping them.
 
 ### Focused one-shot scans
 
-`focus: string[]` switches the provider from exploring to prefilling. The globs match over the enumerated listing (`*` within a path segment, `**` across segments; a bare path matches itself or its directory subtree, the same prefix semantics as `sources`), the matched files are embedded as code-first excerpts (`excerptChars`, default 4,000), and the request drops `agentic` entirely — a one-shot call answered from the context alone.
+`focus: string[]` switches the provider from exploring to prefilling. The globs match over the enumerated listing (`*` within a path segment, `**` across segments; a bare path matches itself or its directory subtree, the same prefix semantics as `sources`). The provider embeds the matched files as code-first excerpts (`excerptChars`, default 4,000) and drops `agentic` from the request entirely. What is left is a one-shot call answered from the context alone.
 
 ```ts
 agentScan({
@@ -47,21 +47,21 @@ agentScan({
 
 Two things follow from prefilling:
 
-- **The cache key covers content.** In agentic mode the model may read file *contents* the listing does not carry, so an edit that changes no listed path can replay a stale cached reply. With `focus` the contents are in the request, so they are in the `cached()` key — an edit to a focused file invalidates the recorded reply. Use `focus` once you know which files matter; it is the honest cache story.
-- **Truncation is announced, absence is failure.** Matches beyond `maxFiles` or the pack's byte budget are announced inline (the one-shot model genuinely cannot see an unexcerpted file, and it must know that). A focus that matches nothing throws — a scan of zero files must not look like a clean domain.
+- **The cache key covers content.** In agentic mode the model may read file *contents* the listing does not carry, so an edit that changes no listed path can replay a stale cached reply. With `focus` the contents are in the request, so they are in the `cached()` key, and an edit to a focused file invalidates the recorded reply. Use `focus` once you know which files matter; it is the honest cache story.
+- **Truncation is announced, absence is failure.** Matches beyond `maxFiles` or the pack's byte budget are announced inline (the one-shot model genuinely cannot see an unexcerpted file, and it must know that). A focus that matches nothing throws. A scan of zero files must not look like a clean domain.
 
 Without `focus`, behavior is unchanged: listing plus `agentic: true` exploration.
 
 ### The fail-closed contract
 
-`agentScan` is deliberately stricter than the agent validate providers. Those are advisory enrichment — every deterministic finding still stands when they degrade to an `agent-unavailable` warning. A scanner is load-bearing: its observations *are* the coverage the rules judge, so an absent scanner must never look like a clean scan. Concretely, each of these **throws**, and the pipeline reports one `provider-failure` error finding attributed to the provider:
+`agentScan` is deliberately stricter than the agent validate providers. Those are advisory enrichment. Every deterministic finding still stands when they degrade to an `agent-unavailable` warning. A scanner is load-bearing: its observations *are* the coverage the rules judge, so an absent scanner must never look like a clean scan. Concretely, each of these **throws**, and the pipeline reports one `provider-failure` error finding attributed to the provider:
 
 - the exec fails (missing CLI, logged out, timeout, non-zero exit);
-- the reply is off-schema — parsing is not conforming;
-- `examined` is empty — a scan that read nothing observed nothing, and zero observations must not read as a clean domain;
+- the reply is off-schema, since parsing is not the same as conforming;
+- `examined` is empty, because a scan that read nothing observed nothing, and zero observations must not read as a clean domain;
 - any path in `subject`/`target`/`evidence`/`examined` is absolute, escapes the repository root, or does not exist on disk. A hallucinated path is a claim about code that is not there; it fails the run visibly rather than being silently dropped, because dropping it would let the rest of the reply pass as trustworthy.
 
-A failed provider contributes nothing — no half-scan — and the other providers still run.
+A failed provider contributes nothing, not even a half-scan. The other providers still run.
 
 ### A worked config
 
@@ -106,11 +106,11 @@ export default defineConfig({
 })
 ```
 
-Two instances coexist because `id` suffixes the provider id (`agent-scan:compose`, `agent-scan:docs`): the pipeline namespaces every observation id with the provider id it was composed under, so distinct suffixes are what keep two instances' attestations from colliding.
+Two instances coexist because `id` suffixes the provider id (`agent-scan:compose`, `agent-scan:docs`). The pipeline namespaces every observation id with the provider id it was composed under, so distinct suffixes keep two instances' attestations from colliding.
 
 ## The `agent-resolve` provider
 
-`agentResolve` is a resolve provider for the observations the deterministic resolvers cannot map: dependencies on external packages, unresolvable specifiers, implied links — anything whose target is not a file under a `sources` prefix. This is what makes description-only "pure thought" elements reachable by the gate. An external system or a managed queue has no source files to own, so no code edge ever resolves to it and nothing the code does to it is ever checked. `agentResolve` reads the element catalog (id, title, description, ownership) and the leftover observations, and proposes `resolved` associations — which the standard relationship rules then judge exactly like a deterministic edge: undeclared crossings become `missing-relationship` errors, declared ones pass.
+`agentResolve` is a resolve provider for the observations the deterministic resolvers cannot map, meaning anything whose target is not a file under a `sources` prefix: dependencies on external packages, unresolvable specifiers, implied links. This is what makes description-only "pure thought" elements reachable by the gate. An external system or a managed queue has no source files to own, so no code edge ever resolves to it and nothing the code does to it is ever checked. `agentResolve` reads the element catalog (id, title, description, ownership) and the leftover observations, and proposes `resolved` associations. The standard relationship rules then judge those exactly like a deterministic edge. Undeclared crossings become `missing-relationship` errors, declared ones pass.
 
 It is used **alongside** the default resolver, never instead of it:
 
@@ -139,50 +139,50 @@ export default defineConfig({
 
 ### The worked example
 
-Say the model declares a description-only `demo.external.payments` ('Third-party payments API') and the code contains `import Stripe from 'stripe'` in a file owned by `demo.app.core`. The TypeScript scanner emits a `dependency` observation with a module target; `source-root` can only mark it `unresolved` — an external package lives under no `sources` prefix. `agentResolve` sends the decision (with the element catalog) to the model, gets back `{ candidateId: 'demo.app.core=>stripe', elementId: 'demo.external.payments' }`, and emits a `resolved` association `demo.app.core → demo.external.payments` per underlying import site. If the model declares that relationship, the run passes; if not, the standard rules report `missing-relationship` — an edge that previously escaped the gate entirely is now judged by it.
+Say the model declares a description-only `demo.external.payments` ('Third-party payments API') and the code contains `import Stripe from 'stripe'` in a file owned by `demo.app.core`. The TypeScript scanner emits a `dependency` observation with a module target; `source-root` can only mark it `unresolved`, since an external package lives under no `sources` prefix. `agentResolve` sends the decision (with the element catalog) to the model, gets back `{ candidateId: 'demo.app.core=>stripe', elementId: 'demo.external.payments' }`, and emits a `resolved` association `demo.app.core → demo.external.payments` per underlying import site. If the model declares that relationship, the run passes; if not, the standard rules report `missing-relationship`. An edge that previously escaped the gate entirely is now judged by it.
 
 ### Leftover candidates are decisions, not import sites
 
-Only observations `source-root` cannot map are considered, recomputed per run from the same inputs it reads (providers recompute rather than share state by design):
+`agentResolve` considers only the observations `source-root` cannot map, recomputed per run from the same inputs it reads (providers recompute rather than share state by design):
 
-- `unresolved-dependency` observations, and `dependency` observations whose target is a module/external specifier — never dependencies with repository-file targets, which are `source-root`'s job, and never external dependencies whose package an element claims via `packages` metadata, which `source-root` already maps deterministically;
-- only where the subject file has exactly one owning element (longest `sources` prefix, mirroring `source-root`) — without an unambiguous owner there is no source end for a judgeable association.
+- `unresolved-dependency` observations, plus `dependency` observations whose target is a module or external specifier. Dependencies with repository-file targets never qualify, because those are `source-root`'s job, and neither do external dependencies whose package an element claims via `packages` metadata, which `source-root` already maps deterministically.
+- only where the subject file has exactly one owning element (longest `sources` prefix, mirroring `source-root`). Without an unambiguous owner there is no source end for a judgeable association.
 
-Those observations then collapse into distinct **decisions**: one candidate per (owning element, package-or-specifier) pair — twelve imports of `stripe` and `stripe/webhooks` from files owned by one element are one question, asked once. Each decision carries a stable `candidateId` (`owner=>package`), its site count, and the site locations; the reply maps `candidateId → elementId`, and an accepted mapping fans back out to one association per underlying observation, so the standard rules still judge every import site. Resolvable module targets key on their package (via `packageNameOf`); unresolvable specifiers key on themselves.
+Those observations then collapse into distinct **decisions**: one candidate per (owning element, package-or-specifier) pair. Twelve imports of `stripe` and `stripe/webhooks` from files owned by one element are one question, asked once. Each decision carries a stable `candidateId` (`owner=>package`), its site count, and the site locations. The reply maps `candidateId → elementId`, and an accepted mapping fans back out to one association per underlying observation, so the standard rules still judge every import site. Resolvable module targets key on their package (via `packageNameOf`); unresolvable specifiers key on themselves.
 
-Decisions beyond `maxObservations` (default 100 — it counts decisions) are announced as truncated in the context and simply stay unmapped — still visible through the existing rules (`unresolved-import`, and the absence of a declared edge), not a failure. The reply may likewise map zero, some, or all candidates: an omitted candidate is a legitimate "I don't know" and keeps its deterministic `unresolved` association.
+Decisions beyond `maxObservations` (default 100, and it counts decisions) are announced as truncated in the context and stay unmapped. That is not a failure. They remain visible through the existing rules, namely `unresolved-import` and the absence of a declared edge. The reply may likewise map zero, some, or all candidates. An omitted candidate is a legitimate "I don't know" and keeps its deterministic `unresolved` association.
 
 ### The fail-closed contract
 
-Same discipline as `agentScan`, same rationale stated the other way around: a resolver that silently fails produces fewer associations, which means fewer checks, which looks like a clean run — the exact fail-open the project exists to prevent. Each of these **throws**, becoming one `provider-failure` error finding:
+Same discipline as `agentScan`, same rationale stated the other way around: a resolver that silently fails produces fewer associations, which means fewer checks, which looks like a clean run. That is the exact fail-open the project exists to prevent. Each of these **throws**, becoming one `provider-failure` error finding:
 
-- the exec fails or the reply is off-schema — including a reply keyed on the old per-observation shape, which a stale cache entry or custom adapter might still speak;
+- the exec fails or the reply is off-schema, including a reply keyed on the old per-observation shape, which a stale cache entry or custom adapter might still speak;
 - the reply names a `candidateId` it was never given: a reply naming ids it never saw is untrustworthy in full, not per entry, and must not be salvaged by dropping the bad rows;
 - the reply names an `elementId` that does not exist in the model, or maps one decision twice.
 
-Accepted mappings carry provenance in each fanned-out association's `data` (`{ agent, candidateId, reason? }`), and the association's own fields — `source`, `target`, `relationship`, `status` — fill the standard envelope, so every validator works against the contract without knowing an agent was involved. The prefilled context (catalog + decisions) is deterministic, so `cached()` composes unchanged. Like `agentScan`, the `id` option suffixes the provider id (`agent-resolve:<id>`) so multiple instances with different instructions coexist.
+Accepted mappings carry provenance in each fanned-out association's `data` (`{ agent, candidateId, reason? }`). The association's own fields fill the standard envelope: `source`, `target`, `relationship`, `status`. Every validator therefore works against the contract without knowing an agent was involved. The prefilled context (catalog + decisions) is deterministic, so `cached()` composes unchanged. Like `agentScan`, the `id` option suffixes the provider id (`agent-resolve:<id>`) so multiple instances with different instructions coexist.
 
 ## Cost and nondeterminism
 
 Judgment about how load-bearing to make this belongs to the user, and the dials are the usual ones:
 
-- **Advisory-first prototyping.** New domains start cheap: private observation kinds surface as `info` findings (`unknown-observation-kind`), so a first draft of the instructions costs a visible nudge, not a broken build. Wire the domain into the model (ownership metadata, declared relationships, or a custom validate rule that reads your kinds) once the observations look right.
+- **Advisory-first prototyping.** New domains start cheap: the pipeline reports private observation kinds as `info` findings (`unknown-observation-kind`), so a first draft of the instructions costs a visible nudge, not a broken build. Wire the domain into the model (ownership metadata, declared relationships, or a custom validate rule that reads your kinds) once the observations look right.
 - **Trigger-driven calls.** `agentResolve` makes zero agent calls when there are no leftover candidates, matching the standing contract of the validate providers: a clean steady state costs nothing.
-- **`cached()` is the cost model.** Both providers' contexts are deterministic, so steady-state CI runs replay the recorded reply for free. A live call happens only when the instructions, the prefilled context, or the exec's fingerprint change. Note the boundary honestly: with `agentic: true` the model may read file *contents* the listing does not carry, so an edit that changes no listed path can replay a stale reply until the cache is cleared — acceptable for prototyping. `focus` closes that hole by putting the contents in the request (and therefore in the key), and is the intermediate step before a domain graduates.
-- **Decisions bound the resolve bill.** `agentResolve`'s call size scales with distinct (element, package) questions, not with import sites: adding the hundredth import of an already-offered package changes nothing the model sees, so the cached reply replays.
-- **Graduate proven domains.** Once a domain stabilizes — you know exactly which files matter and what shape the facts take — replace the `agentScan` instance with a small deterministic provider (a compose parser is an afternoon). Same envelope, same kinds, same resolve and validate phases; the report's provider line shows the swap. Prose is for exploring a domain, not for running one forever.
+- **`cached()` is the cost model.** Both providers' contexts are deterministic, so steady-state CI runs replay the recorded reply for free. A live call happens only when the instructions, the prefilled context, or the exec's fingerprint change. Note the boundary honestly: with `agentic: true` the model may read file *contents* the listing does not carry, so an edit that changes no listed path can replay a stale reply until the cache is cleared. For prototyping that is acceptable. `focus` closes that hole by putting the contents in the request (and therefore in the key), and is the intermediate step before a domain graduates.
+- **Decisions bound the resolve bill.** `agentResolve`'s call size scales with distinct (element, package) questions, not with import sites. Adding the hundredth import of an already-offered package changes nothing the model sees, so the cached reply replays.
+- **Graduate proven domains.** A domain stabilizes when you know exactly which files matter and what shape the facts take. At that point, replace the `agentScan` instance with a small deterministic provider (a compose parser is an afternoon). Same envelope, same kinds, same resolve and validate phases; the report's provider line shows the swap. Prose is for exploring a domain, not for running one forever.
 
 ## Evals
 
-[`evals/`](../evals/) at the repository root is the opt-in harness that measures these providers against fixtures with planted ground truth — `npm run eval` scores the recorded ideal-agent replies for free (and is the harness's own regression test), `npm run eval -- --exec claude` measures a live model on your own CLI and billing. It never runs in CI or under `npm test`. The fixtures double as checked-in end-to-end examples, and the `non-ts` fixture is the worked non-TypeScript `agentScan` example: a docker-compose domain, scanned in focused one-shot mode, judged by the stock deterministic rules. See [`evals/README.md`](../evals/README.md).
+[`evals/`](../evals/) at the repository root is the opt-in harness that measures these providers against fixtures with planted ground truth. `npm run eval` scores the recorded ideal-agent replies for free (and is the harness's own regression test), while `npm run eval -- --exec claude` measures a live model on your own CLI and billing. It never runs in CI or under `npm test`. The fixtures double as checked-in end-to-end examples, and the `non-ts` fixture is the worked non-TypeScript `agentScan` example: a docker-compose domain, scanned in focused one-shot mode, judged by the stock deterministic rules. See [`evals/README.md`](../evals/README.md).
 
 ## Design note: a code-graph provider fits the same seams
 
-A future code-graph-RAG-style provider — one that answers from a prebuilt symbol/call graph rather than raw file reads — needs nothing new from the plugin surface:
+A future code-graph-RAG-style provider, one that answers from a prebuilt symbol or call graph rather than raw file reads, needs nothing new from the plugin API:
 
-- **Same `AgentExec` + `agentic` exploration.** The exec contract already distinguishes "answer from the prefilled context" from "explore read-only"; a graph provider is just one that prefills better. Where `agentScan` prefills a file listing, a graph provider prefills the relevant graph slice — deterministic context extracted from an index, exactly like the listing is extracted from the filesystem.
-- **Same Observation envelope.** Graph-derived facts are `dependency` observations with `symbol` refs (the ref kind is already reserved in the vocabulary) and file/line evidence. Nothing downstream changes: resolve maps them onto the model, validate judges them, unknown kinds are reported.
-- **Same attestation contract.** `examined` generalizes cleanly: the graph provider attests to the index slices it consulted (files, or index shards named as paths), and an empty attestation fails the same way — a graph nobody consulted must not read as a clean graph.
+- **Same `AgentExec` + `agentic` exploration.** The exec contract already distinguishes "answer from the prefilled context" from "explore read-only"; a graph provider is just one that prefills better. Where `agentScan` prefills a file listing, a graph provider prefills the relevant graph slice. That slice is deterministic context extracted from an index, exactly like the listing is extracted from the filesystem.
+- **Same Observation envelope.** Graph-derived facts are `dependency` observations with `symbol` refs (the ref kind is already reserved in the vocabulary) and file/line evidence. Nothing downstream changes: resolve maps them onto the model, validate judges them, and the rules report unknown kinds.
+- **Same attestation contract.** `examined` generalizes: the graph provider attests to the index slices it consulted (files, or index shards named as paths), and an empty attestation fails the same way. A graph nobody consulted must not read as a clean graph.
 - **Same cache seam.** The graph index version belongs in the exec `fingerprint` or the prefilled context, so `cached()` keys on it and a rebuilt index invalidates replies recorded against the old one.
 
-The only genuinely new work is the index itself and the deterministic extraction step that turns it into context. The provider surface — `NamedProvider<ScanProvider>` / `NamedProvider<ResolveProvider>`, the fail-closed contract, natural-key ids, `scan-root` attestations, the association envelope `agentResolve` already fills — carries over unchanged. `agentResolve` is itself the proof for the resolve seam: a provider that maps graph-derived facts onto model elements needs nothing the plugin surface does not already have.
+The only genuinely new work is the index itself and the deterministic extraction step that turns it into context. Everything else carries over unchanged: `NamedProvider<ScanProvider>` and `NamedProvider<ResolveProvider>`, the fail-closed contract, natural-key ids, `scan-root` attestations, and the association envelope `agentResolve` already fills. `agentResolve` is itself the proof for the resolve seam. A provider that maps graph-derived facts onto model elements needs nothing the plugin API does not already have.
