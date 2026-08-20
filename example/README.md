@@ -2,8 +2,8 @@
 
 A minimal project under architecture control. Two components, one declared dependency:
 
-- `example.app.core` (`src/core/`) — business logic, depends on nothing.
-- `example.app.interface` (`src/interface/`) — the public surface, allowed to use Core (`interface -> core` in [`arch/model.c4`](arch/model.c4)).
+- `example.app.core` (`src/core/`) holds the business logic and depends on nothing.
+- `example.app.interface` (`src/interface/`) is the public API and may use Core (`interface -> core` in [`arch/model.c4`](arch/model.c4)).
 
 ## Run the check
 
@@ -11,7 +11,7 @@ A minimal project under architecture control. Two components, one declared depen
 npm run fitc4 -w example
 ```
 
-A clean pass looks like this — every file owned, every import inside a declared boundary:
+A clean pass looks like this, with every file owned and every import inside a declared boundary:
 
 ```text
 scan typescript-imports · resolve source-root · validate architecture-rules
@@ -22,7 +22,7 @@ A clean pass is the least interesting thing this tool does, so break it.
 
 ## Exercise 1: cross a boundary
 
-Create `src/core/bad.ts` — Core reaching into Interface, the reverse of what the model declares:
+Create `src/core/bad.ts`, where Core reaches into Interface, the reverse of what the model declares:
 
 ```ts
 import { status } from '../interface/index.js'
@@ -40,7 +40,7 @@ error (1)
     src/core/bad.ts:1  ../interface/index.js
 ```
 
-Two honest fixes: delete the import, or declare `example.app.core -> example.app.interface` in the model — at which point the diagram shows the cycle you just created, which is the point of keeping the model truthful. Delete `bad.ts` before moving on.
+Two honest fixes: delete the import, or declare `example.app.core -> example.app.interface` in the model. The diagram then shows the cycle you just created, which is the point of keeping the model truthful. Delete `bad.ts` before moving on.
 
 ## Exercise 2: add unowned code
 
@@ -57,7 +57,7 @@ warning (1)
   unmapped-source  src/util.ts is not owned by any model element.
 ```
 
-Still exit 0 — unowned code is a nudge by default, promotable to an error with `architectureRules({ severity: { 'unmapped-source': 'error' } })` in a `.ts` config.
+Still exit 0. Unowned code is a nudge by default, promotable to an error with `architectureRules({ severity: { 'unmapped-source': 'error' } })` in a `.ts` config.
 
 This is also the state where the agent variant has something to say. With a logged-in `claude` CLI:
 
@@ -65,11 +65,11 @@ This is also the state where the agent variant has something to say. With a logg
 npm run fitc4:agent -w example
 ```
 
-runs the same gate plus [`fitc4.agent.config.ts`](fitc4.agent.config.ts): the ownership advisor reads `src/util.ts` and suggests which element should own it — or says the model is missing one — and the semantic review judges each described component against its actual code. Without the CLI the run still passes and prints an `agent-unavailable` note instead. Delete `util.ts` when done.
+runs the same gate plus [`fitc4.agent.config.ts`](fitc4.agent.config.ts). The ownership advisor reads `src/util.ts` and suggests which element should own it, or says the model is missing one. The semantic review judges each described component against its actual code. Without the CLI the run still passes and prints an `agent-unavailable` note instead. Delete `util.ts` when done.
 
 ## Exercise 3: declare drift and burn it down
 
-Brownfield adoption in miniature. Recreate the Exercise 1 violation — `src/core/bad.ts` importing from Interface — but this time suppose it is legacy code you cannot delete today. Instead of hiding it, declare it.
+Brownfield adoption in miniature. Recreate the Exercise 1 violation, `src/core/bad.ts` importing from Interface. This time suppose it is legacy code you cannot delete today. Instead of hiding it, declare it.
 
 First, declare the tag at the top of the specification block in [`arch/model.c4`](arch/model.c4) (LikeC4 rejects undeclared tags):
 
@@ -91,7 +91,7 @@ example.app.core -> example.app.interface 'legacy reach-around' {
 }
 ```
 
-Rerun `npm run fitc4 -w example`. The Exercise 1 error is now an info finding, plus a burn-down line — exit 0:
+Rerun `npm run fitc4 -w example`. The Exercise 1 error is now an info finding, plus a burn-down line. Exit 0:
 
 ```text
 info (1)
@@ -101,7 +101,7 @@ info (1)
 drift: 1 declared · 1 exercised · 0 unused
 ```
 
-The debt is permitted, counted, and visible as an edge in the diagram. Now pay it down: delete `src/core/bad.ts` and rerun. The edge flips to a warning demanding its own deletion:
+The debt is permitted, counted, and visible as an edge in the diagram. Now pay it down. Delete `src/core/bad.ts` and rerun. The edge flips to a warning demanding its own deletion:
 
 ```text
 warning (1)
@@ -110,7 +110,7 @@ warning (1)
 drift: 1 declared · 0 exercised · 1 unused
 ```
 
-That is the ratchet: a drift edge the code stopped exercising cannot quietly stick around as latent permission. Delete the tagged relationship (and the `tag drift` line, since nothing else uses it) and the run is clean again. `severity: { 'unused-drift': 'error' }` in a `.ts` config makes the ratchet hard; `{ 'drift-relationship': 'error' }` forbids tolerated drift entirely.
+A drift edge the code stopped exercising has to go, or the model keeps permitting a dependency nothing needs. Delete the tagged relationship (and the `tag drift` line, since nothing else uses it) and the run is clean again. `severity: { 'unused-drift': 'error' }` in a `.ts` config makes that deletion mandatory. `{ 'drift-relationship': 'error' }` forbids tolerated drift entirely.
 
 ## Layout
 
@@ -122,6 +122,6 @@ AGENTS.md            norms for AI agents working here — the model is the contr
 src/                 the implementation being checked
 ```
 
-One workspace-ism to not copy: this example's `fitc4.config.json` points `$schema` into the workspace (`../packages/fitc4/schema/...`); in your own project point it at `./node_modules/fitc4/schema/fitc4.config.schema.json`.
+One workspace-ism to not copy: this example's `fitc4.config.json` points `$schema` into the workspace (`../packages/fitc4/schema/...`). In your own project point it at `./node_modules/fitc4/schema/fitc4.config.schema.json`.
 
 `npm run check -w example` chains model validation, typecheck, tests, and the gate. `npm run view -w example` opens the live LikeC4 diagram.
