@@ -88,7 +88,7 @@ export default defineConfig({
   tsconfig: 'tsconfig.json',
   // Present replaces: this array is the whole validate phase, so the default
   // rules come back in through the spread. Dropping the spread is how the
-  // standard rules are deliberately replaced — the report's provider line
+  // standard rules are deliberately replaced. The report's provider line
   // shows either way. scan and resolve are absent and keep their defaults.
   validate: [...defaultValidate, { id: PROVIDER_ID, run: importBudget }],
 })
@@ -101,7 +101,7 @@ The standard rules take per-rule severity overrides. `architectureRules()` with 
 ```ts
 import { architectureRules } from 'fitc4'
 
-// Once adoption is done, new unowned code should fail the gate — its
+// Once adoption is done, new unowned code should fail the gate. Its
 // dependencies are never boundary-checked while it stays unowned.
 validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
 ```

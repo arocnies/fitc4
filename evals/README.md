@@ -7,7 +7,7 @@ Nothing here runs in CI or in any package's test suite, ever. You invoke the har
 ```bash
 npm run eval                          # stub mode (default): free, deterministic, exact
 npm run eval -- --fixture greenfield  # one fixture
-npm run eval -- --exec claude         # live mode — read the cost note below first
+npm run eval -- --exec claude         # live mode, read the cost note below first
 npm run eval -- --exec codex          # live mode via the Codex CLI instead
 ```
 
@@ -67,8 +67,8 @@ First live measurements, 2026-08-18, one run per model over all four fixtures (1
 
 | exec · model | rows perfect | divergences |
 |---|---|---|
-| claude · sonnet | 12/12 | none — matched the ideal-agent expectations exactly |
-| codex · gpt-5.6-luna | 12/12 | none — matched exactly (after two codex-adapter fixes this run surfaced, see below) |
+| claude · sonnet | 12/12 | none, matched the ideal-agent expectations exactly |
+| codex · gpt-5.6-luna | 12/12 | none, matched exactly after two codex-adapter fixes this run surfaced, see below |
 | claude · haiku | 9/12 | two precision failures, zero misses: the semantic reviewer flagged the healthy `mono.ui` (brownfield), and exploration emitted a reversed `alerts → worker` edge the deterministic rules correctly rejected (exploratory, one extra on two rows) |
 
 Two readings worth keeping. First, every divergence measured so far is an **extra, never a miss**. Cheap models over-report rather than under-report, and for a gate that is the right failure direction. An extra surfaces for a human to dismiss, a miss would be silence. Second, the harness paid for itself on its first live outing. The codex path's first real execution found two adapter bugs. OpenAI strict mode demands every property be `required`, so optionals now travel as required-but-nullable and are stripped on reply. It also rejects array-rooted schemas, which now travel in an object envelope. Both bugs were invisible to stub mode by design; both failed closed as `provider-failure` errors rather than thinning the run silently.
