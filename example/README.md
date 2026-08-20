@@ -59,7 +59,7 @@ warning (1)
 
 Still exit 0. Unowned code is a nudge by default, promotable to an error with `architectureRules({ severity: { 'unmapped-source': 'error' } })` in a `.ts` config.
 
-This is also the state where the agent variant has something to say. With a logged-in `claude` CLI:
+This is the state where the agent variant has something to say. With a logged-in `claude` CLI:
 
 ```bash
 npm run fitc4:agent -w example

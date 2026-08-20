@@ -7,7 +7,7 @@ A [LikeC4](https://likec4.dev) model is a user-defined contract. It says which c
 Two situations the design leans into:
 
 - **Brownfield code.** Declare the dependencies that really exist and tag them as drift. The model shows the debt as edges in the diagram, the report counts it down, and declared drift can only shrink. See [tolerated drift](#tolerated-drift).
-- **Agent-written code.** Agents are held to the same contract through the same CLI, and they can extend the gate with providers. The agent providers also let them prototype new model domains that graduate to deterministic providers later.
+- **Agent-written code.** Agents are held to the same contract through the same CLI, and they can extend the gate with providers. The agent providers let them prototype new model domains that graduate to deterministic providers later.
 
 ## A complete example
 
@@ -85,7 +85,7 @@ scan typescript-imports · resolve source-root · validate architecture-rules
 
 Exit code 1. `--json` emits the full result instead of the report; `--config <path>` overrides discovery.
 
-The example also carries [`fitc4.agent.config.ts`](example/fitc4.agent.config.ts), the same gate plus the `fitc4/agent` advisory providers, run on demand with `npm run fitc4:agent -w example`. A non-discovery filename plus `--config` is the pattern for keeping an agent-assisted variant beside the deterministic one CI runs. Under it, an unowned file gets the standard `unmapped-source` warning *and* an agent `ownership-suggestion` naming the element that should own it, or saying the model is missing one. The agent also reviews each described element's implementation against its description. Requires a logged-in `claude` CLI; without one the run still passes and reports `agent-unavailable`.
+The example also carries [`fitc4.agent.config.ts`](example/fitc4.agent.config.ts), the same gate plus the `fitc4/agent` advisory providers, run on demand with `npm run fitc4:agent -w example`. A non-discovery filename plus `--config` is the pattern for keeping an agent-assisted variant beside the deterministic one CI runs. Under it, an unowned file gets the standard `unmapped-source` warning *and* an agent `ownership-suggestion` naming the element that should own it, or saying the model is missing one. The agent reviews each described element's implementation against its description. Requires a logged-in `claude` CLI; without one the run still passes and reports `agent-unavailable`.
 
 Agents get the same treatment as humans: the CLI is the interface, failing reports link the rule reference, and `--json` emits the typed `PipelineResult`. What an agent cannot infer is the norm that the model is the contract. So the [npm README](packages/fitc4/README.md#for-ai-agents) ships a copy-paste `AGENTS.md` block for repositories where agents work, and [`example/AGENTS.md`](example/AGENTS.md) is the checked-in version. For querying and authoring the model itself, LikeC4 ships an MCP server (`npx likec4 mcp`) and an agent skill. FitC4 is the enforcement half, and ships the matching enforcement-side Claude Code skill at [`packages/fitc4/skills/fitc4/`](packages/fitc4/skills/fitc4) (`node_modules/fitc4/skills/fitc4/` when installed).
 
@@ -161,7 +161,7 @@ info (1)
 drift: 1 declared · 1 exercised · 0 unused
 ```
 
-When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. A drift edge the code no longer exercises must be deleted, so declared drift can only shrink. Tolerated debt cannot quietly persist. The debt also lives in model text rather than machine state. Every drift edge is visible in the diagram, added and removed in reviewable diffs, and every run recomputes the counts from the code, so there is no baseline file to regenerate or rubber-stamp.
+When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. A drift edge the code no longer exercises must be deleted, so declared drift can only shrink. Tolerated debt cannot quietly persist. The debt lives in model text rather than machine state. Every drift edge is visible in the diagram, added and removed in reviewable diffs, and every run recomputes the counts from the code, so there is no baseline file to regenerate or rubber-stamp.
 
 The tag is `drift` by default (`architectureRules({ driftTag })` changes it) and must be declared in the specification, since LikeC4 rejects unknown tags. Two promotions tune the policy. `severity: { 'drift-relationship': 'error' }` forbids tolerated drift entirely; `{ 'unused-drift': 'error' }` makes a dead drift edge fail the build until someone deletes it. [`example/README.md`](example/README.md) walks the full loop as Exercise 3.
 
@@ -205,7 +205,7 @@ expect(exitCodeFor(result)).toBe(0)
 
 Providers are plain functions composed into phase arrays: `ScanProvider`, `ResolveProvider`, `ValidateProvider`. `pipelineConfig` is the batteries-included default; a caller wanting a different scanner builds its own `PipelineConfig` and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system.
 
-The `fitc4/agent` entry point adds agent providers over locally installed agent CLIs (`claude`, `codex`). They cache on their inputs, and the core never imports them. They come in two tiers. The validate providers (ownership advice, semantic review) are advisory: additive findings, `severity` per provider, part of the gate only when you choose `'error'`. The scan and resolve providers (`agentScan`, `agentResolve`) are load-bearing and therefore fail closed. `agentScan` observes model domains no parser covers from prose instructions. `agentResolve` maps external and unresolvable dependencies onto elements the code cannot reach, including description-only ones. Any failure or off-schema reply is a `provider-failure` error rather than a quietly thinner run. They are also the prototyping path: prose explores a new domain, and a domain that proves out graduates to a small deterministic provider, same envelope and same rules. See [`docs/agent-providers.md`](docs/agent-providers.md). The agent providers are measured, not just tested. [`evals/`](evals) runs four fixture projects with planted ground truth, scored against expected findings: greenfield, brownfield with tolerated drift, a docker-compose model domain no TypeScript parser sees (the worked non-TS `agentScan` example), and an exploratory markdown-runbook domain where the agent walks the repository itself. The default is a free stub mode; `npm run eval -- --exec claude` runs them against a real agent CLI.
+The `fitc4/agent` entry point adds agent providers over locally installed agent CLIs (`claude`, `codex`). They cache on their inputs, and the core never imports them. They come in two tiers. The validate providers (ownership advice, semantic review) are advisory: additive findings, `severity` per provider, part of the gate only when you choose `'error'`. The scan and resolve providers (`agentScan`, `agentResolve`) are load-bearing and therefore fail closed. `agentScan` observes model domains no parser covers from prose instructions. `agentResolve` maps external and unresolvable dependencies onto elements the code cannot reach, including description-only ones. Any failure or off-schema reply is a `provider-failure` error rather than a quietly thinner run. They are the prototyping path: prose explores a new domain, and a domain that proves out graduates to a small deterministic provider, same envelope and same rules. See [`docs/agent-providers.md`](docs/agent-providers.md). The agent providers are measured, not just tested. [`evals/`](evals) runs four fixture projects with planted ground truth, scored against expected findings: greenfield, brownfield with tolerated drift, a docker-compose model domain no TypeScript parser sees (the worked non-TS `agentScan` example), and an exploratory markdown-runbook domain where the agent walks the repository itself. The default is a free stub mode; `npm run eval -- --exec claude` runs them against a real agent CLI.
 
 Extending a phase spreads the defaults back in, as in `validate: [...defaultValidate, myProvider]`. Every report names the providers that composed each phase. See [`docs/providers.md`](docs/providers.md) for the provider contract.
 
@@ -245,7 +245,7 @@ evals/                              agent-provider evals: four fixtures with pla
 docs/                               the design of record and provider references
 ```
 
-`fitc4-dependency-cruiser` wraps dependency-cruiser's `cruise()` as a scan provider for JavaScript and mixed JS/TS projects. It is a separate npm package with its own [README](packages/fitc4-dependency-cruiser/README.md) so the `fitc4` core keeps zero runtime dependencies beyond TypeScript and LikeC4; consumers install both and compose it in config. It is also the template for further companion packages: the provider contract is all there is to integrate against.
+`fitc4-dependency-cruiser` wraps dependency-cruiser's `cruise()` as a scan provider for JavaScript and mixed JS/TS projects. It is a separate npm package with its own [README](packages/fitc4-dependency-cruiser/README.md) so the `fitc4` core keeps zero runtime dependencies beyond TypeScript and LikeC4; consumers install both and compose it in config. It is the template for any further companion packages: the provider contract is all there is to integrate against.
 
 ```bash
 npm install
@@ -260,7 +260,7 @@ npm run smoke               # pack the tarball, install it into a fresh consumer
 
 `fitc4` tests its own pipeline against fixture repositories in `packages/fitc4/test/fixtures/`, each a miniature project with its own `model.c4` and `tsconfig.json`. It assumes nothing about how a host project tests itself.
 
-FitC4 is also self-hosting: [`packages/fitc4/arch/model.c4`](packages/fitc4/arch/model.c4) models its own source, and `check` runs the built CLI against it. CI runs `verify` and `smoke` on Linux, node 22 and 26. Windows is untested. Paths are POSIX-normalized throughout, but no Windows leg runs until there's a Windows consumer to justify it.
+FitC4 is self-hosting: [`packages/fitc4/arch/model.c4`](packages/fitc4/arch/model.c4) models its own source, and `check` runs the built CLI against it. CI runs `verify` and `smoke` on Linux, node 22 and 26. Windows is untested. Paths are POSIX-normalized throughout, but no Windows leg runs until there's a Windows consumer to justify it.
 
 ## Toolchain notes
 
