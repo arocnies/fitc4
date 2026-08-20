@@ -2,8 +2,8 @@
  * The `agent-scan` scan provider.
  *
  * Lets a user enforce model domains the TypeScript scanner cannot see: docs,
- * configs, infra files, anything a user can describe in prose. The
- * user writes instructions, the agent explores the repository read-only
+ * configs, infra files, anything. The user writes instructions describing in
+ * prose what to observe, the agent explores the repository read-only
  * (`agentic: true`), and its observations feed the same deterministic resolve
  * and validate phases as any other scanner's. The prefilled context is only
  * the instructions plus a bounded file listing, so it is deterministic and
@@ -12,11 +12,10 @@
  * With `focus`, the provider prefills instead of exploring: the files the
  * globs match are embedded as code-first excerpts and the request drops
  * `agentic` entirely. What is left is a one-shot call answered from the
- * context alone.
- * Prefilling also closes the agentic mode's cache-staleness hole: file
- * *contents* enter the request, so they enter the `cached()` key, and an
- * edit to a focused file invalidates the recorded reply instead of replaying
- * a stale one. Exploration only ever keyed on the listing.
+ * context alone. Prefilling also closes the agentic mode's cache-staleness
+ * hole: file *contents* enter the request, so they enter the `cached()` key,
+ * and an edit to a focused file invalidates the recorded reply instead of
+ * replaying a stale one. Exploration only ever keyed on the listing.
  *
  * **Fail-closed, deliberately stricter than the advisory validate providers.**
  * The agent validate providers degrade to a visible `agent-unavailable` finding
