@@ -12,14 +12,15 @@ and import onto that model, and fails where the two disagree.
 
 ## Run the gate
 
-- `npx fitc4` — report to stdout; exits 1 when any finding has severity
+- `npx fitc4` reports to stdout and exits 1 when any finding has severity
   `error`.
-- `npx fitc4 --json` — the full structured result instead of the report
+- `npx fitc4 --json` prints the full structured result instead of the report
   (the `PipelineResult` type in `node_modules/fitc4/dist/index.d.ts`).
-- `npx fitc4 --config <path>` — use a specific config instead of discovery.
-- `npx fitc4 init` — scaffold a project that has no model yet: a config, a
-  starter `arch/model.c4` whose one element owns `src/**` (so the first run
-  is green), and an `AGENTS.md` with the norms below. Never overwrites.
+- `npx fitc4 --config <path>` uses a specific config instead of discovery.
+- `npx fitc4 init` scaffolds a project that has no model yet. It writes a
+  config, a starter `arch/model.c4` whose one element owns `src/**` so the
+  first run is green, and an `AGENTS.md` carrying the norms below. It never
+  overwrites an existing file.
 
 Run the gate before handing off changes. Exit 1 is an architecture violation,
 not a flaky tool.
@@ -40,28 +41,28 @@ Every finding carries a rule id and a severity:
 - **info** is counted, not blocking: exercised drift (`drift-relationship`),
   elements nothing checks (`unobserved-elements`).
 
-Severities are project-tunable, so trust the severity in the run you are
+Projects can tune severities, so trust the severity in the run you are
 reading over the defaults above. Full rule reference:
 `node_modules/fitc4/README.md#rules`.
 
 ## Fix the code, not the contract
 
 A finding means the code and the contract disagree, and fixing the code is
-the default path:
+the default:
 
 - `missing-relationship` / `relationship-direction`: remove or reroute the
   offending import so the dependency flows the way the model declares.
-- `unmapped-source`: new code needs an owner — put the file under a directory
+- `unmapped-source`: new code needs an owner. Put the file under a directory
   an element's `sources` already covers, or extend the right element's
   `sources` (assigning ownership of new code is normal, not silencing).
 
 Editing the model is a design decision, legitimate only when the architecture
-genuinely changed — a new component, a dependency the design now accepts.
-Call any model change out explicitly when handing off. Never:
+genuinely changed, like a new component or a dependency the design now
+accepts. Call any model change out explicitly when handing off. Never:
 
 - edit the model merely to make a finding go away;
-- delete `sources` metadata or a declared relationship to silence a finding —
-  that removes code from architecture control entirely;
+- delete `sources` metadata or a declared relationship to silence a finding,
+  which removes code from architecture control entirely;
 - add a `#drift` tag to get a new dependency past the gate (see below).
 
 ## Drift etiquette
@@ -72,7 +73,7 @@ report counts the debt down.
 
 - Each exercised drift edge is one `drift-relationship` info finding; the
   fix is deleting the offending code path, then the tagged relationship.
-- An `unused-drift` warning means no code exercises the edge anymore — the
+- An `unused-drift` warning means no code exercises the edge anymore. The
   only fix is deleting the stale relationship from the model, never
   resurrecting code to keep it.
 - Never add a drift tag to pass the gate. Drift declares debt that already
@@ -82,6 +83,6 @@ report counts the debt down.
 
 `packages` metadata on an element claims exact npm package names (`pg`,
 `@aws-sdk/client-s3`); imports of a claimed package resolve onto the claiming
-element and are boundary-checked like any file dependency. An error on a
-claimed package import means route the code through the claiming element —
-not delete the claim.
+element, and fitc4 checks them against boundaries like any file dependency.
+An error on a claimed package import means route the code
+through the claiming element, not delete the claim.
