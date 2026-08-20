@@ -148,11 +148,11 @@ function envelope(schema: JsonObject): JsonObject {
 }
 
 /**
- * The fixed surface the model sees beyond the request: the isolation and
+ * The fixed setup the model sees beyond the request: the isolation and
  * sandbox flags above, plus the strictSchema transform (and, for array-rooted
- * schemas, the envelope) applied to a requested schema. Bump when the fixed
- * surface changes, so a response cache stops replaying replies recorded
- * against the old surface.
+ * schemas, the envelope) applied to a requested schema. Bump when that setup
+ * changes, so a response cache stops replaying replies recorded against the
+ * old one.
  */
 const FINGERPRINT = 'codex-cli/flags-v3'
 

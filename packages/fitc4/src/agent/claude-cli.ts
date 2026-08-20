@@ -32,9 +32,9 @@ const SYSTEM_PROMPT =
 const READ_ONLY_TOOLS = 'Read,Grep,Glob'
 
 /**
- * The fixed surface the model sees beyond the request: SYSTEM_PROMPT, the
+ * The fixed setup the model sees beyond the request: SYSTEM_PROMPT, the
  * isolation flags, and the tool sets above. Bump when any of them changes, so
- * a response cache stops replaying replies recorded against the old surface.
+ * a response cache stops replaying replies recorded against the old setup.
  */
 const FINGERPRINT = 'claude-cli/system-prompt-v1/flags-v1'
 
