@@ -8,7 +8,7 @@
  * Coverage comes from walking the roots on disk, not from a `Program`'s file
  * list. A `Program` seeded from tsconfig contains only included files plus
  * whatever they transitively import, so a file nobody imports would never be
- * observed — and therefore never reported as unowned. Coverage must not depend
+ * observed, and therefore never reported as unowned. Coverage must not depend
  * on import reachability.
  *
  * This depends on `typescript@6`: TypeScript 7 does not expose the classic
@@ -58,7 +58,7 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
     const observations: Observation[] = []
 
     // A scan root that does not exist, or holds no source, silently reduces
-    // coverage to nothing — every violation disappears and the run goes green.
+    // coverage to nothing. Every violation disappears and the run goes green.
     // This is the same fail-open as unmatched ownership metadata, on the other
     // side of the comparison, so it fails just as loudly.
     if (options.roots.length === 0) {
@@ -232,7 +232,7 @@ export function moduleReferences(sourceFile: ts.SourceFile): ModuleReference[] {
   return references
 }
 
-/** `import.meta.resolve(...)` — a module reference the call-expression checks miss. */
+/** `import.meta.resolve(...)`, a module reference the call-expression checks miss. */
 function isImportMetaResolve(expression: ts.Expression): boolean {
   if (!ts.isPropertyAccessExpression(expression)) return false
   if (expression.name.text !== 'resolve') return false
@@ -272,8 +272,8 @@ function dependencyObservation(
     // A specifier that resolves to nothing is only safely "external" when it
     // is demonstrably not our code: a Node builtin, or a package this
     // repository declares. A broken relative path, a tsconfig alias whose
-    // mapping is wrong, and an undeclared package all get flagged instead —
-    // classifying them as external would silently drop the dependency from
+    // mapping is wrong, and an undeclared package all get flagged instead.
+    // Classifying them as external would silently drop the dependency from
     // the architecture check.
     const external = isKnownExternal(
       reference.specifier,
@@ -384,8 +384,8 @@ interface DeclaredPackageLookup {
 /**
  * Declared dependencies per directory, read lazily and cached for the run.
  *
- * Walks manifests rather than probing node_modules: a phantom dependency —
- * present on disk through hoisting but declared nowhere — is exactly what must
+ * Walks manifests rather than probing node_modules. A phantom dependency,
+ * present on disk through hoisting but declared nowhere, is exactly what must
  * not pass as external.
  */
 function declaredPackageLookup(repositoryRoot: string): DeclaredPackageLookup {

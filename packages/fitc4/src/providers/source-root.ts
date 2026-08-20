@@ -5,7 +5,7 @@
  * Longest matching prefix wins; a tie is genuine ambiguity in the model.
  *
  * Everything a validator needs is expressed through `Association`'s own
- * fields — `source`, `target`, `relationship`, `candidates`, `status`. Nothing
+ * fields: `source`, `target`, `relationship`, `candidates`, `status`. Nothing
  * is passed through `data`, because a validator must work against the
  * `Association` contract rather than against this provider's private shape.
  */
@@ -71,7 +71,7 @@ export type Ownership =
  * Find the owning element of a repository-relative path.
  *
  * Longest prefix wins, so a nested element takes precedence over its parent.
- * Two equally long matches are ambiguous — the model, not the file, is at
+ * Two equally long matches are ambiguous, and the model, not the file, is at
  * fault.
  */
 export function ownerOf(filePath: string, prefixes: OwnershipPrefix[]): Ownership {
@@ -154,7 +154,7 @@ function dependencyAssociation(
 
   // A module target may still map onto the model: an element can claim an
   // external package via `packages` metadata. Only demonstrably external
-  // dependencies qualify — an unresolvable specifier already gets its own
+  // dependencies qualify. An unresolvable specifier already gets its own
   // `unresolved-import` finding, and resolving it here would silently bless a
   // broken import as a checked model edge.
   if (observation.kind === 'dependency' && observation.target?.kind === 'module') {
@@ -221,8 +221,8 @@ function dependencyAssociation(
  * Map an external dependency onto the element claiming its package.
  *
  * From here on the association is indistinguishable from a file-to-file
- * crossing — same statuses, same `relationship` lookup — so the standard rules
- * judge the edge with no package-specific rule code.
+ * crossing, with the same statuses and the same `relationship` lookup, so the
+ * standard rules judge the edge with no package-specific rule code.
  */
 function packageAssociation(
   base: { id: string; observationId: string; provider: string },
