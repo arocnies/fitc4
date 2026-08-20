@@ -1,17 +1,18 @@
 /**
  * The `agent-scan` scan provider.
  *
- * Lets a user enforce model domains the TypeScript scanner cannot see — docs,
- * configs, infra files, anything — by describing in prose what to observe. The
+ * Lets a user enforce model domains the TypeScript scanner cannot see: docs,
+ * configs, infra files, anything a user can describe in prose. The
  * user writes instructions, the agent explores the repository read-only
  * (`agentic: true`), and its observations feed the same deterministic resolve
- * and validate phases as any other scanner's. The prefilled context is
- * deterministic — the instructions plus a bounded file listing — so `cached()`
- * replays a rerun with unchanged inputs byte for byte.
+ * and validate phases as any other scanner's. The prefilled context is only
+ * the instructions plus a bounded file listing, so it is deterministic and
+ * `cached()` replays a rerun with unchanged inputs byte for byte.
  *
  * With `focus`, the provider prefills instead of exploring: the files the
  * globs match are embedded as code-first excerpts and the request drops
- * `agentic` entirely — a one-shot call answered from the context alone.
+ * `agentic` entirely. What is left is a one-shot call answered from the
+ * context alone.
  * Prefilling also closes the agentic mode's cache-staleness hole: file
  * *contents* enter the request, so they enter the `cached()` key, and an
  * edit to a focused file invalidates the recorded reply instead of replaying
@@ -20,15 +21,15 @@
  * **Fail-closed, deliberately stricter than the advisory validate providers.**
  * The agent validate providers degrade to a visible `agent-unavailable` finding
  * because their judgment is an enrichment: every deterministic finding still
- * stands without them. A scanner is load-bearing — its observations are the
- * coverage the rules judge — so an absent scanner must never look like a clean
+ * stands without them. A scanner is load-bearing. Its observations are the
+ * coverage the rules judge, so an absent scanner must never look like a clean
  * scan. Any exec failure, off-schema reply, hallucinated path, or empty
  * `examined` attestation therefore THROWS, which the pipeline reports as one
  * `provider-failure` error finding attributed to this provider.
  *
  * Coverage attestation: the reply's required `examined` array names the files
  * the model actually read, and each becomes a standard `scan-root`
- * observation. An empty `examined` is a failure, not a pass — a scan that
+ * observation. An empty `examined` is a failure, not a pass. A scan that
  * read nothing observed nothing, and zero observations must not read as a
  * clean domain.
  */
@@ -46,14 +47,14 @@ export const PROVIDER_ID = 'agent-scan'
 export interface AgentScanOptions {
   exec: AgentExec
   /**
-   * What to observe, in prose — e.g. "read docker-compose.yml and emit a
-   * dependency observation for each service-to-service link".
+   * What to observe, in prose. For example: "read docker-compose.yml and emit
+   * a dependency observation for each service-to-service link".
    */
   instructions: string
   /**
    * Repository-relative directories whose files are listed in the prefilled
    * context. Default: the repository root. These bound the listing, not the
-   * exploration — the model may still read any repository file it names in
+   * exploration. The model may still read any repository file it names in
    * `examined`.
    */
   roots?: string[]
@@ -62,7 +63,7 @@ export interface AgentScanOptions {
    *
    * The pipeline namespaces every observation id with the provider id it was
    * composed under, so two instances with different instructions coexist only
-   * when their provider ids differ — give each instance its own `id`.
+   * when their provider ids differ. Give each instance its own `id`.
    */
   id?: string
   /** Files listed in the context; a longer listing is announced as truncated. */
@@ -71,11 +72,11 @@ export interface AgentScanOptions {
    * Focus globs over the enumerated listing (`*` within a path segment,
    * `**` across segments; a bare path matches itself or its directory
    * subtree, like a `sources` prefix). When set, the matched files are
-   * embedded as code-first excerpts and the request is one-shot — no
+   * embedded as code-first excerpts and the request is one-shot, with no
    * `agentic` exploration. Because the file CONTENTS are then part of the
    * request, they are part of the `cached()` key too, which closes the
    * agentic mode's staleness hole: an edit to a focused file invalidates the
-   * recorded reply. A focus that matches nothing fails loudly — a scan of
+   * recorded reply. A focus that matches nothing fails loudly. A scan of
    * zero files must not look like a clean domain. Matches beyond `maxFiles`
    * or the byte budget are announced in the context as not shown.
    */
@@ -160,7 +161,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
 
     // Two shapes of request. Without `focus`: the listing plus read-only
     // exploration, unchanged. With `focus`: the matched files' contents are
-    // embedded and the call is one-shot — no `agentic` flag at all — so the
+    // embedded and the call is one-shot with no `agentic` flag at all, so the
     // reply can only come from the prefilled context, and the contents are in
     // the `cached()` key.
     const request =
@@ -260,8 +261,8 @@ interface ReplyObservation {
 /**
  * Convert one reply entry into a standard `Observation`.
  *
- * Kinds outside the standard set are legal — the `unknown-observation-kind`
- * rule reports them at info — but every path must survive the hallucination
+ * Kinds outside the standard set are legal, and the `unknown-observation-kind`
+ * rule reports them at info. But every path must survive the hallucination
  * guard: repo-relative, inside the repository, present on disk. A nonexistent
  * path fails the provider (visible), never gets silently dropped.
  */
@@ -319,7 +320,7 @@ type PathGuard = (candidate: string, where: string) => string
 /**
  * The hallucination guard: normalize a model-reported path and verify it is
  * repository-relative, does not escape the repository root, and exists on
- * disk. Anything else throws — a path that fails the guard is a claim about
+ * disk. Anything else throws. A path that fails the guard is a claim about
  * code that is not there, and dropping it silently would let the rest of the
  * reply pass as trustworthy.
  */
@@ -368,8 +369,8 @@ function composeContext(
  * The focused, one-shot context: instructions plus code-first excerpts of the
  * files the focus globs match, assembled as a context pack.
  *
- * A focus that matches nothing throws — the fail-closed rule again: a scan
- * over zero files must not look like a clean domain. Matches beyond
+ * A focus that matches nothing throws. Fail closed again: a scan over zero
+ * files must not look like a clean domain. Matches beyond
  * `maxFiles` or the pack's byte budget are announced inline, never silently
  * thinned; since the one-shot request has no tools, an unexcerpted file is a
  * file the model genuinely cannot see, and it must know that.
@@ -415,9 +416,9 @@ function composeFocusedContext(
 /**
  * Match focus patterns against listing paths: `*` within a path segment,
  * `**` across segments, and a bare path matching itself or its directory
- * subtree — the same prefix semantics `sources` metadata uses, so a focus
- * reads like the rest of the model's path vocabulary. Deliberately no glob
- * dependency: this is the whole grammar.
+ * subtree. Those are the same prefix semantics `sources` metadata uses, so a
+ * focus reads like the rest of the model's path vocabulary. Deliberately no
+ * glob dependency: this is the whole grammar.
  */
 function focusMatcher(patterns: string[]): (file: string) => boolean {
   if (patterns.length === 0) {
@@ -468,9 +469,9 @@ function globToRegExp(glob: string): RegExp {
 /**
  * Every file under the roots, as sorted repository-relative POSIX paths.
  *
- * Unlike the TypeScript scanner this lists all file types — docs, configs,
- * infra — because unseen file types are exactly what this provider exists
- * for. Hidden entries and `node_modules` are skipped. A root that does not
+ * Unlike the TypeScript scanner this lists every file type, docs and configs
+ * and infra included, because unseen file types are exactly what this provider
+ * exists for. The walk skips hidden entries and `node_modules`. A root that does not
  * exist, or holds no files, fails loudly: an empty listing silently reduces
  * the prompt's coverage to nothing.
  */

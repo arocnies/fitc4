@@ -2,20 +2,20 @@
  * The `agent-semantic-review` validate provider.
  *
  * Judges whether each element's implementation still matches its declared
- * description — the drift relationships cannot express: the "read-only
- * reporting layer" that started writing, the "adapter" that grew business
- * logic. Only elements that have both a description and owned files are
+ * description. This is the drift that relationships cannot express: the
+ * "read-only reporting layer" that started writing, the "adapter" that grew
+ * business logic. Only elements that have both a description and owned files are
  * reviewed; there is nothing to judge against otherwise.
  *
  * One call per element rather than one batch, so a response cache keyed on
  * inputs re-reviews only the elements whose files actually changed. Calls run
- * sequentially, and the first exec failure stops the run — one `agent-unavailable`
- * finding, not one per element against a dead CLI.
+ * sequentially, and the first exec failure stops the run, producing one
+ * `agent-unavailable` finding rather than one per element against a dead CLI.
  *
- * Each element's context is a context pack: the element's facts first —
+ * Each element's context is a context pack. The element's facts come first:
  * description, declared relationships, observed resolved edges, and the
  * COMPLETE owned-file list, so the model knows what exists even when a file
- * is not excerpted — then code-first excerpts of the owned files. Files
+ * is not excerpted. Then come code-first excerpts of the owned files. Files
  * beyond `maxFilesPerElement` are announced in the context AND attested as an
  * `agent-truncated` finding (escalating under a gating severity): a judge
  * that saw half an element must never read as one that saw all of it.
@@ -46,7 +46,7 @@ export const PROVIDER_ID = 'agent-semantic-review'
 export interface SemanticReviewOptions {
   exec: AgentExec
   /**
-   * The severity of a drift finding — how load-bearing this review is.
+   * The severity of a drift finding, which is how load-bearing this review is.
    * Default 'warning' (advisory); 'error' makes it part of the gate, and an
    * unavailable CLI or truncated input then fails the build.
    */
@@ -110,9 +110,9 @@ export function agentSemanticReview(options: SemanticReviewOptions): NamedProvid
         ],
         DEFAULT_PACK_BUDGET_BYTES,
       )
-      // Attested truncation: whatever the pack could not show — the file cap
-      // or the byte budget — is a finding, not a silent thinning of the
-      // judge's evidence. Escalates to error when this provider gates.
+      // Attested truncation: whatever the pack could not show, whether from
+      // the file cap or the byte budget, is a finding, not a silent thinning
+      // of the judge's evidence. Escalates to error when this provider gates.
       for (const drop of pack.dropped) {
         findings.push(agentTruncated(PROVIDER_ID, drop.count, drop.what, severity))
       }

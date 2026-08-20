@@ -3,8 +3,8 @@
  *
  * Runs `claude --print` as an isolated one-shot: no user or project settings
  * (`--setting-sources ''`), no MCP servers (`--strict-mcp-config` with none
- * configured), a replaced system prompt, and — unless the request is agentic —
- * no tools at all, so the reply can only come from the prefilled context.
+ * configured), a replaced system prompt, and no tools at all unless the
+ * request is agentic, so the reply can only come from the prefilled context.
  *
  * The model defaults to Haiku deliberately: extraction-shaped provider work is
  * high-volume and cheap-model-friendly, and a caller doing judgment-shaped
