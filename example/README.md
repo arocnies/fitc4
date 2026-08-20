@@ -14,8 +14,8 @@ npm run fitc4 -w example
 A clean pass looks like this, with every file owned and every import inside a declared boundary:
 
 ```text
-scan typescript-imports · resolve source-root · validate architecture-rules
-4 observations · 3 associations · 0 errors, 0 warnings, 0 info
+scan typescript-imports, resolve source-root, validate architecture-rules
+4 observations, 3 associations, 0 errors, 0 warnings, 0 info
 ```
 
 A clean pass is the least interesting thing this tool does, so break it.
@@ -34,9 +34,8 @@ Rerun `npm run fitc4 -w example`. Exit code 1:
 
 ```text
 error (1)
-  relationship-direction  example.app.core depends on example.app.interface, but the
-  model declares only example.app.interface → example.app.core. Declare the
-  dependency that the code actually has.
+  relationship-direction  example.app.core depends on example.app.interface, but the model declares only example.app.interface -> example.app.core. Declare the dependency that the code actually has.
+    architecture-rules  architecture-rules/relationship-direction/example.app.core->example.app.interface
     src/core/bad.ts:1  ../interface/index.js
 ```
 
@@ -55,6 +54,8 @@ It sits under `src/` (scanned) but under neither component's `sources`, so the d
 ```text
 warning (1)
   unmapped-source  src/util.ts is not owned by any model element.
+    architecture-rules  architecture-rules/unmapped-source/src/util.ts
+    src/util.ts
 ```
 
 Still exit 0. Unowned code is a nudge by default, promotable to an error with `architectureRules({ severity: { 'unmapped-source': 'error' } })` in a `.ts` config.
@@ -95,19 +96,21 @@ Rerun `npm run fitc4 -w example`. The Exercise 1 error is now an info finding, p
 
 ```text
 info (1)
-  drift-relationship  example.app.core → example.app.interface is declared drift; 1 dependency still rides it. Remove the code path, then delete the tagged relationship from the model.
+  drift-relationship  example.app.core -> example.app.interface is declared drift; 1 dependency still rides it. Remove the code path, then delete the tagged relationship from the model.
+    architecture-rules  architecture-rules/drift-relationship/example.app.core::_::example.app.interface
     src/core/bad.ts:1  ../interface/index.js
 
-drift: 1 declared · 1 exercised · 0 unused
+drift: 1 declared, 1 exercised, 0 unused
 ```
 
 The debt is permitted, counted, and visible as an edge in the diagram. Now pay it down. Delete `src/core/bad.ts` and rerun. The edge flips to a warning demanding its own deletion:
 
 ```text
 warning (1)
-  unused-drift  example.app.core → example.app.interface is declared drift, but no code exercises it anymore. Delete the relationship: the model must not keep tolerating what stopped happening.
+  unused-drift  example.app.core -> example.app.interface is declared drift, but no code exercises it anymore. Delete the relationship: the model must not keep tolerating what stopped happening.
+    architecture-rules  architecture-rules/unused-drift/example.app.core::_::example.app.interface
 
-drift: 1 declared · 0 exercised · 1 unused
+drift: 1 declared, 0 exercised, 1 unused
 ```
 
 A drift edge the code stopped exercising has to go, or the model keeps permitting a dependency nothing needs. Delete the tagged relationship (and the `tag drift` line, since nothing else uses it) and the run is clean again. `severity: { 'unused-drift': 'error' }` in a `.ts` config makes that deletion mandatory. `{ 'drift-relationship': 'error' }` forbids tolerated drift entirely.

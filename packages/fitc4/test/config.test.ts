@@ -104,7 +104,7 @@ describe('rejecting a malformed config', () => {
   // runtime must not be laxer than the editor.
   test('an unknown field is an error with a suggestion', () => {
     expect(() => loadConfig(writeConfig({ ...VALID, scanRoot: ['src'] }))).toThrow(
-      "unknown field 'scanRoot' — did you mean 'scanRoots'?",
+      "unknown field 'scanRoot', did you mean 'scanRoots'?",
     )
     expect(() => loadConfig(writeConfig({ ...VALID, banana: true }))).toThrow(
       "unknown field 'banana'",

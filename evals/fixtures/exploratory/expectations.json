@@ -6,7 +6,7 @@
       "severity": "error",
       "subject": { "kind": "element", "id": "ops.alerts" },
       "related": ["ops.store"],
-      "label": "the runbook-documented alerts → store fallback is forbidden by the model"
+      "label": "the runbook-documented alerts -> store fallback is forbidden by the model"
     },
     {
       "provider": "architecture-rules",
@@ -76,21 +76,21 @@
         "source": "ops.gateway",
         "target": "ops.worker",
         "declared": true,
-        "label": "the permitted gateway → worker runbook edge resolves onto the declared relationship"
+        "label": "the permitted gateway -> worker runbook edge resolves onto the declared relationship"
       },
       {
         "provider": "source-root",
         "source": "ops.worker",
         "target": "ops.store",
         "declared": true,
-        "label": "the permitted worker → store runbook edge resolves onto the declared relationship"
+        "label": "the permitted worker -> store runbook edge resolves onto the declared relationship"
       },
       {
         "provider": "source-root",
         "source": "ops.worker",
         "target": "ops.alerts",
         "declared": true,
-        "label": "the permitted worker → alerts runbook edge resolves onto the declared relationship"
+        "label": "the permitted worker -> alerts runbook edge resolves onto the declared relationship"
       }
     ]
   }

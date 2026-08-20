@@ -194,7 +194,7 @@ export function agentResolve(options: AgentResolveOptions): NamedProvider<Resolv
           source: { kind: 'element', id: decision.sourceElementId },
           target: { kind: 'element', id: mapping.elementId },
           ...(match === undefined ? {} : { relationship: { kind: 'relationship', id: match.id } }),
-          description: `${decision.sourceElementId} → ${mapping.elementId} (agent-mapped from ${targetName})`,
+          description: `${decision.sourceElementId} -> ${mapping.elementId} (agent-mapped from ${targetName})`,
           data: {
             agent: options.exec.id,
             candidateId: decision.candidateId,

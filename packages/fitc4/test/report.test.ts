@@ -50,7 +50,7 @@ describe('unmapped-source grouping in the report', () => {
   test('the grouped block breaks the total down by top-level directory', async () => {
     const report = renderReport(await runFixture('ok', unownedScan(over)))
 
-    expect(report.text).toContain('src/ 5 · scripts/ 2 · lib/ 1')
+    expect(report.text).toContain('src/ 5, scripts/ 2, lib/ 1')
   })
 
   test('findings stay per-file for --json consumers', async () => {

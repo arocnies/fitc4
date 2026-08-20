@@ -187,7 +187,7 @@ function dependencyAssociation(
         ...(from.status === 'ambiguous' ? from.candidates : []),
         ...(to.status === 'ambiguous' ? to.candidates : []),
       ].map(element),
-      description: `${fromPath} → ${toPath} could not be mapped to two elements`,
+      description: `${fromPath} -> ${toPath} could not be mapped to two elements`,
     }
   }
 
@@ -213,7 +213,7 @@ function dependencyAssociation(
     source: element(from.elementId),
     target: element(to.elementId),
     relationship: match === undefined ? undefined : { kind: 'relationship', id: match.id },
-    description: `${from.elementId} → ${to.elementId}`,
+    description: `${from.elementId} -> ${to.elementId}`,
   }
 }
 
@@ -244,7 +244,7 @@ function packageAssociation(
         ...(from.status === 'ambiguous' ? from.candidates : []),
         ...(moreClaimants.length > 0 ? claimedBy : []),
       ].map(element),
-      description: `${fromPath} → ${specifier} could not be mapped to two elements`,
+      description: `${fromPath} -> ${specifier} could not be mapped to two elements`,
     }
   }
 
@@ -268,6 +268,6 @@ function packageAssociation(
     source: element(from.elementId),
     target: element(claimant),
     relationship: match === undefined ? undefined : { kind: 'relationship', id: match.id },
-    description: `${from.elementId} → ${claimant} (package ${specifier})`,
+    description: `${from.elementId} -> ${claimant} (package ${specifier})`,
   }
 }

@@ -62,7 +62,7 @@ describe('declared drift', () => {
 
   test('the report prints a burn-down derived from the findings', () => {
     const report = renderReport(drift)
-    expect(report.text).toContain('drift: 2 declared · 1 exercised · 1 unused')
+    expect(report.text).toContain('drift: 2 declared, 1 exercised, 1 unused')
   })
 
   test('a model with no drift edges prints no burn-down', async () => {

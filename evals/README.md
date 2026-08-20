@@ -46,11 +46,11 @@ A live score is a measurement, not a gate. Live mode prints the same scorecard b
 ## Reading the scorecard
 
 ```text
-fixture     provider                 hits  misses  extras  result
-----------  -----------------------  ----  ------  ------  ------
-greenfield  agent-resolve            1     0       0       ok
-greenfield  architecture-rules       1     0       0       ok
-brownfield  agent-ownership-advisor  1     0       0       ok
+fixture      provider                 hits  misses  extras  result
+-----------  -----------------------  ----  ------  ------  ------
+greenfield   agent-resolve            1     0       0       ok
+greenfield   architecture-rules       1     0       0       ok
+brownfield   agent-ownership-advisor  1     0       0       ok
 ...
 ```
 

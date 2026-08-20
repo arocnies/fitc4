@@ -6,7 +6,7 @@
       "severity": "error",
       "subject": { "kind": "element", "id": "deploy.web" },
       "related": ["deploy.db"],
-      "label": "the planted web → db compose edge is forbidden by the model"
+      "label": "the planted web -> db compose edge is forbidden by the model"
     },
     {
       "provider": "architecture-rules",
@@ -51,14 +51,14 @@
         "source": "deploy.web",
         "target": "deploy.api",
         "declared": true,
-        "label": "the permitted web → api compose edge resolves onto the declared relationship"
+        "label": "the permitted web -> api compose edge resolves onto the declared relationship"
       },
       {
         "provider": "source-root",
         "source": "deploy.api",
         "target": "deploy.db",
         "declared": true,
-        "label": "the permitted api → db compose edge resolves onto the declared relationship"
+        "label": "the permitted api -> db compose edge resolves onto the declared relationship"
       }
     ]
   }

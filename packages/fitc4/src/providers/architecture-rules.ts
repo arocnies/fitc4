@@ -242,7 +242,7 @@ class DriftLedger {
    */
   findings(severityOf: SeverityOf): Finding[] {
     return [...this.#edges.values()].map(({ relationship, count, evidence }) => {
-      const edge = `${relationship.sourceId} → ${relationship.targetId}`
+      const edge = `${relationship.sourceId} -> ${relationship.targetId}`
       if (count > 0) {
         return {
           id: findingId(PROVIDER_ID, 'drift-relationship', relationship.id),
@@ -347,7 +347,7 @@ function dependencyRule(
       severity: severityOf('relationship-direction', 'error'),
       description:
         `${sourceId} depends on ${targetId}, but the model declares only ` +
-        `${targetId} → ${sourceId}. Declare the dependency that the code actually has.`,
+        `${targetId} -> ${sourceId}. Declare the dependency that the code actually has.`,
       subject: { kind: 'element', id: sourceId },
       related: [
         { kind: 'element', id: targetId },

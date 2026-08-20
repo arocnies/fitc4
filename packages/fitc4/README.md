@@ -74,9 +74,8 @@ A clean run prints a summary and exits 0. A file in `src/core` importing from `s
 
 ```text
 error (1)
-  relationship-direction  acme.app.core depends on acme.app.interface, but the
-  model declares only acme.app.interface → acme.app.core. Declare the
-  dependency that the code actually has.
+  relationship-direction  acme.app.core depends on acme.app.interface, but the model declares only acme.app.interface -> acme.app.core. Declare the dependency that the code actually has.
+    architecture-rules  architecture-rules/relationship-direction/acme.app.core->acme.app.interface
     src/core/bad.ts:1  ../interface/index.ts
 ```
 
@@ -161,11 +160,11 @@ A drift-tagged relationship is a declared relationship, so the code it covers is
 
 ```text
 info (1)
-  drift-relationship  acme.app.core → acme.app.interface is declared drift;
-  1 dependency still rides it. Remove the code path, then delete the tagged
-  relationship from the model.
+  drift-relationship  acme.app.core -> acme.app.interface is declared drift; 1 dependency still rides it. Remove the code path, then delete the tagged relationship from the model.
+    architecture-rules  architecture-rules/drift-relationship/acme.app.core::_::acme.app.interface
+    src/core/bad.ts:1  ../interface/index.ts
 
-drift: 1 declared · 1 exercised · 0 unused
+drift: 1 declared, 1 exercised, 0 unused
 ```
 
 When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. A drift edge the code no longer exercises must be deleted, so declared drift can only shrink. Tolerated debt cannot quietly persist. It lives in model text, visible in the diagram and reviewed in diffs, not in a generated baseline file. The edge is the unit: a drift relationship is one finding whether one import rides it or forty, so the dependency count it reports is informational, not gated. The tag is `drift` by default (`architectureRules({ driftTag })` changes it) and must be declared in the specification, since LikeC4 rejects unknown tags. `severity: { 'drift-relationship': 'error' }` forbids tolerated drift entirely; `{ 'unused-drift': 'error' }` makes a dead drift edge fail the build until someone deletes it.

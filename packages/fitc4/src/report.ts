@@ -69,7 +69,7 @@ export function renderReport(result: PipelineResult): Report {
     if (grouped) lines.push(...groupedUnmappedBlock(unmapped))
     for (const finding of sortById(rendered)) {
       lines.push(`  ${finding.ruleId}  ${finding.description}`)
-      lines.push(`    ${finding.provider} · ${finding.id}`)
+      lines.push(`    ${finding.provider}  ${finding.id}`)
       for (const evidence of finding.evidence ?? []) {
         lines.push(`    ${formatEvidence(evidence)}`)
       }
@@ -83,14 +83,14 @@ export function renderReport(result: PipelineResult): Report {
   // visible here, not only in the file that did it, whether it replaced the
   // phase deliberately or by forgetting to spread the defaults back in.
   lines.push(
-    `scan ${result.providers.scan.join(', ')} · ` +
-      `resolve ${result.providers.resolve.join(', ')} · ` +
+    `scan ${result.providers.scan.join(', ')}, ` +
+      `resolve ${result.providers.resolve.join(', ')}, ` +
       `validate ${result.providers.validate.join(', ')}`,
   )
   lines.push(
-    `${result.observations.length} observations · ` +
-      `${result.associations.length} associations · ` +
-      `${counts.error} errors, ${counts.warning} warnings, ${counts.info} info`,
+    `${count(result.observations.length, 'observation')}, ` +
+      `${count(result.associations.length, 'association')}, ` +
+      `${count(counts.error, 'error')}, ${count(counts.warning, 'warning')}, ${counts.info} info`,
   )
 
   // One quiet line, not a URL per finding: the per-finding links live in
@@ -118,13 +118,13 @@ function groupedUnmappedBlock(unmapped: Finding[]): string[] {
   }
   const breakdown = [...byDirectory]
     .sort(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b))
-    .map(([directory, count]) => `${directory} ${count}`)
-    .join(' · ')
+    .map(([directory, total]) => `${directory} ${total}`)
+    .join(', ')
 
   const provider = unmapped[0]?.provider ?? 'architecture-rules'
   const lines = [
     `  unmapped-source  ${unmapped.length} files are not owned by any model element.`,
-    `    ${provider} · ${unmapped.length} findings (grouped; --json lists each file)`,
+    `    ${provider}  ${count(unmapped.length, 'finding')} (grouped; --json lists each file)`,
     `    ${breakdown}`,
     ...paths.slice(0, UNMAPPED_SOURCE_LISTED_PATHS).map((filePath) => `    ${filePath}`),
   ]
@@ -144,7 +144,12 @@ function driftBurnDown(findings: Finding[]): string[] {
   const unused = findings.filter((finding) => finding.ruleId === 'unused-drift').length
   const declared = exercised + unused
   if (declared === 0) return []
-  return [`drift: ${declared} declared · ${exercised} exercised · ${unused} unused`]
+  return [`drift: ${declared} declared, ${exercised} exercised, ${unused} unused`]
+}
+
+/** `1 error`, `2 errors`: counted nouns in output pluralize by count. */
+function count(total: number, noun: string): string {
+  return `${total} ${noun}${total === 1 ? '' : 's'}`
 }
 
 function formatEvidence(evidence: Evidence): string {

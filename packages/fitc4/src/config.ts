@@ -282,14 +282,14 @@ function rejectUnknownKeys(
     if (form === 'json' && MODULE_KEYS.includes(key)) {
       throw new Error(
         `${configPath}: '${key}' is only available in the module config forms ` +
-          `(.ts/.mts/.js/.mjs) — a provider is a function, which JSON cannot carry`,
+          `(.ts/.mts/.js/.mjs). A provider is a function, which JSON cannot carry`,
       )
     }
     const candidates = known.filter((name) => name !== '$schema')
     const suggestion = closestName(key, candidates)
     throw new Error(
       `${configPath}: unknown field '${key}'` +
-        (suggestion === undefined ? '' : ` — did you mean '${suggestion}'?`),
+        (suggestion === undefined ? '' : `, did you mean '${suggestion}'?`),
     )
   }
 }
@@ -430,8 +430,8 @@ function requireStringArray(
   const blank = value.findIndex((entry) => (entry as string).trim() === '')
   if (blank !== -1) {
     throw new Error(
-      `${configPath}: '${key}[${blank}]' must be a non-empty string — ` +
-        `an empty entry would put the entire repository under scan`,
+      `${configPath}: '${key}[${blank}]' must be a non-empty string. ` +
+        `An empty entry would put the entire repository under scan`,
     )
   }
   return value as string[]

@@ -131,7 +131,7 @@ export function scoreFixture(
     target.notes.push(
       named?.label !== undefined
         ? `must-not finding appeared: ${named.label}`
-        : `unexpected finding: [${finding.severity}] ${finding.ruleId} — ${finding.description}`,
+        : `unexpected finding: [${finding.severity}] ${finding.ruleId}  ${finding.description}`,
     )
   }
 
@@ -242,19 +242,19 @@ function observationMatches(expected: ExpectedObservation, observation: Observat
 function describeExpectedFinding(expected: ExpectedFinding): string {
   if (expected.label !== undefined) return expected.label
   const subject = expected.subject?.id !== undefined ? ` on ${expected.subject.id}` : ''
-  const related = expected.related !== undefined ? ` (${expected.related.join(' → ')})` : ''
+  const related = expected.related !== undefined ? ` (${expected.related.join(' -> ')})` : ''
   return `${expected.ruleId}${subject}${related}`
 }
 
 function describeExpectedAssociation(expected: ExpectedAssociation): string {
   if (expected.label !== undefined) return expected.label
   if (expected.candidateId !== undefined) return `decision ${expected.candidateId}`
-  return `${expected.source ?? '?'} → ${expected.target ?? '?'}`
+  return `${expected.source ?? '?'} -> ${expected.target ?? '?'}`
 }
 
 function describeExpectedObservation(expected: ExpectedObservation): string {
   if (expected.label !== undefined) return expected.label
-  const target = expected.target !== undefined ? ` → ${expected.target}` : ''
+  const target = expected.target !== undefined ? ` -> ${expected.target}` : ''
   return `${expected.kind}: ${expected.subject ?? '?'}${target}`
 }
 
@@ -294,7 +294,7 @@ export function renderScorecard(scores: FixtureScore[]): string {
     }
     for (const provider of score.providers) {
       for (const note of provider.notes) {
-        details.push(`${score.fixture} · ${provider.provider}: ${note}`)
+        details.push(`${score.fixture}  ${provider.provider}: ${note}`)
       }
     }
   }

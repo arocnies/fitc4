@@ -65,22 +65,22 @@ npx fitc4
 ```
 
 ```text
-scan typescript-imports · resolve source-root · validate architecture-rules
-4 observations · 3 associations · 0 errors, 0 warnings, 0 info
+scan typescript-imports, resolve source-root, validate architecture-rules
+4 observations, 3 associations, 0 errors, 0 warnings, 0 info
 ```
 
 Now add `example/src/core/bad.ts` importing the other way, with `Core` reaching into `Interface`:
 
 ```text
-error (1)
-  relationship-direction  example.app.core depends on example.app.interface, but the
-  model declares only example.app.interface → example.app.core. Declare the
-  dependency that the code actually has.
-    architecture-rules · architecture-rules/relationship-direction/example.app.core->example.app.interface
-    src/core/bad.ts:1  ../interface/index.ts
+rules: node_modules/fitc4/README.md#rules
 
-scan typescript-imports · resolve source-root · validate architecture-rules
-6 observations · 5 associations · 1 errors, 0 warnings, 0 info
+error (1)
+  relationship-direction  example.app.core depends on example.app.interface, but the model declares only example.app.interface -> example.app.core. Declare the dependency that the code actually has.
+    architecture-rules  architecture-rules/relationship-direction/example.app.core->example.app.interface
+    src/core/bad.ts:1  ../interface/index.js
+
+scan typescript-imports, resolve source-root, validate architecture-rules
+6 observations, 5 associations, 1 error, 0 warnings, 0 info
 ```
 
 Exit code 1. `--json` emits the full result instead of the report; `--config <path>` overrides discovery.
@@ -155,12 +155,11 @@ A drift-tagged relationship is a declared relationship, so the code it covers is
 
 ```text
 info (1)
-  drift-relationship  example.app.core → example.app.interface is declared drift;
-  1 dependency still rides it. Remove the code path, then delete the tagged
-  relationship from the model.
+  drift-relationship  example.app.core -> example.app.interface is declared drift; 1 dependency still rides it. Remove the code path, then delete the tagged relationship from the model.
+    architecture-rules  architecture-rules/drift-relationship/example.app.core::_::example.app.interface
     src/core/bad.ts:1  ../interface/index.js
 
-drift: 1 declared · 1 exercised · 0 unused
+drift: 1 declared, 1 exercised, 0 unused
 ```
 
 When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. A drift edge the code no longer exercises must be deleted, so declared drift can only shrink. Tolerated debt cannot quietly persist. The debt lives in model text rather than machine state. Every drift edge is visible in the diagram, added and removed in reviewable diffs, and every run recomputes the counts from the code, so there is no baseline file to regenerate or rubber-stamp.

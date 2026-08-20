@@ -314,7 +314,7 @@ describe('provider composition visibility', () => {
     // The report shows a replaced phase — this run has no architecture-rules,
     // and the line says so.
     expect(renderReport(result).text).toContain(
-      'scan typescript-imports · resolve source-root · validate agent-ownership-advisor',
+      'scan typescript-imports, resolve source-root, validate agent-ownership-advisor',
     )
   })
 })

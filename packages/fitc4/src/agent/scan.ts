@@ -219,7 +219,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
     const examined = [...new Set(parsed.examined.map((entry) => guard(entry, 'examined')))].sort()
     if (examined.length === 0) {
       throw new Error(
-        `Agent scan (${options.exec.id}) attested to examining no files — an absent scan must not look like a clean one`,
+        `Agent scan (${options.exec.id}) attested to examining no files. An absent scan must not look like a clean one`,
       )
     }
 
@@ -387,8 +387,8 @@ function composeFocusedContext(
   const matched = files.filter(matches)
   if (matched.length === 0) {
     throw new Error(
-      `Agent scan focus [${focus.join(', ')}] matched no files under the scanned roots — ` +
-        'a scan of nothing must not look like a clean one',
+      `Agent scan focus [${focus.join(', ')}] matched no files under the scanned roots. ` +
+        'A scan of nothing must not look like a clean one',
     )
   }
 

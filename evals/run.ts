@@ -99,8 +99,8 @@ for (const name of selected) {
 
 if (flags.exec !== 'stub') {
   console.warn(
-    `\nWARNING: --exec ${flags.exec} shells out to your locally installed \`${flags.exec}\` CLI —\n` +
-      'your login, your billing, one or more live model calls per fixture.\n' +
+    `\nWARNING: --exec ${flags.exec} shells out to your locally installed \`${flags.exec}\` CLI.\n` +
+      'Your login, your billing, one or more live model calls per fixture.\n' +
       'Successful replies are cached under evals/.cache/, so a rerun with\n' +
       'unchanged fixtures is free. This mode is for humans; never wire it into CI.\n',
   )
@@ -189,11 +189,11 @@ if (flags.exec === 'stub') {
   if (!allPerfect) {
     console.error(
       'stub mode scored imperfectly. The stub is the recorded ideal agent, so this is a\n' +
-        'broken fixture, expectation, or pipeline wiring — not agent quality. Fix it.',
+        'broken fixture, expectation, or pipeline wiring, not agent quality. Fix it.',
     )
     process.exit(1)
   }
-  console.log('stub mode: perfect score — fixtures, expectations, and pipeline wiring agree.')
+  console.log('stub mode: perfect score. Fixtures, expectations, and pipeline wiring agree.')
 } else {
   console.log(
     allPerfect
