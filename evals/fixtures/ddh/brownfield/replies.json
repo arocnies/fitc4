@@ -1,0 +1,32 @@
+[
+  {
+    "when": { "promptIncludes": "Map each candidate decision" },
+    "reply": [
+      {
+        "candidateId": "ddh.libs.application=>slonik",
+        "elementId": "vendor.postgres",
+        "reason": "slonik is the PostgreSQL client; the request context carries a database transaction connection."
+      },
+      {
+        "candidateId": "ddh.libs.db=>slonik",
+        "elementId": "vendor.postgres",
+        "reason": "The shared repository base issues its SQL through the PostgreSQL client."
+      },
+      {
+        "candidateId": "ddh.user.database=>slonik",
+        "elementId": "vendor.postgres",
+        "reason": "The user repository reads and writes PostgreSQL through the slonik pool."
+      },
+      {
+        "candidateId": "ddh.user.queries=>slonik",
+        "elementId": "vendor.postgres",
+        "reason": "The find-users query handler queries PostgreSQL directly through the slonik pool."
+      },
+      {
+        "candidateId": "ddh.wallet.database=>slonik",
+        "elementId": "vendor.postgres",
+        "reason": "The wallet repository reads and writes PostgreSQL through the slonik pool."
+      }
+    ]
+  }
+]

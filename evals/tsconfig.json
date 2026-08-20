@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["run.ts", "harness/**/*.ts", "fixtures/*/fitc4.eval.ts"]
+  "include": ["run.ts", "harness/**/*.ts", "fixtures/*/fitc4.eval.ts", "fixtures/*/*/fitc4.eval.ts"]
 }

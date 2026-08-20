@@ -1,0 +1,12 @@
+diff --git a/src/modules/user/database/user.repository.ts b/src/modules/user/database/user.repository.ts
+index 621a985..7c41da4 100644
+--- a/src/modules/user/database/user.repository.ts
++++ b/src/modules/user/database/user.repository.ts
+@@ -1,6 +1,7 @@
+ import { InjectPool } from 'nestjs-slonik';
+ import { DatabasePool, sql } from 'slonik';
+ import { UserRepositoryPort } from './user.repository.port';
++import { UserResponseDto } from '../dtos/user.response.dto';
+ import { z } from 'zod';
+ import { UserMapper } from '../user.mapper';
+ import { UserRoles } from '../domain/user.types';

@@ -1,0 +1,274 @@
+// A transcription of domain-driven-hexagon's own stated architecture, pinned
+// at 5c2d15a7e2d69e83dfddf28468ee9f30e02c30de. The source of truth is the
+// project's checked-in .dependency-cruiser.js: its five layer rules
+// (no-domain-to-api-deps, no-domain-to-app-deps, no-domain-to-infra-deps,
+// no-infra-to-api-deps, no-command-query-to-api-deps) become the shape of the
+// relationships below, including both documented exceptions (domain may reach
+// AppRequestContext, and may depend on infrastructure port.ts files). fitc4
+// ownership is directory-prefix based, so the layers are transcribed at the
+// directory granularity this codebase already keeps: each module's domain/,
+// database/, dtos/, commands/ and queries/ directory is one element.
+//
+// Nothing here is invented: every declared relationship is an edge the pinned
+// code exercises and the dependency-cruiser rules permit; every forbidden
+// layer edge is simply not declared.
+
+specification {
+  element system
+  element container
+  element component
+}
+
+model {
+  ddh = system 'Domain-Driven Hexagon' {
+    app = component 'Composition root' {
+      description 'main.ts and app.module.ts: bootstraps Nest and wires the modules together'
+      metadata {
+        sources 'src/**'
+      }
+    }
+
+    configs = component 'Configuration' {
+      description 'Route table and database connection settings'
+      metadata {
+        sources 'src/configs/**'
+      }
+    }
+
+    libs = container 'Shared library' {
+      api = component 'Shared api layer' {
+        description 'Response and request base classes shared by every controller'
+        metadata {
+          sources 'src/libs/api/**'
+        }
+      }
+
+      application = component 'Shared application layer' {
+        description 'Request context (AppRequestContext) and the Nest interceptors'
+        metadata {
+          sources 'src/libs/application/**'
+        }
+      }
+
+      db = component 'Shared database layer' {
+        description 'The generic slonik repository base every module repository extends'
+        metadata {
+          sources 'src/libs/db/**'
+        }
+      }
+
+      ddd = component 'Domain building blocks' {
+        description 'Entity, aggregate, value object, command and query bases, and the repository port'
+        metadata {
+          sources 'src/libs/ddd/**'
+        }
+      }
+
+      shared = component 'Cross-cutting utilities' {
+        description 'Exceptions, guard, types, decorators, ports and utils under src/libs'
+        metadata {
+          sources 'src/libs/**'
+        }
+      }
+    }
+
+    user = container 'User module' {
+      domain = component 'User domain' {
+        description 'User entity, value objects, domain events and errors'
+        metadata {
+          sources 'src/modules/user/domain/**'
+        }
+      }
+
+      database = component 'User database' {
+        description 'Infrastructure layer: the slonik user repository and its port'
+        metadata {
+          sources 'src/modules/user/database/**'
+        }
+      }
+
+      dtos = component 'User dtos' {
+        description 'Api layer: response DTOs for HTTP and GraphQL'
+        metadata {
+          sources 'src/modules/user/dtos/**'
+        }
+      }
+
+      commands = component 'User commands' {
+        description 'Create and delete user use cases: controllers, command objects and services'
+        metadata {
+          sources 'src/modules/user/commands/**'
+        }
+      }
+
+      queries = component 'User queries' {
+        description 'Find-users read side: controllers, resolver and query handler'
+        metadata {
+          sources 'src/modules/user/queries/**'
+        }
+      }
+
+      wiring = component 'User module wiring' {
+        description 'user.module.ts, user.mapper.ts and the DI tokens'
+        metadata {
+          sources 'src/modules/user/**'
+        }
+      }
+    }
+
+    wallet = container 'Wallet module' {
+      domain = component 'Wallet domain' {
+        description 'Wallet entity, domain events and errors'
+        metadata {
+          sources 'src/modules/wallet/domain/**'
+        }
+      }
+
+      database = component 'Wallet database' {
+        description 'Infrastructure layer: the slonik wallet repository and its port'
+        metadata {
+          sources 'src/modules/wallet/database/**'
+        }
+      }
+
+      application = component 'Wallet application' {
+        description 'Event handler creating a wallet when a user is created'
+        metadata {
+          sources 'src/modules/wallet/application/**'
+        }
+      }
+
+      wiring = component 'Wallet module wiring' {
+        description 'wallet.module.ts, wallet.mapper.ts and the DI tokens'
+        metadata {
+          sources 'src/modules/wallet/**'
+        }
+      }
+    }
+  }
+
+  vendor = system 'Third-party platform' {
+    nestjs = component 'NestJS platform' {
+      description 'The Nest framework, its transports and its ecosystem integrations'
+      metadata {
+        packages '@nestjs/common'
+        packages '@nestjs/core'
+        packages '@nestjs/cqrs'
+        packages '@nestjs/swagger'
+        packages '@nestjs/graphql'
+        packages '@nestjs/apollo'
+        packages '@nestjs/event-emitter'
+        packages '@nestjs/microservices'
+        packages 'nestjs-console'
+        packages 'nestjs-request-context'
+        packages 'nestjs-slonik'
+        packages 'rxjs'
+      }
+    }
+
+    toolkit = component 'Typed utility libraries' {
+      description 'Validation, serialization, result types and environment parsing'
+      metadata {
+        packages 'class-validator'
+        packages 'class-transformer'
+        packages 'zod'
+        packages 'oxide.ts'
+        packages 'dotenv'
+        packages 'env-var'
+      }
+    }
+
+    node = component 'Node.js builtins' {
+      description 'Node core modules'
+      metadata {
+        packages 'crypto'
+        packages 'path'
+      }
+    }
+
+    postgres = component 'PostgreSQL database' {
+      description 'The relational database the repositories read and write through a SQL client; description-only, owns no sources'
+    }
+  }
+
+  // The dependency-cruiser preset rules govern package hygiene, not layering:
+  // anything declared in package.json may be imported from any layer
+  // (no-non-package-json, not-to-unresolvable, not-to-dev-dep). One edge
+  // transcribes that: the whole system may use its declared dependencies.
+  ddh -> vendor 'imports the packages declared in package.json'
+
+  // Composition root: app.module.ts wires configuration, the shared
+  // interceptors and both feature modules.
+  ddh.app -> ddh.configs 'reads connection settings'
+  ddh.configs -> ddh.libs.shared 'loads the environment through the dotenv util'
+  ddh.app -> ddh.libs.application 'installs the context and exception interceptors'
+  ddh.app -> ddh.user.wiring 'mounts the user module'
+  ddh.app -> ddh.wallet.wiring 'mounts the wallet module'
+
+  // Shared library layering. domain building blocks and the exception base
+  // reach AppRequestContext, the exception no-domain-to-app-deps documents.
+  ddh.libs.ddd -> ddh.libs.application 'reads the request context (AppRequestContext exception)'
+  ddh.libs.ddd -> ddh.libs.shared 'uses guard, types and exceptions'
+  ddh.libs.shared -> ddh.libs.application 'exception base reads the request id (AppRequestContext exception)'
+  ddh.libs.db -> ddh.libs.application 'repository base reads the transaction from the request context'
+  ddh.libs.db -> ddh.libs.ddd 'implements the repository port'
+  ddh.libs.db -> ddh.libs.shared 'uses ports and exceptions'
+  ddh.libs.application -> ddh.libs.api 'exception interceptor shapes the error response'
+  ddh.libs.application -> ddh.libs.shared 'wraps exceptions'
+  ddh.libs.api -> ddh.libs.shared 'uses shared types'
+  ddh.libs.api -> ddh.libs.ddd 'paginates with the Paginated base'
+  ddh.libs.shared -> ddh.libs.ddd 'props-to-object util reads the entity and value object bases'
+
+  // User module. The commands and queries directories hold the use cases;
+  // their dependency on the database element rides the port.ts exception that
+  // no-domain-to-infra-deps documents.
+  ddh.user.domain -> ddh.libs.ddd 'extends the entity and event bases'
+  ddh.user.domain -> ddh.libs.shared 'guards invariants and raises exceptions'
+  ddh.user.database -> ddh.user.domain 'persists the user entity'
+  ddh.user.database -> ddh.libs.db 'extends the slonik repository base'
+  ddh.user.database -> ddh.libs.ddd 'implements the repository port'
+  ddh.user.database -> ddh.user.wiring 'maps rows through the user mapper'
+  ddh.user.dtos -> ddh.libs.api 'extends the response bases'
+  ddh.user.commands -> ddh.user.domain 'creates and deletes user entities'
+  ddh.user.commands -> ddh.user.database 'depends on the repository port (port.ts exception)'
+  ddh.user.commands -> ddh.user.dtos 'returns response DTOs'
+  ddh.user.commands -> ddh.user.wiring 'injects by DI token'
+  ddh.user.commands -> ddh.libs.ddd 'extends the command base'
+  ddh.user.commands -> ddh.libs.api 'uses the shared response types'
+  ddh.user.commands -> ddh.libs.shared 'maps domain exceptions'
+  ddh.user.commands -> ddh.configs 'mounts the route table'
+  ddh.user.queries -> ddh.user.database 'reads the user read model (port.ts exception)'
+  ddh.user.queries -> ddh.user.dtos 'returns response DTOs'
+  ddh.user.queries -> ddh.libs.ddd 'extends the query base'
+  ddh.user.queries -> ddh.libs.api 'uses the paginated response bases'
+  ddh.user.queries -> ddh.configs 'mounts the route table'
+  ddh.user.wiring -> ddh.user.domain 'maps the entity'
+  ddh.user.wiring -> ddh.user.database 'provides the repository'
+  ddh.user.wiring -> ddh.user.dtos 'maps to response DTOs'
+  ddh.user.wiring -> ddh.user.commands 'registers the command handlers'
+  ddh.user.wiring -> ddh.user.queries 'registers the query handlers'
+  ddh.user.wiring -> ddh.libs.ddd 'implements the mapper interface'
+
+  // Wallet module, including its documented cross-module edge: the wallet
+  // event handler subscribes to a user domain event.
+  ddh.wallet.domain -> ddh.libs.ddd 'extends the entity and event bases'
+  ddh.wallet.domain -> ddh.libs.shared 'raises exceptions'
+  ddh.wallet.database -> ddh.wallet.domain 'persists the wallet entity'
+  ddh.wallet.database -> ddh.libs.db 'extends the slonik repository base'
+  ddh.wallet.database -> ddh.libs.ddd 'implements the repository port'
+  ddh.wallet.database -> ddh.wallet.wiring 'maps rows through the wallet mapper'
+  ddh.wallet.application -> ddh.user.domain 'reacts to the user-created domain event'
+  ddh.wallet.application -> ddh.wallet.domain 'creates the wallet entity'
+  ddh.wallet.application -> ddh.wallet.database 'depends on the repository port (port.ts exception)'
+  ddh.wallet.application -> ddh.wallet.wiring 'injects by DI token'
+  ddh.wallet.wiring -> ddh.wallet.domain 'maps the entity'
+  ddh.wallet.wiring -> ddh.wallet.database 'provides the repository'
+  ddh.wallet.wiring -> ddh.wallet.application 'registers the event handler'
+  ddh.wallet.wiring -> ddh.libs.ddd 'implements the mapper interface'
+}
+
+views {
+  view index of ddh {
+    include *
+  }
+}

@@ -1,14 +1,15 @@
 # Agent-provider evals
 
-An opt-in harness that measures four agent providers against fixtures with planted, known-correct answers: `agentScan`, `agentResolve`, `agentOwnershipAdvisor`, and `agentSemanticReview`. The fixtures double as checked-in end-to-end examples, four tiny projects showing how FitC4 fits code to a model. They start at a clean greenfield gate and end at a domain no TypeScript parser can see.
+An opt-in harness that measures four agent providers against fixtures with planted, known-correct answers: `agentScan`, `agentResolve`, `agentOwnershipAdvisor`, and `agentSemanticReview`. The fixtures double as checked-in end-to-end examples: four tiny projects showing how FitC4 fits code to a model, and one real external project fetched on demand. They start at a clean greenfield gate and end at a codebase this repository does not even contain.
 
 Nothing here runs in CI or in any package's test suite, ever. You invoke the harness deliberately:
 
 ```bash
-npm run eval                          # stub mode (default): free, deterministic, exact
-npm run eval -- --fixture greenfield  # one fixture
-npm run eval -- --exec claude         # live mode, read the cost note below first
-npm run eval -- --exec codex          # live mode via the Codex CLI instead
+npm run eval                              # stub mode (default): free, deterministic, exact
+npm run eval -- --fixture greenfield      # one fixture
+npm run eval -- --fixture ddh/greenfield  # an external fixture; fetches its pinned repo if needed
+npm run eval -- --exec claude             # live mode, read the cost note below first
+npm run eval -- --exec codex              # live mode via the Codex CLI instead
 ```
 
 ## What a fixture is
@@ -18,6 +19,12 @@ Each directory under [`fixtures/`](fixtures/) is a self-contained project: a Lik
 - **`fitc4.eval.ts`** composes the pipeline as a function of the exec, so stub and live mode run through identical wiring.
 - **`replies.json`** is the *recorded ideal agent*: the reply a perfect agent would give to each request, matched by content rather than call order.
 - **`expectations.json`** is what a perfect run produces. `findings` is the complete finding set of that run; `associations`/`observations` `must` and `mustNot` entries pin agent behavior that never surfaces as a finding, such as the mapping `agentResolve` must make and the abstention it must keep.
+
+## External fixtures, fetched on demand
+
+An external fixture pins a real upstream repository instead of vendoring one. Its directory holds only what we author (an `external.json` manifest with the repository URL and a commit SHA, the LikeC4 model, the config, the eval files, and any patches), plus variant subdirectories such as `ddh/greenfield` and `ddh/brownfield` that share the fetch. The harness clones the pin into `evals/.cache/repos/` with `--filter=blob:none`, verifies `git rev-parse HEAD` against the manifest on every use, and assembles a fresh working directory under `evals/.cache/work/` per run: pinned sources, our overlay on top, patches applied for the brownfield variant. It never runs `npm install` in the clone; external package imports stay package claims and resolve candidates, which is the point.
+
+A plain `npm run eval` never touches the network. When the cached checkout is absent, external fixtures are skipped with a note naming the command that fetches them; naming one with `--fixture` is permission to fetch. Once the cache exists they run and gate exactly like the checked-in fixtures.
 
 ## The two exec modes
 
@@ -49,7 +56,7 @@ brownfield  agent-ownership-advisor  1     0       0       ok
 
 One row per provider, because the provider is the unit of judgment. **hits** are expected findings/associations/observations that appeared; **misses** are expected ones that did not; **extras** are emitted things nothing expected. An unexpected agent finding counts against the agent, so the semantic reviewer flagging a healthy element is an extra, and a `mustNot` entry that appears is an extra with its own named note. Every miss and extra prints a detail line beneath the table. Deterministic providers (`architecture-rules`, `source-root`) are expected to be exact in both modes. In claude mode a wrong agent answer often shows up twice, honestly: once on the agent's row and once as the deterministic consequence, say a `missing-relationship` extra caused by a wrong mapping.
 
-## The four fixtures: fitting code to a model, in stages
+## The fixtures: fitting code to a model, in stages
 
 **[`greenfield/`](fixtures/greenfield/)** is a small, clean TypeScript project whose deterministic gate passes. What is left over is exactly what no parser can map: `src/core` imports `stripe` and `@aws-sdk/client-s3`, external packages claimed by no element. `agentResolve` gets both as candidate decisions. `stripe` has one right answer and must be mapped: the description-only payments-gateway element, backed by a declared relationship. The S3 client is genuinely ambiguous on purpose: the model declares *two* object-storage elements and nothing says which bucket the code touches, so the correct behavior is abstention, and mapping it is a named regression. Run the plain gate yourself: `node ../../../packages/fitc4/dist/cli.js` from the fixture directory passes with one info finding.
 
@@ -59,11 +66,13 @@ One row per provider, because the provider is the unit of judgment. **hits** are
 
 **[`exploratory/`](fixtures/exploratory/)** is the same `agentScan` in its least predictable mode. Its live mode is the one that exercises read-only agentic exploration: no `focus`, `agentic: true`, so the request carries only prose instructions and a file listing, and the agent walks the repository to earn its answer. The domain is a directory of markdown runbooks, one service per `docs/runbooks/<name>/`, and the facts are deliberately spread across files so no single prefilled excerpt could answer: each runbook documents the services its own service touches, and the runbook file stands in for the service wherever a fact needs a file. Three documented dependencies are declared and pass: `gateway → worker`, `worker → store`, and `worker → alerts`. The alerts runbook's planted fallback of querying the store directly is forbidden by the model and must surface as a `missing-relationship` error. The expectations also pin the coverage attestation: `examined[]` must name all four runbooks (including the store runbook, which contributes no edges), and the scan must report the forbidden edge honestly rather than tidying it away.
 
-The progression is the point: the deterministic gate carries a greenfield project alone; agents extend it over a brownfield's judgment calls; prose instructions extend it over domains with no parser at all; and exploration extends *those* over domains too spread out to prefill. That is where a proven domain graduates to a small deterministic provider, per [`docs/agent-providers.md`](../docs/agent-providers.md).
+**[`ddh/`](fixtures/ddh/)** leaves the tiny checked-in projects behind: the first external fixture, [Sairyss/domain-driven-hexagon](https://github.com/Sairyss/domain-driven-hexagon) (MIT), pinned by SHA and fetched on demand rather than vendored. The project states its own architecture in a checked-in `.dependency-cruiser.js` with sixteen named forbidden rules, and the model transcribes that config rather than inventing anything: its layer rules become the shape of the declared relationships, both documented exceptions included, at the directory granularity the codebase already keeps (see the [fixture README](fixtures/ddh/README.md) for the rules that granularity cannot express). `ddh/greenfield` runs the pinned sources unmodified and must gate green; `agentResolve` gets six candidate decisions, five `slonik` decisions whose one right mapping is the description-only PostgreSQL element and a `nanoid` whose right behavior is abstention. `ddh/brownfield` applies four patches, each planting an import that violates one named upstream rule, verified at authoring time by running the project's own dependency-cruiser config against the pristine and patched trees; the expectations pin the exact resulting findings, one `relationship-direction` error and three `missing-relationship` errors.
+
+The progression is the point: the deterministic gate carries a greenfield project alone; agents extend it over a brownfield's judgment calls; prose instructions extend it over domains with no parser at all; and exploration extends *those* over domains too spread out to prefill. That is where a proven domain graduates to a small deterministic provider, per [`docs/agent-providers.md`](../docs/agent-providers.md). The external fixture then turns the same gate and the same agents on a real codebase, against rules a stranger project wrote for itself.
 
 ## Measured results
 
-First live measurements, 2026-08-18, one run per model over all four fixtures (12 provider rows; reruns replay the cache, so a fresh measurement needs a fixture edit or a cleared `evals/.cache/`):
+First live measurements, 2026-08-18, one run per model over the four checked-in fixtures (12 provider rows; reruns replay the cache, so a fresh measurement needs a fixture edit or a cleared `evals/.cache/`). The external `ddh` fixture has no live measurement yet.
 
 | exec · model | rows perfect | divergences |
 |---|---|---|

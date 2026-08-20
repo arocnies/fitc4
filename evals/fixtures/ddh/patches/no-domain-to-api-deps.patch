@@ -1,0 +1,11 @@
+diff --git a/src/modules/wallet/domain/wallet.entity.ts b/src/modules/wallet/domain/wallet.entity.ts
+index f328968..a6b10f2 100644
+--- a/src/modules/wallet/domain/wallet.entity.ts
++++ b/src/modules/wallet/domain/wallet.entity.ts
+@@ -1,5 +1,6 @@
+ import { AggregateID, AggregateRoot } from '@libs/ddd';
+ import { ArgumentOutOfRangeException } from '@libs/exceptions';
++import { ResponseBase } from '@libs/api/response.base';
+ import { Err, Ok, Result } from 'oxide.ts';
+ import { WalletCreatedDomainEvent } from './events/wallet-created.domain-event';
+ import { WalletNotEnoughBalanceError } from './wallet.errors';

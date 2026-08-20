@@ -30,13 +30,14 @@ import { parseArgs } from 'node:util'
 import { runPipeline, type PipelineConfig } from 'fitc4'
 import { cached, claudeCli, codexCli, DEFAULT_CLAUDE_MODEL, type AgentExec } from 'fitc4/agent'
 
+import { externalManifest, hasCheckout } from './harness/external.ts'
 import { perfect, renderScorecard, scoreFixture, type Expectations, type FixtureScore } from './harness/score.ts'
 import { scriptedExec, type ScriptedReply } from './harness/stub.ts'
 
-/** The greenfield → brownfield → beyond-TypeScript → exploration progression, in that order. */
-const FIXTURE_ORDER = ['greenfield', 'brownfield', 'non-ts', 'exploratory']
+/** The greenfield → brownfield → beyond-TypeScript → exploration progression, then external fixtures. */
+const FIXTURE_ORDER = ['greenfield', 'brownfield', 'non-ts', 'exploratory', 'ddh/greenfield', 'ddh/brownfield']
 
-type FixtureSpec = (exec: AgentExec, root: string) => PipelineConfig
+type FixtureSpec = (exec: AgentExec, root: string) => PipelineConfig | Promise<PipelineConfig>
 
 const { values: flags } = parseArgs({
   options: {
@@ -56,10 +57,31 @@ if (flags.exec !== 'stub' && flags.exec !== 'claude' && flags.exec !== 'codex') 
 const evalsDir = import.meta.dirname
 const fixturesDir = path.join(evalsDir, 'fixtures')
 
-const discovered = fs
-  .readdirSync(fixturesDir, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .map((entry) => entry.name)
+/**
+ * A fixture is any directory under `fixtures/` holding a `fitc4.eval.ts`. A
+ * directory without one may instead hold variant fixtures one level down
+ * (`ddh/greenfield`, `ddh/brownfield`), which share the parent's manifest,
+ * model, and patches.
+ */
+function discoverFixtures(): string[] {
+  const names: string[] = []
+  for (const entry of fs.readdirSync(fixturesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    if (fs.existsSync(path.join(fixturesDir, entry.name, 'fitc4.eval.ts'))) {
+      names.push(entry.name)
+      continue
+    }
+    for (const variant of fs.readdirSync(path.join(fixturesDir, entry.name), { withFileTypes: true })) {
+      if (!variant.isDirectory()) continue
+      if (fs.existsSync(path.join(fixturesDir, entry.name, variant.name, 'fitc4.eval.ts'))) {
+        names.push(`${entry.name}/${variant.name}`)
+      }
+    }
+  }
+  return names
+}
+
+const discovered = discoverFixtures()
   .sort(
     (a, b) =>
       (FIXTURE_ORDER.includes(a) ? FIXTURE_ORDER.indexOf(a) : FIXTURE_ORDER.length) -
@@ -115,9 +137,20 @@ function readJson(file: string): unknown {
 }
 
 const scores: FixtureScore[] = []
+const skipped: string[] = []
 
 for (const fixture of selected) {
   const root = path.join(fixturesDir, fixture)
+
+  // External fixtures never touch the network in a default run: with no
+  // cached checkout they are skipped, and only naming one with --fixture is
+  // permission to fetch (the fetch itself lives in the fixture's eval spec).
+  const manifest = externalManifest(root)
+  if (manifest !== undefined && !hasCheckout(evalsDir, manifest) && flags.fixture === undefined) {
+    skipped.push(fixture)
+    continue
+  }
+
   const expectations = readJson(path.join(root, 'expectations.json')) as Expectations
 
   let score: FixtureScore
@@ -125,7 +158,7 @@ for (const fixture of selected) {
     const specModule = (await import(pathToFileURL(path.join(root, 'fitc4.eval.ts')).href)) as {
       default: FixtureSpec
     }
-    const result = await runPipeline(specModule.default(execFor(fixture), root))
+    const result = await runPipeline(await specModule.default(execFor(fixture), root))
     score = scoreFixture(fixture, expectations, result)
   } catch (error) {
     score = {
@@ -140,6 +173,14 @@ for (const fixture of selected) {
 console.log(`\nexec: ${flags.exec}${flags.exec === 'stub' ? '' : ` (model: ${model ?? 'CLI default'})`}\n`)
 console.log(renderScorecard(scores))
 console.log('')
+
+if (skipped.length > 0) {
+  const flagList = skipped.map((name) => `--fixture ${name}`).join(' ')
+  console.log(
+    `note: external fixtures skipped, no cached checkout: ${skipped.join(', ')}. ` +
+      `Fetch and run them with: npm run eval -- ${flagList}\n`,
+  )
+}
 
 const allPerfect = scores.every(perfect)
 const anyBroken = scores.some((score) => score.error !== undefined)

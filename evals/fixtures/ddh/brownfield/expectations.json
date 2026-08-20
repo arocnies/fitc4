@@ -1,0 +1,116 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "relationship-direction",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "ddh.user.domain"
+      },
+      "related": [
+        "ddh.user.database"
+      ],
+      "label": "no-domain-to-infra-deps: the user entity imports the concrete repository, and the model declares only user.database -> user.domain"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "ddh.user.domain"
+      },
+      "related": [
+        "ddh.libs.application"
+      ],
+      "label": "no-domain-to-app-deps: user.types.ts imports the exception interceptor, which is not the exempted AppRequestContext"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "ddh.wallet.domain"
+      },
+      "related": [
+        "ddh.libs.api"
+      ],
+      "label": "no-domain-to-api-deps: the wallet entity imports the shared response base"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "ddh.user.database"
+      },
+      "related": [
+        "ddh.user.dtos"
+      ],
+      "label": "no-infra-to-api-deps: the user repository imports a response DTO"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unobserved-elements",
+      "severity": "info",
+      "related": [
+        "vendor.postgres"
+      ],
+      "label": "the description-only PostgreSQL element is reported as unobserved"
+    }
+  ],
+  "associations": {
+    "must": [
+      {
+        "provider": "agent-resolve",
+        "source": "ddh.libs.application",
+        "target": "vendor.postgres",
+        "candidateId": "ddh.libs.application=>slonik",
+        "declared": true,
+        "label": "slonik from the request context is mapped onto PostgreSQL, backed by ddh -> vendor"
+      },
+      {
+        "provider": "agent-resolve",
+        "source": "ddh.libs.db",
+        "target": "vendor.postgres",
+        "candidateId": "ddh.libs.db=>slonik",
+        "declared": true,
+        "label": "slonik from the repository base is mapped onto PostgreSQL, backed by ddh -> vendor"
+      },
+      {
+        "provider": "agent-resolve",
+        "source": "ddh.user.database",
+        "target": "vendor.postgres",
+        "candidateId": "ddh.user.database=>slonik",
+        "declared": true,
+        "label": "slonik from the user repository is mapped onto PostgreSQL, backed by ddh -> vendor"
+      },
+      {
+        "provider": "agent-resolve",
+        "source": "ddh.user.queries",
+        "target": "vendor.postgres",
+        "candidateId": "ddh.user.queries=>slonik",
+        "declared": true,
+        "label": "slonik from the query handler is mapped onto PostgreSQL, backed by ddh -> vendor"
+      },
+      {
+        "provider": "agent-resolve",
+        "source": "ddh.wallet.database",
+        "target": "vendor.postgres",
+        "candidateId": "ddh.wallet.database=>slonik",
+        "declared": true,
+        "label": "slonik from the wallet repository is mapped onto PostgreSQL, backed by ddh -> vendor"
+      }
+    ],
+    "mustNot": [
+      {
+        "provider": "agent-resolve",
+        "candidateId": "ddh.libs.application=>nanoid",
+        "label": "nanoid was mapped although no vendor element covers an id generator; abstention is correct"
+      }
+    ]
+  }
+}
