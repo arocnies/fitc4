@@ -1,0 +1,62 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unobserved-elements",
+      "severity": "info",
+      "related": ["vendor.postgres"],
+      "label": "the description-only PostgreSQL element is reported as unobserved"
+    }
+  ],
+  "associations": {
+    "must": [
+      {
+        "provider": "agent-resolve",
+        "source": "ddh.libs.application",
+        "target": "vendor.postgres",
+        "candidateId": "ddh.libs.application=>slonik",
+        "declared": true,
+        "label": "slonik from the request context is mapped onto PostgreSQL, backed by ddh -> vendor"
+      },
+      {
+        "provider": "agent-resolve",
+        "source": "ddh.libs.db",
+        "target": "vendor.postgres",
+        "candidateId": "ddh.libs.db=>slonik",
+        "declared": true,
+        "label": "slonik from the repository base is mapped onto PostgreSQL, backed by ddh -> vendor"
+      },
+      {
+        "provider": "agent-resolve",
+        "source": "ddh.user.database",
+        "target": "vendor.postgres",
+        "candidateId": "ddh.user.database=>slonik",
+        "declared": true,
+        "label": "slonik from the user repository is mapped onto PostgreSQL, backed by ddh -> vendor"
+      },
+      {
+        "provider": "agent-resolve",
+        "source": "ddh.user.queries",
+        "target": "vendor.postgres",
+        "candidateId": "ddh.user.queries=>slonik",
+        "declared": true,
+        "label": "slonik from the query handler is mapped onto PostgreSQL, backed by ddh -> vendor"
+      },
+      {
+        "provider": "agent-resolve",
+        "source": "ddh.wallet.database",
+        "target": "vendor.postgres",
+        "candidateId": "ddh.wallet.database=>slonik",
+        "declared": true,
+        "label": "slonik from the wallet repository is mapped onto PostgreSQL, backed by ddh -> vendor"
+      }
+    ],
+    "mustNot": [
+      {
+        "provider": "agent-resolve",
+        "candidateId": "ddh.libs.application=>nanoid",
+        "label": "nanoid was mapped although no vendor element covers an id generator; abstention is correct"
+      }
+    ]
+  }
+}

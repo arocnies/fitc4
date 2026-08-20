@@ -1,0 +1,11 @@
+diff --git a/src/modules/user/domain/user.entity.ts b/src/modules/user/domain/user.entity.ts
+index 48ccc20..730aa50 100644
+--- a/src/modules/user/domain/user.entity.ts
++++ b/src/modules/user/domain/user.entity.ts
+@@ -1,5 +1,6 @@
+ import { AggregateRoot, AggregateID } from '@libs/ddd';
+ import { UserCreatedDomainEvent } from './events/user-created.domain-event';
++import { UserRepository } from '../database/user.repository';
+ import { Address, AddressProps } from './value-objects/address.value-object';
+ import {
+   CreateUserProps,
