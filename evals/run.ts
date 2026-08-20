@@ -42,7 +42,7 @@ type FixtureSpec = (exec: AgentExec, root: string) => PipelineConfig | Promise<P
 const { values: flags } = parseArgs({
   options: {
     exec: { type: 'string', default: 'stub' },
-    // No parse-time default: the model default is per exec — claude falls back
+    // No parse-time default: the model default is per exec. claude falls back
     // to its cheap DEFAULT_CLAUDE_MODEL, codex to whatever its CLI defaults to.
     model: { type: 'string' },
     fixture: { type: 'string', multiple: true },
@@ -128,7 +128,7 @@ function execFor(fixture: string): AgentExec {
   }
   // No `--model` passes nothing through, deferring to the codex CLI's own
   // default (the adapter runs codex isolated from ~/.codex/config.toml, so
-  // that default is the CLI's built-in one — pass --model to override it).
+  // that default is the CLI's built-in one; pass --model to override it).
   return cached(codexCli(model === undefined ? {} : { model }), { directory })
 }
 

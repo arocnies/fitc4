@@ -55,7 +55,7 @@ export async function loadModel(workspaceDir: string): Promise<LoadedModel> {
 
   // An empty model is not a passing model. A deleted `model.c4`, a wrong path,
   // or an over-broad `exclude` would otherwise yield zero ownership prefixes,
-  // no errors, and a green build — the pipeline would gate on nothing.
+  // no errors, and a green build. The pipeline would gate on nothing.
   if (errors.length === 0 && [...model.elements()].length === 0) {
     errors.push(`${workspaceDir}: no LikeC4 elements found; is there a model in this workspace?`)
   }
