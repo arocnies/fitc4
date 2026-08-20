@@ -42,7 +42,7 @@ describe('external-package constraints', () => {
     expect(result.findings.filter((finding) => finding.description.includes('lodash'))).toEqual([])
   })
 
-  // The ratchet works on package edges exactly as on file edges.
+  // Declared drift works on package edges exactly as on file edges.
   test('a drift-tagged relationship covers a package edge', () => {
     const drift = findingFor(result.findings, 'drift-relationship')
     expect(drift?.subject).toEqual({

@@ -5,10 +5,10 @@ import { architectureRules } from '../src/providers/architecture-rules.ts'
 import { exitCodeFor, renderReport } from '../src/report.ts'
 import { findingFor, ruleIds, runFixture } from './helpers.ts'
 
-// The drift ratchet: a brownfield repo declares the edges the code actually
+// Declared drift: a brownfield repo declares the edges the code actually
 // has but the target architecture does not want, tagged in the model. Tagged
 // edges are permitted but counted; an edge nothing exercises must be deleted.
-describe('the drift ratchet', () => {
+describe('declared drift', () => {
   // One shared default run; only the override tests re-run the pipeline.
   let drift: PipelineResult
   beforeAll(async () => {
@@ -42,7 +42,7 @@ describe('the drift ratchet', () => {
     ])
   })
 
-  // The ratchet's shrink mechanism: the code no longer does this, so the model
+  // How the declared set shrinks: the code no longer does this, so the model
   // must stop tolerating it.
   test('a drift edge nothing exercises anymore demands deletion', () => {
     const { findings } = drift
@@ -80,7 +80,7 @@ describe('the drift ratchet', () => {
     expect(exitCodeFor(result)).toBe(1)
   })
 
-  // The hard ratchet: an edge the code stopped exercising fails the gate until
+  // Promoted to error: an edge the code stopped exercising fails the gate until
   // it is deleted from the model.
   test('a severity override turns unused drift into a gate failure', async () => {
     const result = await runFixture('drift', {

@@ -45,7 +45,7 @@ model {
     #drift
   }
 
-  // Declared drift no code exercises anymore — the ratchet must demand its
+  // Declared drift no code exercises anymore. The rules must demand its
   // deletion.
   mono.ui -> mono.legacy 'old entry point' {
     #drift
