@@ -93,6 +93,12 @@ export function renderReport(result: PipelineResult): Report {
       `${counts.error} errors, ${counts.warning} warnings, ${counts.info} info`,
   )
 
+  // One quiet line, not a URL per finding: the per-finding links live in
+  // `--json`, where a consumer can carry them into an issue.
+  if (result.viewerBaseUrl !== undefined) {
+    lines.push(`viewer: ${result.viewerBaseUrl}`)
+  }
+
   return { text: lines.join('\n'), exitCode }
 }
 

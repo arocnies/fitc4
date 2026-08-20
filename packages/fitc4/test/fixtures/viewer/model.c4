@@ -1,0 +1,35 @@
+specification {
+  element system
+  element container
+  element component
+}
+
+model {
+  fixture = system 'Fixture' {
+    app = container 'App' {
+      core = component 'Core'
+      interface = component 'Interface'
+    }
+
+    web = container 'Web' {
+      ui = component 'Ui'
+    }
+  }
+
+  fixture.app.interface -> fixture.app.core
+  fixture.web -> fixture.app
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+
+  view appOnly of fixture.app {
+    include *
+  }
+
+  view everything of fixture {
+    include *, fixture.app.*, fixture.web.*
+  }
+}

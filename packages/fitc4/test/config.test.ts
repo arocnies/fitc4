@@ -33,6 +33,27 @@ const VALID = {
 }
 
 describe('loading the config', () => {
+  // The viewer base names a published site, so it must not be path-resolved,
+  // and its absence is the feature being off, not a default.
+  test('keeps viewerBaseUrl verbatim and optional', () => {
+    expect(loadConfig(writeConfig(VALID)).viewerBaseUrl).toBeUndefined()
+
+    const base = 'https://acme.github.io/arch/#/'
+    expect(loadConfig(writeConfig({ ...VALID, viewerBaseUrl: base })).viewerBaseUrl).toBe(base)
+  })
+
+  test.each([
+    ['a non-string', 7],
+    ['a blank string', '  '],
+    ['a relative path', './site'],
+    ['a schemeless host', 'acme.github.io/arch'],
+    ['a non-http scheme', 'ftp://acme.github.io/arch'],
+  ])('rejects %s viewerBaseUrl', (_label, value) => {
+    expect(() => loadConfig(writeConfig({ ...VALID, viewerBaseUrl: value }))).toThrow(
+      "'viewerBaseUrl' must be an absolute http(s) URL",
+    )
+  })
+
   test('resolves every path relative to the config file', () => {
     const configPath = writeConfig(VALID)
     const base = path.dirname(configPath)

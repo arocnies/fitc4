@@ -86,6 +86,12 @@ export interface Finding {
   evidence?: Evidence[]
   data?: JsonObject
   provider: string
+  /**
+   * A URL into a published LikeC4 viewer showing the elements this finding is
+   * about. Set by the pipeline when the config carries `viewerBaseUrl`; absent
+   * otherwise. See `viewer.ts`.
+   */
+  link?: string
 }
 
 /**
