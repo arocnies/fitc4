@@ -33,6 +33,8 @@ export { exitCodeFor, renderReport, UNMAPPED_SOURCE_GROUP_THRESHOLD } from './re
 
 export { relationshipId, findingId, namespaced } from './ids.ts'
 
+export { viewerLink, viewIdFor, withViewerLinks, INDEX_VIEW_ID } from './viewer.ts'
+
 export {
   OBSERVATION_KINDS,
   REF_KINDS,

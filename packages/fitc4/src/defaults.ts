@@ -50,6 +50,7 @@ export function pipelineConfig(config: ResolvedConfig): PipelineConfig {
   return {
     repositoryRoot: config.repositoryRoot,
     modelDir: config.modelDir,
+    ...(config.viewerBaseUrl === undefined ? {} : { viewerBaseUrl: config.viewerBaseUrl }),
     scan: config.providers?.scan ?? [
       {
         id: TYPESCRIPT_IMPORTS_ID,

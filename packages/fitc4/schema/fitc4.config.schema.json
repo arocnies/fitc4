@@ -34,6 +34,11 @@
       "minLength": 1,
       "pattern": "\\S",
       "description": "tsconfig supplying compiler options (paths, baseUrl) for module resolution. Point this at your project's real tsconfig — a path that cannot be read fails the scan loudly."
+    },
+    "viewerBaseUrl": {
+      "type": "string",
+      "pattern": "^https?://\\S+$",
+      "description": "Optional base URL of a published LikeC4 viewer (likec4 build). When set, every finding in --json carries a link into the viewer and the report footer names the base URL. End it with #/ if the viewer was built with --use-hash-history."
     }
   }
 }

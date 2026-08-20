@@ -88,6 +88,8 @@ That exit 1 is the product: the gate that fails exactly where code and contract 
 
 The module forms default-export the same fields (wrap them in `defineConfig` for editor types) plus optional provider arrays. That is how the agent providers below are composed in. They load as ES modules, so in a CommonJS package (no `"type": "module"`), name the config `fitc4.config.mts`. If your tsconfig typechecks the config file, keep `skipLibCheck: true`. LikeC4's own declarations do not pass a strict lib check.
 
+The optional `viewerBaseUrl` links findings into a published LikeC4 viewer. Publish one with `likec4 build --use-hash-history -o <dir>` to any static host (GitHub Pages works) and set `viewerBaseUrl` to where it is served, ending in `#/` for a hash-history build. Each finding in `--json` then carries a `link` to the most specific view showing the elements involved, the index view otherwise, so a finding pasted into an issue lands on the diagram. The text report only adds a `viewer:` footer line. With no host, `likec4 build --output-single-file` makes a single HTML file that works as a CI artifact.
+
 ## Rules
 
 | Rule | Severity | Meaning |

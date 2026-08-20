@@ -16,6 +16,7 @@ import { messageOf } from './errors.ts'
 import { findingId, namespaced } from './ids.ts'
 import { loadModel } from './model.ts'
 import { isSeverity } from './types.ts'
+import { withViewerLinks } from './viewer.ts'
 import type {
   Association,
   Finding,
@@ -33,6 +34,12 @@ export interface PipelineConfig {
   repositoryRoot: string
   /** Directory containing the LikeC4 workspace. */
   modelDir: string
+  /**
+   * Base URL of a published LikeC4 viewer (`likec4 build`). When set, every
+   * finding gets a `link` into the viewer and the report names the base URL.
+   * Absent means no links; nothing else changes.
+   */
+  viewerBaseUrl?: string
   scan: NamedProvider<ScanProvider>[]
   resolve: NamedProvider<ResolveProvider>[]
   validate: NamedProvider<ValidateProvider>[]
@@ -47,6 +54,8 @@ export interface PhaseProviders {
 
 export interface PipelineResult {
   modelErrors: string[]
+  /** The configured viewer base URL, echoed so `--json` consumers and the report see it. */
+  viewerBaseUrl?: string
   /**
    * Always present, even when the model fails validation: what would have
    * judged the run is part of the result, so a replaced phase is visible in
@@ -71,9 +80,18 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
     validate: config.validate.map((provider) => provider.id),
   }
 
+  const viewer = config.viewerBaseUrl === undefined ? {} : { viewerBaseUrl: config.viewerBaseUrl }
+
   const { model, errors } = await loadModel(config.modelDir)
   if (errors.length > 0) {
-    return { modelErrors: errors, providers, observations: [], associations: [], findings: [] }
+    return {
+      modelErrors: errors,
+      ...viewer,
+      providers,
+      observations: [],
+      associations: [],
+      findings: [],
+    }
   }
 
   const findings: Finding[] = []
@@ -97,12 +115,18 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   )
   findings.push(...produced)
 
+  const finalized = findings.map(withKnownSeverity)
+
   return {
     modelErrors: [],
+    ...viewer,
     providers,
     observations,
     associations,
-    findings: findings.map(withKnownSeverity),
+    findings:
+      config.viewerBaseUrl === undefined
+        ? finalized
+        : withViewerLinks(finalized, model, config.viewerBaseUrl),
   }
 }
 

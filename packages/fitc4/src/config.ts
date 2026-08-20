@@ -51,6 +51,12 @@ export interface FitC4Config {
   scanRoots: string[]
   /** Absolute path to the tsconfig supplying compiler options. */
   tsconfigPath: string
+  /**
+   * Base URL of a published LikeC4 viewer (`likec4 build`). When set, findings
+   * carry links into it; end it with `#/` for a `--use-hash-history` build.
+   * Absent means the feature is off.
+   */
+  viewerBaseUrl?: string
 }
 
 /**
@@ -72,6 +78,8 @@ export interface FitC4FileConfig {
   scanRoots: string[]
   /** Path to the tsconfig supplying compiler options, relative to the config file. */
   tsconfig: string
+  /** Base URL of a published LikeC4 viewer; findings link into it when set. */
+  viewerBaseUrl?: string
   /**
    * Replaces the default scan phase entirely. The default scanner is built
    * from `tsconfig` and `scanRoots`. Rebuild it with
@@ -170,7 +178,15 @@ export async function resolveConfig(configPath: string): Promise<ResolvedConfig>
 }
 
 /** The fields every config form carries. `$schema` is the JSON editor hook. */
-const SHARED_KEYS = ['version', 'repositoryRoot', 'model', 'scanRoots', 'tsconfig', '$schema']
+const SHARED_KEYS = [
+  'version',
+  'repositoryRoot',
+  'model',
+  'scanRoots',
+  'tsconfig',
+  'viewerBaseUrl',
+  '$schema',
+]
 
 /** The provider arrays, legal only where a function can live. */
 const MODULE_KEYS = ['scan', 'resolve', 'validate']
@@ -209,12 +225,49 @@ function validateFields(
     throw new Error(`${configPath}: scanRoots must list at least one directory`)
   }
 
+  const viewerBaseUrl = optionalViewerBaseUrl(configPath, record)
+
   return {
     repositoryRoot: resolve('repositoryRoot'),
     modelDir: resolve('model'),
     scanRoots,
     tsconfigPath: resolve('tsconfig'),
+    ...(viewerBaseUrl === undefined ? {} : { viewerBaseUrl }),
   }
+}
+
+/**
+ * Validate the optional viewer base URL.
+ *
+ * Absolute http(s) only. A relative path or a bare hostname cannot be pasted
+ * from an issue into a browser, so accepting one would mint links that work
+ * for nobody. Deliberately not resolved relative to the config file: this
+ * names a published site, not a file.
+ */
+function optionalViewerBaseUrl(
+  configPath: string,
+  record: Record<string, unknown>,
+): string | undefined {
+  const value = record['viewerBaseUrl']
+  if (value === undefined) return undefined
+
+  const complain = (): never => {
+    throw new Error(
+      `${configPath}: 'viewerBaseUrl' must be an absolute http(s) URL ` +
+        `such as https://acme.github.io/arch/ (end it with #/ for a --use-hash-history build)`,
+    )
+  }
+
+  if (typeof value !== 'string' || value.trim() === '') return complain()
+  const trimmed = value.trim()
+  let parsed: URL
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    return complain()
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return complain()
+  return trimmed
 }
 
 function rejectUnknownKeys(
