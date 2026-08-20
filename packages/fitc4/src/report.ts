@@ -2,7 +2,7 @@
  * Report rendering and the gate decision.
  *
  * The renderer reads only the common finding envelope. It never interprets a
- * provider's `data` — that stays owned by the provider that emitted it, so a
+ * provider's `data`. That stays owned by the provider that emitted it, so a
  * provider can change its private shape without breaking the report.
  */
 
@@ -46,7 +46,7 @@ export function renderReport(result: PipelineResult): Report {
   const counts = countBySeverity(result.findings)
   const lines: string[] = []
 
-  // A reader mid-failure — human or agent — should not have to hunt for what
+  // A reader mid-failure, human or agent, should not have to hunt for what
   // a rule means. The shipped README documents every rule and its fixes, and
   // the local path works offline.
   if (result.findings.length > 0) {
@@ -79,9 +79,9 @@ export function renderReport(result: PipelineResult): Report {
 
   lines.push(...driftBurnDown(result.findings))
 
-  // Who judged the run is part of the run. A config that replaced a phase —
-  // deliberately or by forgetting to spread the defaults back in — is visible
-  // here, not only in the file that did it.
+  // Who judged the run is part of the run. A config that replaced a phase is
+  // visible here, not only in the file that did it, whether it replaced the
+  // phase deliberately or by forgetting to spread the defaults back in.
   lines.push(
     `scan ${result.providers.scan.join(', ')} · ` +
       `resolve ${result.providers.resolve.join(', ')} · ` +
@@ -129,7 +129,7 @@ function groupedUnmappedBlock(unmapped: Finding[]): string[] {
 }
 
 /**
- * The drift ratchet's burn-down, derived from the findings alone so a `--json`
+ * The declared drift burn-down, derived from the findings alone so a `--json`
  * consumer computes the identical numbers: every drift edge yields exactly one
  * `drift-relationship` (exercised) or `unused-drift` (unused) finding.
  */

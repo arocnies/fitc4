@@ -40,7 +40,7 @@ has severity 'error'.`
  * Read the version from this package's own manifest.
  *
  * `../package.json` is correct from both `src/` and `dist/`, which is the
- * point — a hardcoded string would drift from the manifest on the first
+ * point. A hardcoded string would drift from the manifest on the first
  * release that forgets to update it.
  */
 function version(): string {
@@ -67,8 +67,8 @@ const KNOWN_COMMANDS = ['init']
  * Parse argv, rejecting anything unrecognized.
  *
  * A typo'd flag or command that is silently ignored runs the default check
- * instead of what was asked — `--josn` quietly loses the JSON output some
- * script was about to parse. Same fail-open as an ignored config key, so it
+ * instead of what was asked. A typo'd `--josn` quietly loses the JSON output
+ * some script was about to parse. Same fail-open as an ignored config key, so it
  * gets the same treatment: a loud error with a suggestion when one is close.
  */
 function parseArguments(argv: string[]): Arguments {

@@ -1,12 +1,12 @@
 /**
  * The `fitc4` library entry point.
  *
- * The CLI in `cli.ts` is one caller of this surface, not a layer above it —
- * anything it can do is reachable here, so a host project can run the pipeline
+ * The CLI in `cli.ts` is one caller of these exports, not a layer above them.
+ * Anything it can do is reachable here, so a host project can run the pipeline
  * inside its own test suite instead of shelling out.
  *
  * Providers are exported individually rather than behind a registry. Composing
- * them is the caller's job — in code, or in a `fitc4.config.ts` — and a
+ * them is the caller's job, in code or in a `fitc4.config.ts`, and a
  * caller that wants a different scanner supplies a function.
  */
 

@@ -3,7 +3,7 @@
  *
  * `Observation.kind` and `Ref.kind` are the one contract that crosses provider
  * boundaries: a scan provider emitting `import` where the rules look for
- * `dependency` produces no findings and a clean exit — precisely the fail-open
+ * `dependency` produces no findings and a clean exit, precisely the fail-open
  * this project exists to prevent. Left as bare string literals in two files,
  * that contract is invisible until a second scanner gets it wrong.
  *
@@ -54,8 +54,8 @@ export const REF_KINDS = [
    * A LikeC4 element, whatever its C4 kind.
    *
    * Not `component`: an element that owns `sources` may just as well be a
-   * container, and copying the C4 kind here would duplicate — and eventually
-   * contradict — the model. Ask the model when the specific kind matters.
+   * container, and copying the C4 kind here would duplicate the model, then
+   * eventually contradict it. Ask the model when the specific kind matters.
    */
   'element',
   /** A declared relationship, by its stable derived id. */
@@ -67,7 +67,7 @@ export const REF_KINDS = [
   /** A directory, as a repository-relative POSIX path. */
   'directory',
   /**
-   * A module specifier as written — `@acme/lib`, `./sibling`.
+   * A module specifier as written, like `@acme/lib` or `./sibling`.
    *
    * Whether it resolved is a property of the observation, not of the id, so
    * there is no separate `unresolved` ref kind.

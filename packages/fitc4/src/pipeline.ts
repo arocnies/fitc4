@@ -4,7 +4,7 @@
  *   native LikeC4 validation → scan → resolve → validate → report
  *
  * The core sequences the phases, namespaces provider output, and contains
- * provider failures. It never interprets a provider's `data` — it only checks
+ * provider failures. It never interprets a provider's `data`. It only checks
  * that the data could survive serialization.
  *
  * Every containment check here exists to stop the gate failing open. A
@@ -49,8 +49,8 @@ export interface PipelineResult {
   modelErrors: string[]
   /**
    * Always present, even when the model fails validation: what would have
-   * judged the run is part of the result, so a replaced phase — deliberate or
-   * accidental — is visible in every report rather than only in the config.
+   * judged the run is part of the result, so a replaced phase is visible in
+   * every report rather than only in the config, deliberate or accidental.
    */
   providers: PhaseProviders
   observations: Observation[]
@@ -160,7 +160,7 @@ async function runPhase<TProvider, TItem extends { id: string; provider: string 
  * Namespacing prevents two providers colliding on a natural key such as
  * `file:src/index.ts`. `observationId` is deliberately left alone: a resolve
  * provider already received namespaced observations, so it references the
- * namespaced id — and `orphanedAssociations` reports it if that assumption
+ * namespaced id, and `orphanedAssociations` reports it if that assumption
  * turns out to be wrong.
  */
 function ingest<T extends { id: string; provider: string; data?: JsonObject }>(
@@ -175,10 +175,10 @@ function ingest<T extends { id: string; provider: string; data?: JsonObject }>(
  * Reject anything that would not survive a JSON round trip.
  *
  * `JSON.stringify` alone only throws on cycles, BigInt, and throwing getters.
- * Values it silently discards — `undefined`, functions, symbols, Map, Set —
- * would vanish from `--json` output with no error, so the walk below rejects
- * them explicitly; a final `stringify` attempt then catches whatever throws
- * (a hostile getter, say) rather than letting it surface mid-report.
+ * The values it silently discards, `undefined`, functions, symbols, Map, and
+ * Set, would vanish from `--json` output with no error, so the walk below
+ * rejects them explicitly; a final `stringify` attempt then catches whatever
+ * throws (a hostile getter, say) rather than letting it break mid-report.
  */
 function assertJsonSafe(providerId: string, itemId: string, data: JsonObject): void {
   const reject = (reason: string): never => {
@@ -274,7 +274,7 @@ function orphanedAssociations(
  * Force an unrecognized severity to `error`.
  *
  * A finding whose severity is outside the union would otherwise be dropped by
- * the renderer and counted by nothing — invisible and ungated.
+ * the renderer and counted by nothing, so invisible and ungated.
  */
 function withKnownSeverity(finding: Finding): Finding {
   if (isSeverity(finding.severity)) return finding
