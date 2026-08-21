@@ -21,6 +21,16 @@
  * `draft-elements` (which known elements the draft produced) and
  * `draft-edges` (which known relationships its edges covered). Extras are
  * drafted things the reference never declared, invented rather than observed.
+ *
+ * A fixture may additionally pin the gap between today's draft and the
+ * reference, for architectures the draft's granularity is known not to reach.
+ * A reference entry marked `expectedMiss: true` still counts in the misses
+ * column when absent, so the column stays truthful, but a pinned miss does
+ * not fail the row. `expectedExtras` names the coarse drafted output the
+ * reference never declares, counted in the extras column the same way. Every
+ * pin is checked in both directions: an expected miss that is covered and an
+ * expected extra that never appears are stale pins, and a stale pin fails
+ * stub mode so the fixture gets updated instead of rotting silently.
  */
 
 import type { DraftResult } from 'fitc4'
@@ -34,6 +44,8 @@ export interface DraftExpectedElement {
   sources?: string
   /** True when the configured scan cannot observe this element. */
   outsideScan?: boolean
+  /** True when today's draft is known to miss this entry (see the module doc). */
+  expectedMiss?: boolean
 }
 
 export interface DraftExpectedEdge {
@@ -42,6 +54,25 @@ export interface DraftExpectedEdge {
   to: string
   /** True when the configured scan cannot observe this edge. */
   outsideScan?: boolean
+  /** True when today's draft is known to miss this entry (see the module doc). */
+  expectedMiss?: boolean
+}
+
+/** One drafted extra the fixture pins as today's known coarse output. */
+export interface DraftPinnedExtraElement {
+  /** The drafted element's title, exactly as the draft renders it. */
+  title: string
+  /** The drafted `sources` value, when the drafted element declares one. */
+  sources?: string
+}
+
+export interface DraftPinnedExtraEdge {
+  /**
+   * Endpoints in reference names where the drafted endpoint matched a
+   * reference element, drafted identifiers otherwise.
+   */
+  from: string
+  to: string
 }
 
 export interface DraftExpectations {
@@ -49,6 +80,15 @@ export interface DraftExpectations {
   elements: DraftExpectedElement[]
   /** Every relationship of the reference model, as (from, to) pairs. */
   edges: DraftExpectedEdge[]
+  /**
+   * Drafted output the reference never declares but today's draft is known
+   * to emit: the coarse artifacts of first-level-directory granularity.
+   * Counted in the extras column, does not fail the row, stale when absent.
+   */
+  expectedExtras?: {
+    elements?: DraftPinnedExtraElement[]
+    edges?: DraftPinnedExtraEdge[]
+  }
 }
 
 /** One element as the draft rendered it. */
@@ -118,23 +158,45 @@ export function scoreDraft(
           ? element.sources === expected.sources
           : element.title === expected.name),
     )
+    const label = `${expected.name}${expected.sources === undefined ? '' : ` (${expected.sources})`}`
     if (match === undefined) {
       if (expected.outsideScan === true) continue
       elementRow.misses += 1
-      elementRow.notes.push(
-        `missing element: ${expected.name}${expected.sources === undefined ? '' : ` (${expected.sources})`}`,
-      )
+      if (expected.expectedMiss === true) {
+        elementRow.pinned = (elementRow.pinned ?? 0) + 1
+      } else {
+        elementRow.notes.push(`missing element: ${label}`)
+      }
       continue
     }
     matchedElements.add(match)
     referenceName.set(match.id, expected.name)
     elementRow.hits += 1
+    if (expected.expectedMiss === true) {
+      elementRow.stale = (elementRow.stale ?? 0) + 1
+      elementRow.notes.push(`stale pin, expected miss was covered: ${label}. Update expectations.json.`)
+    }
   }
+  const pinnedExtraElements = [...(expectations.expectedExtras?.elements ?? [])]
   for (const element of elements) {
     if (matchedElements.has(element)) continue
     elementRow.extras += 1
+    const pinIndex = pinnedExtraElements.findIndex(
+      (pin) => pin.title === element.title && pin.sources === element.sources,
+    )
+    if (pinIndex !== -1) {
+      pinnedExtraElements.splice(pinIndex, 1)
+      elementRow.pinned = (elementRow.pinned ?? 0) + 1
+      continue
+    }
     elementRow.notes.push(
       `invented element: ${element.title}${element.sources === undefined ? '' : ` (${element.sources})`}`,
+    )
+  }
+  for (const pin of pinnedExtraElements) {
+    elementRow.stale = (elementRow.stale ?? 0) + 1
+    elementRow.notes.push(
+      `stale pin, expected extra never appeared: ${pin.title}${pin.sources === undefined ? '' : ` (${pin.sources})`}. Update expectations.json.`,
     )
   }
 
@@ -150,18 +212,53 @@ export function scoreDraft(
     if (match === undefined) {
       if (expected.outsideScan === true) continue
       edgeRow.misses += 1
-      edgeRow.notes.push(`missing relationship: ${expected.from} -> ${expected.to}`)
+      if (expected.expectedMiss === true) {
+        edgeRow.pinned = (edgeRow.pinned ?? 0) + 1
+      } else {
+        edgeRow.notes.push(`missing relationship: ${expected.from} -> ${expected.to}`)
+      }
       continue
     }
     matchedEdges.add(match)
     edgeRow.hits += 1
+    if (expected.expectedMiss === true) {
+      edgeRow.stale = (edgeRow.stale ?? 0) + 1
+      edgeRow.notes.push(
+        `stale pin, expected miss was covered: ${expected.from} -> ${expected.to}. Update expectations.json.`,
+      )
+    }
   }
+  const pinnedExtraEdges = [...(expectations.expectedExtras?.edges ?? [])]
   for (const edge of edges) {
     if (matchedEdges.has(edge)) continue
     const from = referenceName.get(edge.from) ?? edge.from
     const to = referenceName.get(edge.to) ?? edge.to
     edgeRow.extras += 1
+    const pinIndex = pinnedExtraEdges.findIndex((pin) => pin.from === from && pin.to === to)
+    if (pinIndex !== -1) {
+      pinnedExtraEdges.splice(pinIndex, 1)
+      edgeRow.pinned = (edgeRow.pinned ?? 0) + 1
+      continue
+    }
     edgeRow.notes.push(`invented relationship: ${from} -> ${to}`)
+  }
+  for (const pin of pinnedExtraEdges) {
+    edgeRow.stale = (edgeRow.stale ?? 0) + 1
+    edgeRow.notes.push(
+      `stale pin, expected extra never appeared: ${pin.from} -> ${pin.to}. Update expectations.json.`,
+    )
+  }
+
+  // Pinned misses and extras stay out of the per-item notes (a deliberately
+  // humbling fixture would drown the scorecard); one summary line per row
+  // keeps them visible without the noise.
+  for (const row of [elementRow, edgeRow]) {
+    const pinned = row.pinned ?? 0
+    if (pinned > 0) {
+      row.notes.unshift(
+        `${pinned} pinned ${pinned === 1 ? 'divergence' : 'divergences'}, expected of today's draft, see the fixture README`,
+      )
+    }
   }
 
   return { fixture, providers: [edgeRow, elementRow].sort((a, b) => a.provider.localeCompare(b.provider)) }
