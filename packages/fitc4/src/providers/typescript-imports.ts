@@ -57,6 +57,14 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
   return async (context: ScanContext): Promise<Observation[]> => {
     const compilerOptions = readCompilerOptions(options.tsconfigPath)
     const declaredPackages = declaredPackageLookup(context.repositoryRoot)
+    // One resolution cache per scan run. Without it every import re-walks
+    // node_modules from its own directory; with it TypeScript reuses per-
+    // directory results. In-memory only, discarded with the run.
+    const resolutionCache = ts.createModuleResolutionCache(
+      context.repositoryRoot,
+      (fileName) => (ts.sys.useCaseSensitiveFileNames ? fileName : fileName.toLowerCase()),
+      compilerOptions,
+    )
     const observations: Observation[] = []
 
     // A scan root that does not exist, or holds no source, silently reduces
@@ -129,6 +137,7 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
           dependencyObservation(
             context,
             compilerOptions,
+            resolutionCache,
             declaredPackages,
             absolute,
             relative,
@@ -293,6 +302,7 @@ function isTypeOnlyReExport(node: ts.ExportDeclaration): boolean {
 function dependencyObservation(
   context: ScanContext,
   compilerOptions: ts.CompilerOptions,
+  resolutionCache: ts.ModuleResolutionCache,
   declaredPackages: DeclaredPackageLookup,
   containingFile: string,
   from: string,
@@ -304,6 +314,7 @@ function dependencyObservation(
     containingFile,
     compilerOptions,
     ts.sys,
+    resolutionCache,
   ).resolvedModule
 
   // The location is part of the id: two references from one file to one target
