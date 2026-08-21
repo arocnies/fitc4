@@ -132,6 +132,8 @@ validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
 
 promotes new unowned code from a nudge to a gate failure. That is worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. It also turns a typo'd `sources` metadata key loud: LikeC4 metadata is freeform, so `source` is silently valid and just leaves the element owning nothing.
 
+Type-only imports get their own policy. The scanner knows when a crossing is erased at compile time (`import type { X }`, `import { type X }` with only type specifiers, `export type { X } from`), and an edge counts as type-only only when every dependency behind it is; a mixed import like `import { type X, y }` is a value import. `architectureRules({ typeOnlyImports })` decides what that means: the default `'enforce'` keeps the standard severities but appends `(type-only)` to the boundary finding, `'info'` downgrades `missing-relationship` and `relationship-direction` on purely type-only edges to info, and `'ignore'` drops them. Ignored means not counted anywhere: under `'ignore'` a type-only import also stops exercising a drift-tagged relationship, so a drift edge kept alive only by type imports reports as `unused-drift`.
+
 ## Tolerated drift
 
 A brownfield codebase fails a truthful model on day one. The escape hatch is not a baseline file. It is the model itself: declare the dependencies that really exist and tag them as drift.

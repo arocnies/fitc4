@@ -54,6 +54,7 @@ export {
 export type {
   ArchitectureRuleId,
   ArchitectureRulesOptions,
+  TypeOnlyImportsPolicy,
 } from './providers/architecture-rules.ts'
 export { sourceRoot, ownerOf, PROVIDER_ID as SOURCE_ROOT_PROVIDER_ID } from './providers/source-root.ts'
 export {

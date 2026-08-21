@@ -57,6 +57,14 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
   return async (context: ScanContext): Promise<Observation[]> => {
     const compilerOptions = readCompilerOptions(options.tsconfigPath)
     const declaredPackages = declaredPackageLookup(context.repositoryRoot)
+    // One resolution cache per scan run. Without it every import re-walks
+    // node_modules from its own directory; with it TypeScript reuses per-
+    // directory results. In-memory only, discarded with the run.
+    const resolutionCache = ts.createModuleResolutionCache(
+      context.repositoryRoot,
+      (fileName) => (ts.sys.useCaseSensitiveFileNames ? fileName : fileName.toLowerCase()),
+      compilerOptions,
+    )
     const observations: Observation[] = []
 
     // A scan root that does not exist, or holds no source, silently reduces
@@ -129,6 +137,7 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
           dependencyObservation(
             context,
             compilerOptions,
+            resolutionCache,
             declaredPackages,
             absolute,
             relative,
@@ -184,6 +193,18 @@ interface ModuleReference {
   specifier: string
   dependencyKind: DependencyKind
   line: number
+  /**
+   * Whether the reference is erased at compile time.
+   *
+   * True for a type-only clause (`import type { X }`), for named bindings
+   * that are all type-only specifiers (`import { type X, type Y }`), and for
+   * a type-only re-export (`export type { X } from ...`). A mixed import
+   * (`import { type X, y }`) is a value import: `y` survives compilation.
+   * Recorded as `typeOnly` on the dependency observation's data so validation
+   * rules can treat compile-time-only coupling differently from runtime
+   * coupling.
+   */
+  typeOnly: boolean
 }
 
 /**
@@ -200,23 +221,25 @@ function moduleReferences(sourceFile: ts.SourceFile): ModuleReference[] {
     specifier: ts.Expression | undefined,
     dependencyKind: DependencyKind,
     node: ts.Node,
+    typeOnly = false,
   ): void => {
     if (specifier === undefined || !ts.isStringLiteralLike(specifier)) return
     references.push({
       specifier: specifier.text,
       dependencyKind,
       line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+      typeOnly,
     })
   }
 
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node)) {
-      record(node.moduleSpecifier, 'import', node)
+      record(node.moduleSpecifier, 'import', node, isTypeOnlyImport(node))
     } else if (ts.isExportDeclaration(node)) {
-      record(node.moduleSpecifier, 're-export', node)
+      record(node.moduleSpecifier, 're-export', node, isTypeOnlyReExport(node))
     } else if (ts.isImportEqualsDeclaration(node)) {
       if (ts.isExternalModuleReference(node.moduleReference)) {
-        record(node.moduleReference.expression, 'require', node)
+        record(node.moduleReference.expression, 'require', node, node.isTypeOnly)
       }
     } else if (ts.isCallExpression(node)) {
       if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
@@ -241,9 +264,45 @@ function isImportMetaResolve(expression: ts.Expression): boolean {
   return ts.isMetaProperty(expression.expression)
 }
 
+/**
+ * Whether an import declaration is fully erased at compile time.
+ *
+ * `import type { X }` is; so is `import { type X, type Y }` where every named
+ * binding is type-only and there is no default import beside them. A mixed
+ * import keeps at least one runtime binding, and a bare `import './x'` or
+ * `import {} from './x'` still executes the module, so both stay value
+ * imports.
+ */
+function isTypeOnlyImport(node: ts.ImportDeclaration): boolean {
+  const clause = node.importClause
+  if (clause === undefined) return false
+  if (clause.isTypeOnly) return true
+  if (clause.name !== undefined) return false
+
+  const bindings = clause.namedBindings
+  if (bindings === undefined || !ts.isNamedImports(bindings)) return false
+  if (bindings.elements.length === 0) return false
+  return bindings.elements.every((element) => element.isTypeOnly)
+}
+
+/**
+ * Whether a re-export is fully erased at compile time: `export type { X }
+ * from ...`, or named exports that are all type-only specifiers. A bare
+ * `export * from ...` re-exports values, so it stays a value dependency.
+ */
+function isTypeOnlyReExport(node: ts.ExportDeclaration): boolean {
+  if (node.isTypeOnly) return true
+
+  const clause = node.exportClause
+  if (clause === undefined || !ts.isNamedExports(clause)) return false
+  if (clause.elements.length === 0) return false
+  return clause.elements.every((element) => element.isTypeOnly)
+}
+
 function dependencyObservation(
   context: ScanContext,
   compilerOptions: ts.CompilerOptions,
+  resolutionCache: ts.ModuleResolutionCache,
   declaredPackages: DeclaredPackageLookup,
   containingFile: string,
   from: string,
@@ -255,6 +314,7 @@ function dependencyObservation(
     containingFile,
     compilerOptions,
     ts.sys,
+    resolutionCache,
   ).resolvedModule
 
   // The location is part of the id: two references from one file to one target
@@ -293,6 +353,7 @@ function dependencyObservation(
       data: {
         specifier: reference.specifier,
         dependencyKind: reference.dependencyKind,
+        typeOnly: reference.typeOnly,
         external,
         resolved: false,
       },
@@ -312,6 +373,7 @@ function dependencyObservation(
       data: {
         specifier: reference.specifier,
         dependencyKind: reference.dependencyKind,
+        typeOnly: reference.typeOnly,
         external: true,
         resolved: true,
       },
@@ -325,6 +387,7 @@ function dependencyObservation(
     data: {
       specifier: reference.specifier,
       dependencyKind: reference.dependencyKind,
+      typeOnly: reference.typeOnly,
       external: false,
       resolved: true,
     },
