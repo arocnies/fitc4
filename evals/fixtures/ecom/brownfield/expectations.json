@@ -1,0 +1,468 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "subject": {"kind": "element", "id": "ecommerce.orders"},
+      "related": ["ecommerce.payment"],
+      "label": "the pinned tree wires orders -> payment without declaring it; genuine upstream drift"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "subject": {"kind": "element", "id": "ecommerce.orders"},
+      "related": ["ecommerce.warehouse"],
+      "label": "the planted orders -> warehouse edge is undeclared in the model"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "delivery-pricing/metadata.yaml",
+        "label": "the scan attests to having examined delivery-pricing/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "delivery-pricing/template.yaml",
+        "label": "the scan attests to having examined delivery-pricing/template.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "delivery/metadata.yaml",
+        "label": "the scan attests to having examined delivery/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "delivery/template.yaml",
+        "label": "the scan attests to having examined delivery/template.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "frontend-api/metadata.yaml",
+        "label": "the scan attests to having examined frontend-api/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "frontend-api/template.yaml",
+        "label": "the scan attests to having examined frontend-api/template.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "orders/metadata.yaml",
+        "label": "the scan attests to having examined orders/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "orders/template.yaml",
+        "label": "the scan attests to having examined orders/template.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "payment-3p/metadata.yaml",
+        "label": "the scan attests to having examined payment-3p/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "payment/metadata.yaml",
+        "label": "the scan attests to having examined payment/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "payment/template.yaml",
+        "label": "the scan attests to having examined payment/template.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "platform/metadata.yaml",
+        "label": "the scan attests to having examined platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "platform/template.yaml",
+        "label": "the scan attests to having examined platform/template.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "products/metadata.yaml",
+        "label": "the scan attests to having examined products/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "products/template.yaml",
+        "label": "the scan attests to having examined products/template.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "users/metadata.yaml",
+        "label": "the scan attests to having examined users/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "users/template.yaml",
+        "label": "the scan attests to having examined users/template.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "warehouse/metadata.yaml",
+        "label": "the scan attests to having examined warehouse/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "scan-root",
+        "subject": "warehouse/template.yaml",
+        "label": "the scan attests to having examined warehouse/template.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "delivery/metadata.yaml",
+        "target": "orders/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "delivery/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "delivery/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "delivery-pricing/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "orders/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "products/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "users/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "warehouse/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders/metadata.yaml",
+        "target": "delivery-pricing/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders/metadata.yaml",
+        "target": "products/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "payment/metadata.yaml",
+        "target": "payment-3p/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "payment/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "products/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "users/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "warehouse/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "warehouse/metadata.yaml",
+        "target": "users/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "delivery/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "delivery/metadata.yaml",
+        "target": "orders/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "delivery-pricing/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "delivery/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "orders/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "products/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "users/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api/metadata.yaml",
+        "target": "warehouse/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders/metadata.yaml",
+        "target": "delivery-pricing/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders/metadata.yaml",
+        "target": "payment/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders/metadata.yaml",
+        "target": "products/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "payment/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "payment/metadata.yaml",
+        "target": "payment-3p/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "products/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "users/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "warehouse/metadata.yaml",
+        "target": "platform/metadata.yaml"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders/metadata.yaml",
+        "target": "warehouse/metadata.yaml"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "ecommerce.delivery",
+        "target": "ecommerce.orders",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.delivery",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.delivery",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.deliveryPricing",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.orders",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.products",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.users",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.warehouse",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.orders",
+        "target": "ecommerce.deliveryPricing",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.orders",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.orders",
+        "target": "ecommerce.products",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.payment",
+        "target": "ecommerce.payment3p",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.payment",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.products",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.users",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.warehouse",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.warehouse",
+        "target": "ecommerce.users",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.orders",
+        "target": "ecommerce.payment",
+        "declared": false,
+        "label": "the undeclared orders -> payment edge resolves onto no relationship"
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.orders",
+        "target": "ecommerce.warehouse",
+        "declared": false,
+        "label": "the undeclared orders -> warehouse edge resolves onto no relationship"
+      }
+    ]
+  }
+}

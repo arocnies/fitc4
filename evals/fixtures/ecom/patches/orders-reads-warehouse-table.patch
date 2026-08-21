@@ -1,0 +1,27 @@
+diff --git a/orders/metadata.yaml b/orders/metadata.yaml
+index bd886d9..ea50811 100644
+--- a/orders/metadata.yaml
++++ b/orders/metadata.yaml
+@@ -11,4 +11,5 @@ parameters:
+   PaymentApiArn: /ecommerce/{Environment}/payment/api/arn
+   PaymentApiUrl: /ecommerce/{Environment}/payment/api/url
+   ProductsApiArn: /ecommerce/{Environment}/products/api/arn
+-  ProductsApiUrl: /ecommerce/{Environment}/products/api/url
+\ No newline at end of file
++  ProductsApiUrl: /ecommerce/{Environment}/products/api/url
++  WarehouseTableName: /ecommerce/{Environment}/warehouse/table/name
+\ No newline at end of file
+diff --git a/orders/template.yaml b/orders/template.yaml
+index f751110..7c30e2a 100644
+--- a/orders/template.yaml
++++ b/orders/template.yaml
+@@ -38,6 +38,9 @@ Parameters:
+   ProductsApiArn:
+     Type: AWS::SSM::Parameter::Value<String>
+     Description: Products API Gateway ARN
++  WarehouseTableName:
++    Type: AWS::SSM::Parameter::Value<String>
++    Description: Warehouse DynamoDB table name
+ 
+ 
+ Globals:

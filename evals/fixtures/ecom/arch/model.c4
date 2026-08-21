@@ -1,0 +1,141 @@
+// AWS Serverless Ecommerce Platform (aws-samples/aws-serverless-ecommerce-platform,
+// MIT-0, archived July 2024), pinned at 3b9ef36dd3e3. The relationships transcribe
+// the declared architecture the pinned sources state for themselves: every entry of
+// every service's metadata.yaml `dependencies:` list is one outbound edge, nothing
+// more. The transcription is verified mechanically at authoring time; see the
+// fixture README for the oracle and its two documented leftovers.
+//
+// The one deliberate consequence of transcribing the dependencies lists exactly:
+// orders' own metadata.yaml wires payment's API into the stack (the PaymentApiArn
+// and PaymentApiUrl entries under `parameters:`) while its `dependencies:` list
+// omits payment. That drift ships in the pristine upstream tree, so the greenfield
+// variant pins the resulting missing-relationship error as a genuine finding
+// rather than declaring the edge away.
+//
+// Each service owns its own top-level directory, which is also where its
+// metadata.yaml and SAM template live, so ownership grounding needs no invented
+// stand-in directories. The service's metadata.yaml stands in for it wherever a
+// fact needs a file, because it is the file the declared architecture lives in.
+// Event reactions (EventBridge rules on the platform bus) are deliberately not
+// modelled; docs/service_to_service.md decouples emitters from reactors through
+// the platform bus, and upstream's own dependencies lists do not count them.
+
+specification {
+  element system
+  element service
+}
+
+model {
+  ecommerce = system 'Serverless Ecommerce Platform' {
+    delivery = service 'Delivery' {
+      description 'Manages the delivery of packages to customers'
+      metadata {
+        sources 'delivery/**'
+      }
+    }
+
+    deliveryPricing = service 'Delivery pricing' {
+      description 'Quotes delivery pricing for an order; upstream directory delivery-pricing'
+      metadata {
+        sources 'delivery-pricing/**'
+      }
+    }
+
+    frontendApi = service 'Frontend API' {
+      description 'GraphQL API exposing the platform to end users; upstream directory frontend-api'
+      metadata {
+        sources 'frontend-api/**'
+      }
+    }
+
+    orders = service 'Orders' {
+      description 'Stores and manages customer orders'
+      metadata {
+        sources 'orders/**'
+      }
+    }
+
+    payment = service 'Payment' {
+      description 'Manages payment collection against the third party payment system'
+      metadata {
+        sources 'payment/**'
+      }
+    }
+
+    payment3p = service 'Payment third party' {
+      description 'Mock third party payment system; a CDK app rather than a SAM template, upstream directory payment-3p'
+      metadata {
+        sources 'payment-3p/**'
+      }
+    }
+
+    platform = service 'Platform' {
+      description 'Shared infrastructure: the EventBridge event bus every service publishes to'
+      metadata {
+        sources 'platform/**'
+      }
+    }
+
+    products = service 'Products' {
+      description 'Serves the product catalog and validates products in orders'
+      metadata {
+        sources 'products/**'
+      }
+    }
+
+    users = service 'Users' {
+      description 'Manages user accounts through Amazon Cognito'
+      metadata {
+        sources 'users/**'
+      }
+    }
+
+    warehouse = service 'Warehouse' {
+      description 'Manages packaging requests for created orders'
+      metadata {
+        sources 'warehouse/**'
+      }
+    }
+  }
+
+  // delivery, per delivery/metadata.yaml
+  ecommerce.delivery -> ecommerce.orders 'dependencies: orders'
+  ecommerce.delivery -> ecommerce.platform 'dependencies: platform'
+
+  // frontend-api, per frontend-api/metadata.yaml
+  ecommerce.frontendApi -> ecommerce.delivery 'dependencies: delivery'
+  ecommerce.frontendApi -> ecommerce.deliveryPricing 'dependencies: delivery-pricing'
+  ecommerce.frontendApi -> ecommerce.orders 'dependencies: orders'
+  ecommerce.frontendApi -> ecommerce.products 'dependencies: products'
+  ecommerce.frontendApi -> ecommerce.users 'dependencies: users'
+  ecommerce.frontendApi -> ecommerce.warehouse 'dependencies: warehouse'
+
+  // orders, per orders/metadata.yaml. Note the absence of payment: the upstream
+  // dependencies list omits it even though the same file's parameters wire
+  // payment's API in. The gate reports that, not the model.
+  ecommerce.orders -> ecommerce.deliveryPricing 'dependencies: delivery-pricing'
+  ecommerce.orders -> ecommerce.platform 'dependencies: platform'
+  ecommerce.orders -> ecommerce.products 'dependencies: products'
+
+  // payment, per payment/metadata.yaml
+  ecommerce.payment -> ecommerce.payment3p 'dependencies: payment-3p'
+  ecommerce.payment -> ecommerce.platform 'dependencies: platform'
+
+  // products, per products/metadata.yaml
+  ecommerce.products -> ecommerce.platform 'dependencies: platform'
+
+  // users, per users/metadata.yaml
+  ecommerce.users -> ecommerce.platform 'dependencies: platform'
+
+  // warehouse, per warehouse/metadata.yaml. warehouse -> users is declared
+  // upstream but wires no SSM parameter at this pin, so the scan never
+  // observes it; a declared edge without observations is not a finding.
+  ecommerce.warehouse -> ecommerce.platform 'dependencies: platform'
+  ecommerce.warehouse -> ecommerce.users 'dependencies: users'
+}
+
+views {
+  view index of ecommerce {
+    include *
+  }
+}

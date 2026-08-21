@@ -1,0 +1,275 @@
+[
+  {
+    "when": {"promptIncludes": "Carry out the scan instructions"},
+    "reply": {
+      "observations": [
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "delivery/metadata.yaml"},
+          "target": {"kind": "file", "id": "orders/metadata.yaml"},
+          "description": "delivery declares a dependency on orders",
+          "evidence": [{"path": "delivery/metadata.yaml", "line": 3}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "delivery/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "delivery declares a dependency on platform",
+          "evidence": [{"path": "delivery/metadata.yaml", "line": 4}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "delivery/metadata.yaml"},
+          "description": "frontend-api declares a dependency on delivery",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 3}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "delivery-pricing/metadata.yaml"},
+          "description": "frontend-api declares a dependency on delivery-pricing",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 4}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "orders/metadata.yaml"},
+          "description": "frontend-api declares a dependency on orders",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 5}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "products/metadata.yaml"},
+          "description": "frontend-api declares a dependency on products",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 6}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "users/metadata.yaml"},
+          "description": "frontend-api declares a dependency on users",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 7}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "warehouse/metadata.yaml"},
+          "description": "frontend-api declares a dependency on warehouse",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 8}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "orders/metadata.yaml"},
+          "target": {"kind": "file", "id": "delivery-pricing/metadata.yaml"},
+          "description": "orders declares a dependency on delivery-pricing",
+          "evidence": [{"path": "orders/metadata.yaml", "line": 3}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "orders/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "orders declares a dependency on platform",
+          "evidence": [{"path": "orders/metadata.yaml", "line": 4}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "orders/metadata.yaml"},
+          "target": {"kind": "file", "id": "products/metadata.yaml"},
+          "description": "orders declares a dependency on products",
+          "evidence": [{"path": "orders/metadata.yaml", "line": 5}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "payment/metadata.yaml"},
+          "target": {"kind": "file", "id": "payment-3p/metadata.yaml"},
+          "description": "payment declares a dependency on payment-3p",
+          "evidence": [{"path": "payment/metadata.yaml", "line": 3}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "payment/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "payment declares a dependency on platform",
+          "evidence": [{"path": "payment/metadata.yaml", "line": 4}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "products/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "products declares a dependency on platform",
+          "evidence": [{"path": "products/metadata.yaml", "line": 3}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "users/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "users declares a dependency on platform",
+          "evidence": [{"path": "users/metadata.yaml", "line": 3}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "warehouse/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "warehouse declares a dependency on platform",
+          "evidence": [{"path": "warehouse/metadata.yaml", "line": 3}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "warehouse/metadata.yaml"},
+          "target": {"kind": "file", "id": "users/metadata.yaml"},
+          "description": "warehouse declares a dependency on users",
+          "evidence": [{"path": "warehouse/metadata.yaml", "line": 4}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "delivery/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "delivery wires EventBusArn to an SSM path in platform's namespace",
+          "evidence": [{"path": "delivery/metadata.yaml", "line": 6}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "delivery/metadata.yaml"},
+          "target": {"kind": "file", "id": "orders/metadata.yaml"},
+          "description": "delivery wires OrdersApiUrl to an SSM path in orders's namespace",
+          "evidence": [{"path": "delivery/metadata.yaml", "line": 8}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "delivery-pricing/metadata.yaml"},
+          "description": "frontend-api wires DeliveryPricingApiArn to an SSM path in delivery-pricing's namespace",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 10}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "delivery/metadata.yaml"},
+          "description": "frontend-api wires DeliveryTableName to an SSM path in delivery's namespace",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 12}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "orders/metadata.yaml"},
+          "description": "frontend-api wires OrdersTableName to an SSM path in orders's namespace",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 13}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "products/metadata.yaml"},
+          "description": "frontend-api wires ProductsTableName to an SSM path in products's namespace",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 15}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "users/metadata.yaml"},
+          "description": "frontend-api wires UserPoolId to an SSM path in users's namespace",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 16}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "frontend-api/metadata.yaml"},
+          "target": {"kind": "file", "id": "warehouse/metadata.yaml"},
+          "description": "frontend-api wires WarehouseTableName to an SSM path in warehouse's namespace",
+          "evidence": [{"path": "frontend-api/metadata.yaml", "line": 17}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "orders/metadata.yaml"},
+          "target": {"kind": "file", "id": "delivery-pricing/metadata.yaml"},
+          "description": "orders wires DeliveryApiArn to an SSM path in delivery-pricing's namespace",
+          "evidence": [{"path": "orders/metadata.yaml", "line": 7}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "orders/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "orders wires EventBusArn to an SSM path in platform's namespace",
+          "evidence": [{"path": "orders/metadata.yaml", "line": 9}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "orders/metadata.yaml"},
+          "target": {"kind": "file", "id": "payment/metadata.yaml"},
+          "description": "orders wires PaymentApiArn to an SSM path in payment's namespace",
+          "evidence": [{"path": "orders/metadata.yaml", "line": 11}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "orders/metadata.yaml"},
+          "target": {"kind": "file", "id": "products/metadata.yaml"},
+          "description": "orders wires ProductsApiArn to an SSM path in products's namespace",
+          "evidence": [{"path": "orders/metadata.yaml", "line": 13}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "payment/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "payment wires EventBusName to an SSM path in platform's namespace",
+          "evidence": [{"path": "payment/metadata.yaml", "line": 6}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "payment/metadata.yaml"},
+          "target": {"kind": "file", "id": "payment-3p/metadata.yaml"},
+          "description": "payment wires Payment3PApiUrl to an SSM path in payment-3p's namespace",
+          "evidence": [{"path": "payment/metadata.yaml", "line": 7}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "products/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "products wires EventBusArn to an SSM path in platform's namespace",
+          "evidence": [{"path": "products/metadata.yaml", "line": 9}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "users/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "users wires EventBusArn to an SSM path in platform's namespace",
+          "evidence": [{"path": "users/metadata.yaml", "line": 5}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "warehouse/metadata.yaml"},
+          "target": {"kind": "file", "id": "platform/metadata.yaml"},
+          "description": "warehouse wires EventBusArn to an SSM path in platform's namespace",
+          "evidence": [{"path": "warehouse/metadata.yaml", "line": 6}]
+        },
+        {
+          "kind": "dependency",
+          "subject": {"kind": "file", "id": "orders/metadata.yaml"},
+          "target": {"kind": "file", "id": "warehouse/metadata.yaml"},
+          "description": "orders wires WarehouseTableName to an SSM path in warehouse's namespace",
+          "evidence": [{"path": "orders/metadata.yaml", "line": 15}]
+        }
+      ],
+      "examined": [
+        "delivery-pricing/metadata.yaml",
+        "delivery-pricing/template.yaml",
+        "delivery/metadata.yaml",
+        "delivery/template.yaml",
+        "frontend-api/metadata.yaml",
+        "frontend-api/template.yaml",
+        "orders/metadata.yaml",
+        "orders/template.yaml",
+        "payment-3p/metadata.yaml",
+        "payment/metadata.yaml",
+        "payment/template.yaml",
+        "platform/metadata.yaml",
+        "platform/template.yaml",
+        "products/metadata.yaml",
+        "products/template.yaml",
+        "users/metadata.yaml",
+        "users/template.yaml",
+        "warehouse/metadata.yaml",
+        "warehouse/template.yaml"
+      ]
+    }
+  }
+]
