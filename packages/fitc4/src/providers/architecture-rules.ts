@@ -526,7 +526,7 @@ function coverageRules(
   // scan attested to examining the claim's file: a fragment inside a file
   // nothing examined is outside the scan, the same legal state as a directory
   // outside the scan roots. A claim inside an examined file that no
-  // observation touches is the fragment-side fail-open — a typo'd locator
+  // observation touches is the fragment-side fail-open: a typo'd locator
   // would otherwise silently gate nothing.
   const fragmentSubjects = new Set<string>()
   for (const observation of all) {

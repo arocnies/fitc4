@@ -46,6 +46,8 @@ const FIXTURE_ORDER = [
   'boutique/brownfield',
   'ecom/greenfield',
   'ecom/brownfield',
+  'supabase/greenfield',
+  'supabase/brownfield',
 ]
 
 type FixtureSpec = (exec: AgentExec, root: string) => PipelineConfig | Promise<PipelineConfig>

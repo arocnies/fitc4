@@ -1,0 +1,5 @@
+{
+  "repository": "https://github.com/supabase/supabase",
+  "commit": "7b04fc7d09b97ef68357c0bd7f172da05c9af58f",
+  "sparse": ["docker"]
+}
