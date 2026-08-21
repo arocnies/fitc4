@@ -48,6 +48,7 @@ const FIXTURE_ORDER = [
   'exploratory',
   'ddh/greenfield',
   'ddh/brownfield',
+  'ddh/draft',
   'boutique/greenfield',
   'boutique/brownfield',
   'boutique/draft',

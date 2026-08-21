@@ -7,7 +7,7 @@ This directory holds only what we author:
 - `external.json`, the repository URL and pin
 - `arch/model.c4` and `fitc4.config.json`, the overlay copied onto the pinned sources per run
 - `patches/*.patch`, one planted violation per patch, each named after the upstream rule it breaks
-- `greenfield/` and `brownfield/`, the two fixture variants, each with its own `fitc4.eval.ts`, `replies.json`, and `expectations.json`
+- `greenfield/`, `brownfield/`, and `draft/`, the three fixture variants, each with its own eval spec, `replies.json`, and `expectations.json`
 
 ## What the model transcribes
 
@@ -17,7 +17,7 @@ Granularity is the honest limit. Upstream classifies single files into layers by
 
 The eleven preset rules are package and test hygiene, not layering. `not-to-unresolvable` and `no-non-package-json` correspond to fitc4's own `unresolved-import` rule, and one declared edge (`ddh -> vendor`) transcribes their flip side: anything declared in `package.json` may be imported, from any layer. `not-to-test` and `not-to-spec` are covered in part by fitc4 excluding test paths from the scan. `no-orphans`, `no-deprecated-core`, `not-to-deprecated`, `no-duplicate-dep-types`, `not-to-dev-dep`, `optional-deps-used`, and `peer-deps-used` reason about npm metadata fitc4 does not model, and are not transcribed.
 
-## The two variants
+## The three variants
 
 **greenfield** runs the pinned sources unmodified. The deterministic gate is green, and `agentResolve` gets six candidate decisions: five `slonik` decisions whose one right mapping is the description-only `vendor.postgres` element, and `nanoid`, which no element covers, so the right behavior is abstention.
 
@@ -29,3 +29,11 @@ The eleven preset rules are package and test hygiene, not layering. `not-to-unre
 | `no-domain-to-app-deps.patch` | `user.types.ts` imports the exception interceptor | `missing-relationship` error, `AppRequestContext` is the only exempted target |
 | `no-domain-to-api-deps.patch` | `wallet.entity.ts` imports the shared response base | `missing-relationship` error |
 | `no-infra-to-api-deps.patch` | `user.repository.ts` imports a response DTO | `missing-relationship` error |
+
+**draft** runs `fitc4 draft` over the pinned sources instead of the gate, and it is deliberately humbling. No agent is involved anywhere: the scan provider is the stock `typescript-imports` scanner the default pipeline composes, so stub and live mode run the identical free scan, and the variant measures `draft()` itself. No overlay is copied in, a draft run has no authored model by premise, and the draft is written to a fresh directory inside the disposable work tree.
+
+What today's draft produces from this codebase, deterministically: 5 elements and 10 relationships. The elements are one per first-level directory under the scan root (`src` claiming `src/**` as the catch-all for `main.ts` and `app.module.ts`, `configs`, `libs`, `modules`) plus the `External packages` stub claiming the 20 observed packages. The reference (`../arch/model.c4`, restated as data in `draft/expectations.json`) holds 26 elements and 57 relationships. They meet at exactly 3 element hits (`app` via `src/**`, `configs`, and `libs.shared` via `src/libs/**`, the reference's own catch-all for the shared library) and 2 edge hits (`app -> configs` and `configs -> libs.shared`).
+
+The rest of the gap is pinned rather than hidden, the same philosophy as ecom pinning a real upstream error. Reference entries the draft cannot reach carry `expectedMiss: true`: 17 elements (the per-module `domain/`, `database/`, `dtos/`, `commands/` and `queries/` directories live two and three levels below the scan root, and the three vendor package elements are lumped into the single package stub) and 55 edges. The coarse output the reference never declares is listed under `expectedExtras`: the `modules` element, the package stub, and the 8 edges touching them. Pinned entries stay in the misses and extras columns, so the scorecard stays truthful (`draft-edges 2 hits, 55 misses, 8 extras` reads exactly as bad as it is), but they do not fail stub mode; a pin that stops describing the output, an expected miss that gets covered or an expected extra that vanishes, fails the run so the fixture gets updated. One ordering rule in `expectations.json`: entries carrying `sources` are listed before the title-matched grouping entries, so the drafted element titled `libs` cannot shadow the `libs.shared` sources match.
+
+What the gap means: the draft is a starting point whose granularity is the scan root's first level, and this architecture lives deeper than that. A user drafting ddh for real would point `scanRoots` deeper (at `src/libs` and the module directories) or split the drafted elements by hand, which is the rewrite the draft explicitly asks for. Whether `draft` should offer nested elements itself is an open question, not a promise.

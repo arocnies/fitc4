@@ -69,6 +69,18 @@ export interface ProviderScore {
   hits: number
   misses: number
   extras: number
+  /**
+   * How many of the misses and extras the fixture pinned as expected (see
+   * `harness/draft.ts`). Pinned entries stay in their columns, so the counts
+   * above are always truthful, but they do not fail the row.
+   */
+  pinned?: number
+  /**
+   * Pins that no longer describe the output: an expected miss that was
+   * covered, an expected extra that never appeared. Always fails the row, so
+   * a stale pin forces a fixture update instead of rotting silently.
+   */
+  stale?: number
   /** One line per miss and extra, ready for the scorecard details. */
   notes: string[]
 }
@@ -85,9 +97,14 @@ function isAgentProvider(provider: string): boolean {
   return provider.startsWith('agent-')
 }
 
+/** A row passes when every miss and extra is a pinned one and no pin is stale. */
+export function rowOk(row: ProviderScore): boolean {
+  return row.misses + row.extras === (row.pinned ?? 0) && (row.stale ?? 0) === 0
+}
+
 export function perfect(score: FixtureScore): boolean {
   if (score.error !== undefined) return false
-  return score.providers.every((row) => row.misses === 0 && row.extras === 0)
+  return score.providers.every(rowOk)
 }
 
 export function scoreFixture(
@@ -275,7 +292,7 @@ export function renderScorecard(scores: FixtureScore[]): string {
         String(provider.hits),
         String(provider.misses),
         String(provider.extras),
-        provider.misses === 0 && provider.extras === 0 ? 'ok' : 'FAIL',
+        rowOk(provider) ? 'ok' : 'FAIL',
       ])
     }
   }
