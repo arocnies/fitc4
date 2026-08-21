@@ -6,6 +6,10 @@
 # smoke:  packs the fitc4 tarball, installs it into a throwaway consumer, and
 #         asserts the CLI, library entry point, schema export, and pass/fail
 #         gate behave the way a real npm consumer would see them.
+# likec4 latest (advisory): reruns the fitc4 build and tests with likec4@latest
+#         in place of the lockfile resolution, so skew against new likec4
+#         releases shows up here instead of in a consumer's install. It never
+#         blocks a merge; a red leg means "look at the new likec4 release".
 #
 # `npm ci` runs the package's `prepare` script, which builds dist/ — no
 # separate build step is needed. Node 22 is the matrix floor because the
@@ -47,3 +51,29 @@ jobs:
       - run: npm run verify
 
       - run: npm run smoke
+
+  likec4-latest:
+    name: likec4 latest (advisory)
+    runs-on: ubuntu-latest
+    # Advisory by design: fitc4 declares likec4 as a caret range, so this leg
+    # warns about drift against the newest release without blocking merges.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: install likec4@latest into the workspace
+        run: npm install likec4@latest -w packages/fitc4 --no-save
+
+      - name: print the likec4 version under test
+        run: node -p "require('likec4/package.json').version"
+        working-directory: packages/fitc4
+
+      - name: build and test fitc4 against it
+        run: npm run check -w fitc4

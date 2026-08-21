@@ -57,7 +57,7 @@
     "fitc4": "node dist/cli.js"
   },
   "dependencies": {
-    "likec4": "1.59.2",
+    "likec4": "^1.59.2",
     "typescript": "^6.0.3"
   },
   "devDependencies": {

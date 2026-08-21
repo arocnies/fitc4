@@ -15,7 +15,7 @@ npm install --save-dev fitc4
 npx fitc4 init
 ```
 
-`init` scaffolds `fitc4.config.json`, a starter `arch/model.c4` whose single element owns `src/**` so the very first check is green, and an `AGENTS.md` carrying the norms below. Split the placeholder into real components from there. It never overwrites existing files. Requires Node >= 22.22.3 (the CLI loads `.ts` configs with Node's native type stripping) and a `tsconfig.json`, whose module resolution the scanner uses.
+`init` scaffolds `fitc4.config.json`, a starter `arch/model.c4` whose single element owns `src/**` so the very first check is green, and an `AGENTS.md` carrying the norms below. Split the placeholder into real components from there. It never overwrites existing files. Requires Node >= 22.22.3 (the CLI loads `.ts` configs with Node's native type stripping) and a `tsconfig.json`, whose module resolution the scanner uses. `fitc4` depends on `likec4` as a caret range (`^1.59.2`), so it dedupes with the likec4 your project already installs; an advisory CI leg runs the suite against `likec4@latest` so skew with new releases surfaces there, not in your install.
 
 The pieces, whether scaffolded or written by hand:
 
