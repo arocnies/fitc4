@@ -1,0 +1,128 @@
+[
+  {
+    "when": { "promptIncludes": "Carry out the scan instructions" },
+    "reply": {
+      "observations": [
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/frontend/Dockerfile" },
+          "target": { "kind": "file", "id": "src/productcatalogservice/Dockerfile" },
+          "description": "frontend declares PRODUCT_CATALOG_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/frontend.yaml", "line": 69 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/frontend/Dockerfile" },
+          "target": { "kind": "file", "id": "src/currencyservice/Dockerfile" },
+          "description": "frontend declares CURRENCY_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/frontend.yaml", "line": 71 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/frontend/Dockerfile" },
+          "target": { "kind": "file", "id": "src/cartservice/src/Dockerfile" },
+          "description": "frontend declares CART_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/frontend.yaml", "line": 73 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/frontend/Dockerfile" },
+          "target": { "kind": "file", "id": "src/recommendationservice/Dockerfile" },
+          "description": "frontend declares RECOMMENDATION_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/frontend.yaml", "line": 75 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/frontend/Dockerfile" },
+          "target": { "kind": "file", "id": "src/shippingservice/Dockerfile" },
+          "description": "frontend declares SHIPPING_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/frontend.yaml", "line": 77 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/frontend/Dockerfile" },
+          "target": { "kind": "file", "id": "src/checkoutservice/Dockerfile" },
+          "description": "frontend declares CHECKOUT_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/frontend.yaml", "line": 79 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/frontend/Dockerfile" },
+          "target": { "kind": "file", "id": "src/adservice/Dockerfile" },
+          "description": "frontend declares AD_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/frontend.yaml", "line": 81 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/frontend/Dockerfile" },
+          "target": { "kind": "file", "id": "src/shoppingassistantservice/Dockerfile" },
+          "description": "frontend declares SHOPPING_ASSISTANT_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/frontend.yaml", "line": 83 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/checkoutservice/Dockerfile" },
+          "target": { "kind": "file", "id": "src/productcatalogservice/Dockerfile" },
+          "description": "checkoutservice declares PRODUCT_CATALOG_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/checkoutservice.yaml", "line": 57 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/checkoutservice/Dockerfile" },
+          "target": { "kind": "file", "id": "src/shippingservice/Dockerfile" },
+          "description": "checkoutservice declares SHIPPING_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/checkoutservice.yaml", "line": 59 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/checkoutservice/Dockerfile" },
+          "target": { "kind": "file", "id": "src/paymentservice/Dockerfile" },
+          "description": "checkoutservice declares PAYMENT_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/checkoutservice.yaml", "line": 61 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/checkoutservice/Dockerfile" },
+          "target": { "kind": "file", "id": "src/emailservice/Dockerfile" },
+          "description": "checkoutservice declares EMAIL_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/checkoutservice.yaml", "line": 63 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/checkoutservice/Dockerfile" },
+          "target": { "kind": "file", "id": "src/currencyservice/Dockerfile" },
+          "description": "checkoutservice declares CURRENCY_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/checkoutservice.yaml", "line": 65 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/checkoutservice/Dockerfile" },
+          "target": { "kind": "file", "id": "src/cartservice/src/Dockerfile" },
+          "description": "checkoutservice declares CART_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/checkoutservice.yaml", "line": 67 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/recommendationservice/Dockerfile" },
+          "target": { "kind": "file", "id": "src/productcatalogservice/Dockerfile" },
+          "description": "recommendationservice declares PRODUCT_CATALOG_SERVICE_ADDR",
+          "evidence": [{ "path": "kubernetes-manifests/recommendationservice.yaml", "line": 60 }]
+        }
+      ],
+      "examined": [
+        "kubernetes-manifests/adservice.yaml",
+        "kubernetes-manifests/cartservice.yaml",
+        "kubernetes-manifests/checkoutservice.yaml",
+        "kubernetes-manifests/currencyservice.yaml",
+        "kubernetes-manifests/emailservice.yaml",
+        "kubernetes-manifests/frontend.yaml",
+        "kubernetes-manifests/kustomization.yaml",
+        "kubernetes-manifests/loadgenerator.yaml",
+        "kubernetes-manifests/paymentservice.yaml",
+        "kubernetes-manifests/productcatalogservice.yaml",
+        "kubernetes-manifests/recommendationservice.yaml",
+        "kubernetes-manifests/shippingservice.yaml"
+      ]
+    }
+  }
+]

@@ -1,0 +1,13 @@
+diff --git a/kubernetes-manifests/recommendationservice.yaml b/kubernetes-manifests/recommendationservice.yaml
+index 2d2c6ee..e191665 100644
+--- a/kubernetes-manifests/recommendationservice.yaml
++++ b/kubernetes-manifests/recommendationservice.yaml
+@@ -59,6 +59,8 @@ spec:
+           value: "8080"
+         - name: PRODUCT_CATALOG_SERVICE_ADDR
+           value: "productcatalogservice:3550"
++        - name: PAYMENT_SERVICE_ADDR
++          value: "paymentservice:50051"
+         - name: DISABLE_PROFILER
+           value: "1"
+         resources:
