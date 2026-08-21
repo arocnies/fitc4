@@ -67,9 +67,11 @@ A failed provider contributes nothing, not even a half-scan. The other providers
 
 ```ts
 import { defineConfig, defaultValidate, typescriptImports, TYPESCRIPT_IMPORTS_PROVIDER_ID } from 'fitc4'
-import { agentScan, cached, claudeCli } from 'fitc4/agent'
+import { agentScan, cached, claudeCli, codexCli } from 'fitc4/agent'
 
 const exec = cached(claudeCli({ model: 'sonnet' }))
+// Or the Codex CLI; gpt-5.6-luna also measured perfect across the eval suite:
+// const exec = cached(codexCli({ model: 'gpt-5.6-luna' }))
 
 export default defineConfig({
   version: 1,
@@ -166,7 +168,7 @@ Accepted mappings carry provenance in each fanned-out association's `data` (`{ a
 
 Judgment about how load-bearing to make this belongs to the user, and the dials are the usual ones:
 
-- **Model choice is a severity decision.** A haiku-class model is fine for the advisory tier, whose measured failure mode is noise a human dismisses. For an `agentScan` or `agentResolve` that gates a merge, a sonnet-class model is the measured recommendation: in the 2026-08-21 eval run haiku's scan missed a planted one-line violation in a large compose file, and a scan miss is fail-open, invisible to the gate by construction. See the measured results in [`evals/README.md`](../evals/README.md).
+- **Model choice is a severity decision.** A haiku-class model is fine for the advisory tier, whose measured failure mode is noise a human dismisses. For an `agentScan` or `agentResolve` that gates a merge, use a model that measured perfect across the suite: `codexCli({ model: 'gpt-5.6-luna' })` and `claudeCli({ model: 'sonnet' })` both did, 35/35 on 2026-08-21. In the same run haiku's scan missed a planted one-line violation in a large compose file, and a scan miss is fail-open, invisible to the gate by construction. See the measured results in [`evals/README.md`](../evals/README.md).
 - **Advisory-first prototyping.** New domains start cheap: the pipeline reports private observation kinds as `info` findings (`unknown-observation-kind`), so a first draft of the instructions costs a visible nudge, not a broken build. Wire the domain into the model (ownership metadata, declared relationships, or a custom validate rule that reads your kinds) once the observations look right.
 - **Trigger-driven calls.** `agentResolve` makes zero agent calls when there are no leftover candidates, matching the standing contract of the validate providers: a clean steady state costs nothing.
 - **`cached()` is the cost model.** Both providers' contexts are deterministic, so steady-state CI runs replay the recorded reply for free. A live call happens only when the instructions, the prefilled context, or the exec's fingerprint change. Note the boundary honestly: with `agentic: true` the model may read file *contents* the listing does not carry, so an edit that changes no listed path can replay a stale reply until the cache is cleared. For prototyping that is acceptable. `focus` closes that hole by putting the contents in the request (and therefore in the key), and is the intermediate step before a domain graduates.
