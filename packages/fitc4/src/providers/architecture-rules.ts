@@ -5,9 +5,12 @@
  * ownership. Generic code smells are out of scope by design.
  *
  * This provider reads only `Association`'s own fields and the native model
- * from `ValidateContext`. It never reads another provider's `data`, so it works
- * against the contract rather than against one resolve provider's private
- * shape. Any resolve provider that fills the contract feeds these rules.
+ * from `ValidateContext`. It never reads a resolve provider's `data`, so it
+ * works against the contract rather than against one resolve provider's
+ * private shape. Any resolve provider that fills the contract feeds these
+ * rules. The one observation data field it reads is `typeOnly` on
+ * `dependency` observations, which is part of the shared vocabulary
+ * (see `kinds.ts`), not any provider's private shape.
  */
 
 import { findingId } from '../ids.ts'
@@ -65,6 +68,27 @@ export type ArchitectureRuleId =
 /** The default tag marking a relationship as tolerated drift. */
 export const DEFAULT_DRIFT_TAG = 'drift'
 
+/**
+ * What a boundary crossing made only of type-only imports means.
+ *
+ * The scanner marks a dependency `typeOnly` when the import is erased at
+ * compile time. An edge between two elements aggregates possibly many
+ * dependencies, and the edge is type-only only when every one of them is:
+ * a single value import makes it runtime coupling.
+ *
+ * - `'enforce'` (the default) treats a type-only edge like any other, but the
+ *   boundary finding says `(type-only)` so the report is honest about what
+ *   crossed.
+ * - `'info'` downgrades boundary findings (`missing-relationship`,
+ *   `relationship-direction`) on purely type-only edges to `info` severity.
+ * - `'ignore'` drops those findings entirely. Ignored means not counted
+ *   anywhere: under `'ignore'` a type-only dependency also stops counting as
+ *   exercising a drift-tagged relationship, so a drift edge kept alive only
+ *   by type imports reports as `unused-drift`. Under `'enforce'` and `'info'`
+ *   it still counts.
+ */
+export type TypeOnlyImportsPolicy = 'enforce' | 'info' | 'ignore'
+
 export interface ArchitectureRulesOptions {
   /**
    * Per-rule severity overrides.
@@ -90,6 +114,11 @@ export interface ArchitectureRulesOptions {
    * specification (`tag drift`), since LikeC4 itself rejects unknown tags.
    */
   driftTag?: string
+  /**
+   * How to judge boundary crossings made only of type-only imports.
+   * See `TypeOnlyImportsPolicy`. Defaults to `'enforce'`.
+   */
+  typeOnlyImports?: TypeOnlyImportsPolicy
 }
 
 /** How load-bearing each rule is: the configured override, or the standard severity. */
@@ -105,12 +134,18 @@ export function architectureRules(
 ): NamedProvider<ValidateProvider> {
   const severityOf: SeverityOf = (rule, standard) => options.severity?.[rule] ?? standard
   const driftTag = options.driftTag ?? DEFAULT_DRIFT_TAG
+  const typeOnlyPolicy = options.typeOnlyImports ?? 'enforce'
 
   const run: ValidateProvider = async (context: ValidateContext): Promise<Finding[]> => {
     const observations = new Map(context.observations.map((item) => [item.id, item]))
     const declared = declaredRelationships(context.model)
     const drift = new DriftLedger(declared.byId.values(), driftTag)
     const collector = new FindingCollector()
+
+    // Whether every dependency behind a boundary finding is type-only. Seeded
+    // true on first sight and ANDed per contributing dependency, so a single
+    // value import flips the whole edge to runtime coupling.
+    const edgeIsTypeOnly = new Map<string, boolean>()
 
     for (const association of context.associations) {
       const observation = observations.get(association.observationId)
@@ -119,8 +154,19 @@ export function architectureRules(
       if (observation.kind === 'file') {
         collector.add(fileRule(association, observation, severityOf))
       } else if (observation.kind === 'dependency') {
-        collector.add(dependencyRule(association, observation, declared, severityOf))
-        drift.record(association, observation)
+        const finding = dependencyRule(association, observation, declared, severityOf)
+        if (finding !== undefined) {
+          edgeIsTypeOnly.set(
+            finding.id,
+            (edgeIsTypeOnly.get(finding.id) ?? true) && isTypeOnlyDependency(observation),
+          )
+          collector.add(finding)
+        }
+        // Ignored means not counted anywhere: under 'ignore' a type-only
+        // dependency must not keep a drift edge alive either.
+        if (typeOnlyPolicy !== 'ignore' || !isTypeOnlyDependency(observation)) {
+          drift.record(association, observation)
+        }
       } else if (observation.kind === 'unresolved-dependency') {
         collector.add(unresolvedImportRule(association, observation, severityOf))
       }
@@ -129,7 +175,7 @@ export function architectureRules(
     for (const finding of drift.findings(severityOf)) collector.add(finding)
 
     return [
-      ...collector.findings(),
+      ...applyTypeOnlyPolicy(collector.findings(), edgeIsTypeOnly, typeOnlyPolicy),
       ...coverageRules(context, observations, severityOf),
       ...packageRules(context, observations, severityOf),
       ...unobservedElementsRule(context, severityOf),
@@ -276,6 +322,44 @@ class DriftLedger {
       }
     })
   }
+}
+
+/** Whether a dependency observation records a compile-time-only import. */
+function isTypeOnlyDependency(observation: Observation): boolean {
+  return observation.data?.['typeOnly'] === true
+}
+
+/**
+ * Apply the type-only policy to boundary findings.
+ *
+ * Runs after collection because an edge aggregates possibly many dependencies
+ * and is type-only only when every one of them is. Whatever the policy, a
+ * surviving boundary finding on a purely type-only edge says `(type-only)`,
+ * so even default enforcement is honest about what crossed. Only ids present
+ * in `edgeIsTypeOnly` are boundary findings from dependencies; everything
+ * else passes through untouched.
+ */
+function applyTypeOnlyPolicy(
+  findings: Finding[],
+  edgeIsTypeOnly: Map<string, boolean>,
+  policy: TypeOnlyImportsPolicy,
+): Finding[] {
+  const result: Finding[] = []
+
+  for (const finding of findings) {
+    if (edgeIsTypeOnly.get(finding.id) !== true) {
+      result.push(finding)
+      continue
+    }
+    if (policy === 'ignore') continue
+    result.push({
+      ...finding,
+      ...(policy === 'info' ? { severity: 'info' as const } : {}),
+      description: `${finding.description} (type-only)`,
+    })
+  }
+
+  return result
 }
 
 function fileRule(

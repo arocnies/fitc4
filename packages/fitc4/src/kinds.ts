@@ -22,7 +22,14 @@
 export const OBSERVATION_KINDS = [
   /** A source file exists and is in scope for ownership. */
   'file',
-  /** One thing depends on another. `subject` depends on `target`. */
+  /**
+   * One thing depends on another. `subject` depends on `target`.
+   *
+   * A scanner that can tell may set `data.typeOnly: true` when the dependency
+   * is erased at compile time, like a TypeScript type-only import. This is
+   * the one `data` field the standard rules read; absent or false means a
+   * runtime dependency.
+   */
   'dependency',
   /**
    * A dependency whose target could not be resolved.

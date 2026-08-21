@@ -1,0 +1,55 @@
+specification {
+  element system
+  element component
+  tag drift
+}
+
+model {
+  fixture = system 'Fixture' {
+    core = component 'Core' {
+      metadata {
+        sources 'src/core/**'
+      }
+    }
+
+    interface = component 'Interface' {
+      metadata {
+        sources 'src/interface/**'
+      }
+    }
+
+    mixed = component 'Mixed' {
+      metadata {
+        sources 'src/mixed/**'
+      }
+    }
+
+    legacy = component 'Legacy' {
+      metadata {
+        sources 'src/legacy/**'
+      }
+    }
+
+    reversed = component 'Reversed' {
+      metadata {
+        sources 'src/reversed/**'
+      }
+    }
+  }
+
+  // Tolerated debt exercised only by a type-only import. Under the 'ignore'
+  // policy nothing counts as riding this edge anymore.
+  fixture.legacy -> fixture.core 'legacy types' {
+    #drift
+  }
+
+  // The code has reversed -> core, type-only; the model declares the opposite
+  // direction, so the crossing is a relationship-direction finding.
+  fixture.core -> fixture.reversed 'declared backwards'
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}
