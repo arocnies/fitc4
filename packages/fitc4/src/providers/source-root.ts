@@ -14,6 +14,7 @@ import {
   declaredRelationships,
   hasRelationship,
   isSameOrNested,
+  matchesClaim,
   ownershipPrefixes,
   packageClaims,
   packageNameOf,
@@ -68,14 +69,16 @@ export type Ownership =
   | { status: 'unresolved' }
 
 /**
- * Find the owning element of a repository-relative path.
+ * Find the owning element of a repository-relative path, or of a fragment
+ * subject (`<path>#<fragment>`) inside one.
  *
- * Longest prefix wins, so a nested element takes precedence over its parent.
- * Two equally long matches are ambiguous, and the model, not the file, is at
+ * Longest claim wins, so a nested element takes precedence over its parent,
+ * and a fragment claim beats a directory claim covering the same file. Two
+ * equally long matches are ambiguous, and the model, not the file, is at
  * fault.
  */
 export function ownerOf(filePath: string, prefixes: OwnershipPrefix[]): Ownership {
-  const matches = prefixes.filter((candidate) => filePath.startsWith(candidate.prefix))
+  const matches = prefixes.filter((candidate) => matchesClaim(candidate.prefix, filePath))
   if (matches.length === 0) return { status: 'unresolved' }
 
   const longest = Math.max(...matches.map((match) => match.prefix.length))

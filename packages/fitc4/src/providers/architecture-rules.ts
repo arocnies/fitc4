@@ -19,7 +19,9 @@ import {
   hasRelationship,
   declaredRelationships,
   isAncestorOf,
+  isFragmentClaim,
   isSameOrNested,
+  matchesClaim,
   normalizeSources,
   ownershipPrefixes,
   packageClaims,
@@ -27,6 +29,7 @@ import {
   PACKAGES_KEY,
   SOURCES_KEY,
   type DeclaredRelationship,
+  type OwnershipPrefix,
 } from '../model.ts'
 import type {
   Association,
@@ -508,6 +511,41 @@ function coverageRules(
   }
 
   const all = [...observations.values()]
+
+  const unmatched = (entry: OwnershipPrefix): Finding => ({
+    id: findingId(PROVIDER_ID, 'unmatched-sources', `${entry.elementId}/${entry.declared}`),
+    ruleId: 'unmatched-sources',
+    severity: severityOf('unmatched-sources', 'error'),
+    description: `${entry.elementId} declares sources '${entry.declared}', which matches no scanned file.`,
+    subject: { kind: 'element', id: entry.elementId },
+    provider: PROVIDER_ID,
+  })
+
+  // Fragment claims are matched by the subject and target ids of the scan's
+  // observations rather than by scanned files, and are judged only when the
+  // scan attested to examining the claim's file: a fragment inside a file
+  // nothing examined is outside the scan, the same legal state as a directory
+  // outside the scan roots. A claim inside an examined file that no
+  // observation touches is the fragment-side fail-open — a typo'd locator
+  // would otherwise silently gate nothing.
+  const fragmentSubjects = new Set<string>()
+  for (const observation of all) {
+    for (const ref of [observation.subject, observation.target]) {
+      if (ref?.kind === 'file' && ref.id.includes('#')) fragmentSubjects.add(ref.id)
+    }
+  }
+  const examined = new Set(
+    all
+      .filter((observation) => observation.kind === 'scan-root')
+      .map((observation) => observation.subject?.id ?? ''),
+  )
+  for (const entry of prefixes.filter((candidate) => isFragmentClaim(candidate.prefix))) {
+    if ([...fragmentSubjects].some((subject) => matchesClaim(entry.prefix, subject))) continue
+    if (!examined.has(entry.prefix.slice(0, entry.prefix.indexOf('#')))) continue
+    findings.push(unmatched(entry))
+  }
+
+  const directoryPrefixes = prefixes.filter((candidate) => !isFragmentClaim(candidate.prefix))
   const scanned = all
     .filter((observation) => observation.kind === 'file')
     .map((observation) => observation.subject?.id ?? '')
@@ -528,19 +566,12 @@ function coverageRules(
       return root === '' || root === '.' ? '' : `${root.replace(/\/+$/, '')}/`
     })
 
-  for (const entry of prefixes) {
+  for (const entry of directoryPrefixes) {
     if (scanned.some((filePath) => filePath.startsWith(entry.prefix))) continue
     if (!covered.some((root) => entry.prefix.startsWith(root) || root.startsWith(entry.prefix))) {
       continue
     }
-    findings.push({
-      id: findingId(PROVIDER_ID, 'unmatched-sources', `${entry.elementId}/${entry.declared}`),
-      ruleId: 'unmatched-sources',
-      severity: severityOf('unmatched-sources', 'error'),
-      description: `${entry.elementId} declares sources '${entry.declared}', which matches no scanned file.`,
-      subject: { kind: 'element', id: entry.elementId },
-      provider: PROVIDER_ID,
-    })
+    findings.push(unmatched(entry))
   }
 
   return findings

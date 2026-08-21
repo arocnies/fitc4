@@ -78,7 +78,10 @@ export function normalizeSources(raw: unknown): string[] {
 
 export interface OwnershipPrefix {
   elementId: string
-  /** Repository-relative directory prefix, always ending in `/`. */
+  /**
+   * Repository-relative directory prefix ending in `/`, or a fragment claim
+   * of the form `<file path>#<fragment>` (see `matchesClaim`).
+   */
   prefix: string
   declared: string
 }
@@ -128,10 +131,17 @@ export function ownershipPrefixes(model: LikeC4Model): Ownership {
  * lead and Windows separators, and rejects any surviving wildcard. The trailing
  * slash is load-bearing: without it the prefix `src/` would also claim
  * `src-legacy/`.
+ *
+ * A declared source containing `#` is a fragment claim instead: ownership of
+ * a region inside one file, for domains where several elements live in a
+ * single file (a compose file, a workflow definition). It normalizes to
+ * `<file path>#<fragment>` with no trailing slash; matching semantics live in
+ * `matchesClaim`.
  */
 export function toPrefix(declared: string): { prefix: string } | { reason: string } {
   const trimmed = declared.trim()
   if (trimmed === '') return { reason: 'is empty' }
+  if (trimmed.includes('#')) return toFragmentClaim(trimmed)
 
   const normalized = trimmed
     .replace(/\\/g, '/')
@@ -153,6 +163,56 @@ export function toPrefix(declared: string): { prefix: string } | { reason: strin
   }
 
   return { prefix: `${normalized}/` }
+}
+
+/**
+ * Normalize one fragment claim, `<file path>#<fragment>`.
+ *
+ * The path part gets the same lead and separator tolerance as a directory
+ * prefix; the fragment rides along as an opaque locator. Both halves must be
+ * non-empty and wildcard-free, rejected loudly like any other claim the
+ * matcher cannot honour.
+ */
+function toFragmentClaim(trimmed: string): { prefix: string } | { reason: string } {
+  const hash = trimmed.indexOf('#')
+  const fragment = trimmed.slice(hash + 1)
+  const filePath = trimmed
+    .slice(0, hash)
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '')
+
+  if (filePath === '') return { reason: 'names a fragment without a file' }
+  if (fragment === '') return { reason: 'names a file with an empty fragment' }
+  if (filePath.includes('*') || fragment.includes('*')) {
+    return { reason: 'contains an unsupported wildcard' }
+  }
+
+  return { prefix: `${filePath}#${fragment}` }
+}
+
+/** Whether a normalized ownership prefix is a fragment claim rather than a directory prefix. */
+export function isFragmentClaim(prefix: string): boolean {
+  return prefix.includes('#')
+}
+
+/**
+ * Whether one normalized ownership claim covers a subject id.
+ *
+ * A directory prefix covers any path under it, its trailing slash guarding
+ * the boundary. A fragment claim covers its exact locator and any locator
+ * nested under it at a `.` boundary; the dot plays the trailing slash's role,
+ * so `f#services.auth` never covers `f#services.auth2`. A fragment claim
+ * never covers a plain path, while a directory prefix covers a fragment
+ * subject through its file part, so an unclaimed fragment falls back to
+ * whichever element owns the file.
+ */
+export function matchesClaim(prefix: string, subjectId: string): boolean {
+  if (isFragmentClaim(prefix)) {
+    return subjectId === prefix || subjectId.startsWith(`${prefix}.`)
+  }
+  return subjectId.startsWith(prefix)
 }
 
 /** The package a specifier names: `@scope/name/deep` → `@scope/name`, `name/deep` → `name`. */

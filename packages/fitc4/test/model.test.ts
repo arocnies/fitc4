@@ -66,6 +66,28 @@ describe('toPrefix', () => {
     expect(result).toHaveProperty('reason')
     expect('reason' in result ? result.reason : '').toContain(hint)
   })
+
+  // A fragment claim owns a region inside one file; only its path half is
+  // normalized, the locator rides along opaquely.
+  test.each([
+    ['stack/compose.yml#services.web', 'stack/compose.yml#services.web'],
+    ['./stack/compose.yml#services.web', 'stack/compose.yml#services.web'],
+    ['stack\\compose.yml#services.web', 'stack/compose.yml#services.web'],
+    ['  stack/compose.yml#services.web  ', 'stack/compose.yml#services.web'],
+  ])('normalizes the fragment claim %j to %j', (declared, prefix) => {
+    expect(toPrefix(declared)).toEqual({ prefix })
+  })
+
+  test.each([
+    ['#services.web', 'fragment without a file'],
+    ['stack/compose.yml#', 'empty fragment'],
+    ['stack/*.yml#services.web', 'wildcard'],
+    ['stack/compose.yml#services.*', 'wildcard'],
+  ])('rejects the fragment claim %j', (declared, hint) => {
+    const result = toPrefix(declared)
+    expect(result).toHaveProperty('reason')
+    expect('reason' in result ? result.reason : '').toContain(hint)
+  })
 })
 
 describe('ownership prefixes', () => {
@@ -138,6 +160,52 @@ describe('ownerOf', () => {
     expect(ownerOf('src-legacy/old.ts', [prefixes[0] as (typeof prefixes)[number]])).toEqual({
       status: 'unresolved',
     })
+  })
+})
+
+describe('ownerOf with fragment claims', () => {
+  const declared = 'stack/compose.yml#services.web'
+  const prefixes = [
+    { elementId: 'app.web', prefix: 'stack/compose.yml#services.web', declared },
+    { elementId: 'app.stack', prefix: 'stack/', declared: 'stack/**' },
+  ]
+
+  test('resolves a fragment subject to the claiming element', () => {
+    expect(ownerOf('stack/compose.yml#services.web', prefixes)).toEqual({
+      status: 'resolved',
+      elementId: 'app.web',
+    })
+  })
+
+  test('a locator nested at a dot boundary is still claimed', () => {
+    expect(ownerOf('stack/compose.yml#services.web.environment', prefixes)).toEqual({
+      status: 'resolved',
+      elementId: 'app.web',
+    })
+  })
+
+  // The dot boundary plays the trailing slash's role: without it the claim
+  // `#services.web` would also own `#services.web2`.
+  test('a sibling locator sharing a name prefix falls back to the directory claim', () => {
+    expect(ownerOf('stack/compose.yml#services.web2', prefixes)).toEqual({
+      status: 'resolved',
+      elementId: 'app.stack',
+    })
+  })
+
+  test('a plain file path is never owned by a fragment claim', () => {
+    expect(ownerOf('stack/compose.yml', prefixes)).toEqual({
+      status: 'resolved',
+      elementId: 'app.stack',
+    })
+  })
+
+  test('an unclaimed fragment subject with no directory fallback is unresolved', () => {
+    expect(
+      ownerOf('stack/compose.yml#services.db', [
+        prefixes[0] as (typeof prefixes)[number],
+      ]),
+    ).toEqual({ status: 'unresolved' })
   })
 })
 

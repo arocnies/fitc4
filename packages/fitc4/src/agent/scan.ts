@@ -139,6 +139,8 @@ const PROMPT =
   'it points at (for dependency-shaped facts), and `evidence` cites where you saw it. ' +
   'Every path — in refs of kind file or directory, in evidence, and in examined — must be a ' +
   'repository-relative POSIX path to something that exists in this repository. ' +
+  "A ref of kind file may append '#<fragment>' to scope itself to a region inside the file, but " +
+  'only where the scan instructions define such locators; the path before the # must still exist. ' +
   'List in `examined` every file you actually read; do not list files you did not open. ' +
   'An empty `examined` is treated as a failed scan.'
 
@@ -306,9 +308,21 @@ function toObservation(
   }
 }
 
-/** Refs of kind `file` or `directory` carry paths; other kinds pass through. */
+/**
+ * Refs of kind `file` or `directory` carry paths; other kinds pass through.
+ *
+ * A `file` ref may scope its id to a region inside the file with a fragment
+ * locator (`<path>#<fragment>`), for scan instructions whose subjects share
+ * one file. The path part goes through the hallucination guard like any other
+ * path; the fragment rides along as an opaque locator for ownership
+ * resolution, not a filesystem claim.
+ */
 function guardedRef(ref: { kind: string; id: string }, guard: PathGuard, where: string): Ref {
   if (ref.kind === 'file' || ref.kind === 'directory') {
+    const hash = ref.kind === 'file' ? ref.id.indexOf('#') : -1
+    if (hash > 0 && hash < ref.id.length - 1) {
+      return { kind: ref.kind, id: `${guard(ref.id.slice(0, hash), where)}${ref.id.slice(hash)}` }
+    }
     return { kind: ref.kind, id: guard(ref.id, where) }
   }
   return { kind: ref.kind, id: ref.id }
