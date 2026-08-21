@@ -1,0 +1,36 @@
+{
+  "elements": [
+    { "name": "frontend", "sources": "src/frontend/**" },
+    { "name": "adservice", "sources": "src/adservice/**" },
+    { "name": "cartservice", "sources": "src/cartservice/**" },
+    { "name": "checkoutservice", "sources": "src/checkoutservice/**" },
+    { "name": "currencyservice", "sources": "src/currencyservice/**" },
+    { "name": "emailservice", "sources": "src/emailservice/**" },
+    { "name": "loadgenerator", "sources": "src/loadgenerator/**" },
+    { "name": "paymentservice", "sources": "src/paymentservice/**" },
+    { "name": "productcatalogservice", "sources": "src/productcatalogservice/**" },
+    { "name": "recommendationservice", "sources": "src/recommendationservice/**" },
+    { "name": "shippingservice", "sources": "src/shippingservice/**" },
+    { "name": "shoppingassistantservice", "sources": "src/shoppingassistantservice/**" },
+    { "name": "redis", "outsideScan": true }
+  ],
+  "edges": [
+    { "from": "frontend", "to": "productcatalogservice" },
+    { "from": "frontend", "to": "currencyservice" },
+    { "from": "frontend", "to": "cartservice" },
+    { "from": "frontend", "to": "recommendationservice" },
+    { "from": "frontend", "to": "shippingservice" },
+    { "from": "frontend", "to": "checkoutservice" },
+    { "from": "frontend", "to": "adservice" },
+    { "from": "frontend", "to": "shoppingassistantservice" },
+    { "from": "checkoutservice", "to": "productcatalogservice" },
+    { "from": "checkoutservice", "to": "shippingservice" },
+    { "from": "checkoutservice", "to": "paymentservice" },
+    { "from": "checkoutservice", "to": "emailservice" },
+    { "from": "checkoutservice", "to": "currencyservice" },
+    { "from": "checkoutservice", "to": "cartservice" },
+    { "from": "recommendationservice", "to": "productcatalogservice" },
+    { "from": "cartservice", "to": "redis", "outsideScan": true },
+    { "from": "loadgenerator", "to": "frontend", "outsideScan": true }
+  ]
+}

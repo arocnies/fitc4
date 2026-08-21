@@ -14,6 +14,11 @@
  * - `replies.json`      — the recorded ideal-agent reply per request;
  * - `expectations.json` — what a perfect run produces (see `harness/score.ts`).
  *
+ * A fixture carrying `draft.eval.ts` instead runs `fitc4 draft` rather than
+ * the gate: the spec composes the config `draft()` scans from, and the drafted
+ * model is scored against a reference restatement of the known architecture
+ * (see `harness/draft.ts`).
+ *
  * Stub mode doubles as a regression test of the harness and the pipeline
  * wiring: everything in it is deterministic, so anything short of a perfect
  * score means a fixture or the plumbing broke — never the agent — and the
@@ -27,9 +32,10 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
-import { runPipeline, type PipelineConfig } from 'fitc4'
+import { draft, runPipeline, type PipelineConfig, type ResolvedConfig } from 'fitc4'
 import { cached, claudeCli, codexCli, DEFAULT_CLAUDE_MODEL, type AgentExec } from 'fitc4/agent'
 
+import { scoreDraft, type DraftExpectations } from './harness/draft.ts'
 import { externalManifest, hasCheckout } from './harness/external.ts'
 import { perfect, renderScorecard, scoreFixture, type Expectations, type FixtureScore } from './harness/score.ts'
 import { scriptedExec, type ScriptedReply } from './harness/stub.ts'
@@ -44,11 +50,15 @@ const FIXTURE_ORDER = [
   'ddh/brownfield',
   'boutique/greenfield',
   'boutique/brownfield',
+  'boutique/draft',
   'ecom/greenfield',
   'ecom/brownfield',
 ]
 
 type FixtureSpec = (exec: AgentExec, root: string) => PipelineConfig | Promise<PipelineConfig>
+
+/** A draft fixture's spec composes the config `draft()` runs against instead. */
+type DraftFixtureSpec = (exec: AgentExec, root: string) => ResolvedConfig | Promise<ResolvedConfig>
 
 const { values: flags } = parseArgs({
   options: {
@@ -69,22 +79,29 @@ const evalsDir = import.meta.dirname
 const fixturesDir = path.join(evalsDir, 'fixtures')
 
 /**
- * A fixture is any directory under `fixtures/` holding a `fitc4.eval.ts`. A
- * directory without one may instead hold variant fixtures one level down
- * (`ddh/greenfield`, `ddh/brownfield`), which share the parent's manifest,
- * model, and patches.
+ * A fixture is any directory under `fixtures/` holding a `fitc4.eval.ts` (a
+ * pipeline fixture) or a `draft.eval.ts` (a draft fixture, scored by
+ * `harness/draft.ts`). A directory with neither may instead hold variant
+ * fixtures one level down (`ddh/greenfield`, `boutique/draft`), which share
+ * the parent's manifest, model, and patches.
  */
+function hasSpec(dir: string): boolean {
+  return (
+    fs.existsSync(path.join(dir, 'fitc4.eval.ts')) || fs.existsSync(path.join(dir, 'draft.eval.ts'))
+  )
+}
+
 function discoverFixtures(): string[] {
   const names: string[] = []
   for (const entry of fs.readdirSync(fixturesDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
-    if (fs.existsSync(path.join(fixturesDir, entry.name, 'fitc4.eval.ts'))) {
+    if (hasSpec(path.join(fixturesDir, entry.name))) {
       names.push(entry.name)
       continue
     }
     for (const variant of fs.readdirSync(path.join(fixturesDir, entry.name), { withFileTypes: true })) {
       if (!variant.isDirectory()) continue
-      if (fs.existsSync(path.join(fixturesDir, entry.name, variant.name, 'fitc4.eval.ts'))) {
+      if (hasSpec(path.join(fixturesDir, entry.name, variant.name))) {
         names.push(`${entry.name}/${variant.name}`)
       }
     }
@@ -162,15 +179,26 @@ for (const fixture of selected) {
     continue
   }
 
-  const expectations = readJson(path.join(root, 'expectations.json')) as Expectations
-
   let score: FixtureScore
   try {
-    const specModule = (await import(pathToFileURL(path.join(root, 'fitc4.eval.ts')).href)) as {
-      default: FixtureSpec
+    // A draft fixture runs `draft()` against the composed config, no model in
+    // sight, and scores the drafted text against the reference expectations.
+    // Everything else runs the pipeline exactly as before.
+    if (fs.existsSync(path.join(root, 'draft.eval.ts'))) {
+      const expectations = readJson(path.join(root, 'expectations.json')) as DraftExpectations
+      const specModule = (await import(pathToFileURL(path.join(root, 'draft.eval.ts')).href)) as {
+        default: DraftFixtureSpec
+      }
+      const result = await draft(await specModule.default(execFor(fixture), root))
+      score = scoreDraft(fixture, expectations, result)
+    } else {
+      const expectations = readJson(path.join(root, 'expectations.json')) as Expectations
+      const specModule = (await import(pathToFileURL(path.join(root, 'fitc4.eval.ts')).href)) as {
+        default: FixtureSpec
+      }
+      const result = await runPipeline(await specModule.default(execFor(fixture), root))
+      score = scoreFixture(fixture, expectations, result)
     }
-    const result = await runPipeline(await specModule.default(execFor(fixture), root))
-    score = scoreFixture(fixture, expectations, result)
   } catch (error) {
     score = {
       fixture,

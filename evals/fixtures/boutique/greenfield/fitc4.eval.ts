@@ -35,8 +35,11 @@ export const SCAN_INSTRUCTIONS =
   'no service. List every manifest you read in examined, including manifests that contribute ' +
   'no dependencies.'
 
-/** The `agent-scan` options both variants share; only the workdir differs. */
-export function boutiqueScan(exec: AgentExec) {
+/**
+ * The `agent-scan` options the variants share; only the workdir differs, and
+ * the draft variant appends one rule to the instructions.
+ */
+export function boutiqueScan(exec: AgentExec, instructions: string = SCAN_INSTRUCTIONS) {
   return agentScan({
     exec,
     id: 'manifests',
@@ -47,7 +50,7 @@ export function boutiqueScan(exec: AgentExec) {
     // largest manifest (frontend.yaml, 4032 bytes) whole.
     focus: ['kubernetes-manifests/*.yaml'],
     excerptChars: 4_500,
-    instructions: SCAN_INSTRUCTIONS,
+    instructions,
   })
 }
 
