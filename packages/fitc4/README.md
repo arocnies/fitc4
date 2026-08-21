@@ -235,7 +235,7 @@ export default defineConfig({
 
 The advisor makes zero calls on a clean repository; the review makes one call per described element (cached after the first run).
 
-Judgment quality is measured, not assumed. Against planted ground truth in [`evals/`](https://github.com/arocnies/fitc4/tree/main/evals), `sonnet` and `gpt-5.6-luna` both score 12/12 across the fixture matrix, and the cheap-model failure mode is extra findings rather than silent misses. That is the failure direction a gate can live with.
+Judgment quality is measured, not assumed. Against planted ground truth in [`evals/`](https://github.com/arocnies/fitc4/tree/main/evals), `sonnet` and `gpt-5.6-luna` both score 12/12 across the four checked-in fixtures (the external fixtures have no live measurements yet), and the cheap-model failure mode is extra findings rather than silent misses. That is the failure direction a gate can live with.
 
 The same entry point ships `agentScan` and `agentResolve`. `agentScan` is a scan provider driven by prose instructions, so it can enforce model domains no parser covers: compose files, runbooks, OpenAPI. `agentResolve` maps external and unresolvable dependencies onto model elements, including description-only ones like an external system. Unlike the advisory validate providers these are load-bearing, so they fail closed: any exec failure, off-schema reply, or hallucinated path is a `provider-failure` error, never a quietly thinner run. They are the prototyping path for new model domains. Prose explores, and a proven domain graduates to a small deterministic provider. Details: [`docs/agent-providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/agent-providers.md).
 
