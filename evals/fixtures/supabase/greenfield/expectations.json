@@ -1,0 +1,182 @@
+{
+  "findings": [],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:compose",
+        "kind": "scan-root",
+        "subject": "docker/docker-compose.yml",
+        "label": "the scan attests to having examined docker/docker-compose.yml"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.api-gw",
+        "target": "docker/docker-compose.yml#services.studio"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.auth",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.rest",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.realtime",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.storage",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.storage",
+        "target": "docker/docker-compose.yml#services.rest"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.storage",
+        "target": "docker/docker-compose.yml#services.imgproxy"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.meta",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.functions",
+        "target": "docker/docker-compose.yml#services.api-gw"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.supavisor",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.studio",
+        "target": "docker/docker-compose.yml#services.meta"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.studio",
+        "target": "docker/docker-compose.yml#services.api-gw"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.storage",
+        "target": "docker/docker-compose.yml#services.rest",
+        "label": "the env URL restatement of storage -> rest (POSTGREST_URL)"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.storage",
+        "target": "docker/docker-compose.yml#services.imgproxy",
+        "label": "the env URL restatement of storage -> imgproxy (IMGPROXY_URL)"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.functions",
+        "target": "docker/docker-compose.yml#services.api-gw",
+        "label": "the env URL restatement of functions -> api-gw (SUPABASE_URL)"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "supabase.apiGw",
+        "target": "supabase.studio",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.auth",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.rest",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.realtime",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.storage",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.storage",
+        "target": "supabase.rest",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.storage",
+        "target": "supabase.imgproxy",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.meta",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.functions",
+        "target": "supabase.apiGw",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.supavisor",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.studio",
+        "target": "supabase.meta",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.studio",
+        "target": "supabase.apiGw",
+        "declared": true
+      }
+    ]
+  }
+}

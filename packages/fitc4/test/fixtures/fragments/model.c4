@@ -1,0 +1,38 @@
+// Three services sharing one compose file: the fragment-claim fixture.
+// No directory prefix can give each service its own ownership here, so each
+// element claims its region of the file with a fragment locator.
+specification {
+  element system
+  element service
+}
+
+model {
+  fixture = system 'Fixture' {
+    web = service 'Web' {
+      metadata {
+        sources 'stack/compose.yml#services.web'
+      }
+    }
+
+    api = service 'API' {
+      metadata {
+        sources 'stack/compose.yml#services.api'
+      }
+    }
+
+    db = service 'DB' {
+      metadata {
+        sources 'stack/compose.yml#services.db'
+      }
+    }
+  }
+
+  fixture.web -> fixture.api
+  fixture.api -> fixture.db
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

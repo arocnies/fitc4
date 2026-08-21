@@ -128,6 +128,8 @@ Four more rules appear only when the [agent providers](#agent-providers) are com
 
 An element with no `sources` is legal: a grouping element, or a component implemented elsewhere. An unowned *file* is a finding; an unowned *element* is not. Legal, but not invisible. One `unobserved-elements` info finding per run lists the leaf elements with neither `sources` nor `packages`, so deliberate abstraction stays visible rather than accidental. A relationship declared between two parents covers traffic between their descendants. The scan excludes test files, by filename and by directory.
 
+A `sources` entry containing `#` is a fragment claim, `<file path>#<fragment>`: ownership of a region inside one file, for domains where several elements live in a single file, like a compose file declaring every service of a stack. A scanner that emits subjects of the form `<path>#<fragment>` (the agent scanner accepts them on `file` refs) resolves against fragment claims by the same longest-claim rule; the fragment's dots play the trailing slash's role, and an unclaimed fragment falls back to whichever element owns the file. A fragment claim nothing observes inside an examined file is `unmatched-sources`, same as a directory prefix matching no scanned file.
+
 Above five `unmapped-source` findings the report renders one grouped block: the total, a by-directory breakdown, and the first ten paths. A brownfield repository's unowned files are one adoption fact, not hundreds. `--json` is unchanged and keeps every finding.
 
 The severities above are defaults, not policy. In a `.ts` config:

@@ -1,0 +1,130 @@
+// Supabase self-hosting stack (supabase/supabase, Apache-2.0), pinned at
+// 7b04fc7d09b9, scoped to docker/. The relationships transcribe the explicit
+// architecture docker/docker-compose.yml states for itself: every depends_on
+// entry, plus every environment URL whose host is literally another service
+// declared in the same file. The transcription is verified mechanically at
+// authoring time; see the fixture README for the oracle and its scoping.
+//
+// All eleven services live in that one compose file, so no directory prefix
+// can give each service its own ownership; at this pin most services have no
+// per-service file anywhere under docker/ to stand in for them. Each element
+// therefore claims its region of the compose file with a fragment locator,
+// 'docker/docker-compose.yml#services.<name>', and the scan emits subjects of
+// the same form. See the README's ownership design note.
+//
+// Database URLs assembled from ${POSTGRES_HOST} are deliberately not
+// transcribed as edges: the variable exists so the whole stack can point at
+// an external Postgres, so its host is a deployment choice, not a literal
+// service reference in the file. The db edges below all come from depends_on.
+
+specification {
+  element system
+  element service
+}
+
+model {
+  supabase = system 'Supabase self-hosting stack' {
+    studio = service 'Studio' {
+      description 'The Supabase dashboard'
+      metadata {
+        sources 'docker/docker-compose.yml#services.studio'
+      }
+    }
+
+    apiGw = service 'API gateway' {
+      description 'Envoy, the default API gateway; compose service api-gw, with envoy and kong as network aliases'
+      metadata {
+        sources 'docker/docker-compose.yml#services.api-gw'
+      }
+    }
+
+    auth = service 'Auth' {
+      description 'GoTrue, the authentication and user management API'
+      metadata {
+        sources 'docker/docker-compose.yml#services.auth'
+      }
+    }
+
+    rest = service 'REST' {
+      description 'PostgREST, the RESTful API over Postgres'
+      metadata {
+        sources 'docker/docker-compose.yml#services.rest'
+      }
+    }
+
+    realtime = service 'Realtime' {
+      description 'Websocket subscriptions to database changes'
+      metadata {
+        sources 'docker/docker-compose.yml#services.realtime'
+      }
+    }
+
+    storage = service 'Storage' {
+      description 'The storage API for files and objects'
+      metadata {
+        sources 'docker/docker-compose.yml#services.storage'
+      }
+    }
+
+    imgproxy = service 'Image proxy' {
+      description 'imgproxy, image resizing for storage'
+      metadata {
+        sources 'docker/docker-compose.yml#services.imgproxy'
+      }
+    }
+
+    meta = service 'Postgres meta' {
+      description 'postgres-meta, the database management API studio drives'
+      metadata {
+        sources 'docker/docker-compose.yml#services.meta'
+      }
+    }
+
+    functions = service 'Edge functions' {
+      description 'edge-runtime, the Deno edge function host'
+      metadata {
+        sources 'docker/docker-compose.yml#services.functions'
+      }
+    }
+
+    db = service 'Database' {
+      description 'The Postgres database itself'
+      metadata {
+        sources 'docker/docker-compose.yml#services.db'
+      }
+    }
+
+    supavisor = service 'Pooler' {
+      description 'Supavisor, the connection pooler; compose service supavisor'
+      metadata {
+        sources 'docker/docker-compose.yml#services.supavisor'
+      }
+    }
+  }
+
+  // depends_on edges, in the compose file's service order. The gateway
+  // health-gates on studio while studio's SUPABASE_URL points back at the
+  // gateway; both directions are stated by the file, so both are declared.
+  supabase.apiGw -> supabase.studio 'depends_on: studio'
+  supabase.auth -> supabase.db 'depends_on: db'
+  supabase.rest -> supabase.db 'depends_on: db'
+  supabase.realtime -> supabase.db 'depends_on: db'
+  supabase.storage -> supabase.db 'depends_on: db'
+  supabase.storage -> supabase.rest 'depends_on: rest'
+  supabase.storage -> supabase.imgproxy 'depends_on: imgproxy'
+  supabase.meta -> supabase.db 'depends_on: db'
+  supabase.functions -> supabase.apiGw 'depends_on: api-gw'
+  supabase.supavisor -> supabase.db 'depends_on: db'
+
+  // Environment URL edges naming a literal service host. Three more such
+  // URLs (storage -> rest, storage -> imgproxy, functions -> api-gw) restate
+  // depends_on edges already declared above.
+  supabase.studio -> supabase.meta 'STUDIO_PG_META_URL'
+  supabase.studio -> supabase.apiGw 'SUPABASE_URL'
+}
+
+views {
+  view index of supabase {
+    include *
+  }
+}

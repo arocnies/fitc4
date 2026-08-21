@@ -31,6 +31,7 @@ import path from 'node:path'
 
 import {
   declaredRelationships,
+  matchesClaim,
   ownershipPrefixes,
   packageClaims,
   packageNameOf,
@@ -107,7 +108,7 @@ export function unambiguousOwner(
   filePath: string,
   prefixes: OwnershipPrefix[],
 ): string | undefined {
-  const matches = prefixes.filter((candidate) => filePath.startsWith(candidate.prefix))
+  const matches = prefixes.filter((candidate) => matchesClaim(candidate.prefix, filePath))
   if (matches.length === 0) return undefined
 
   const longest = Math.max(...matches.map((match) => match.prefix.length))

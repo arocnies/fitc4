@@ -5,7 +5,9 @@
  * files, patches) plus an `external.json` manifest naming the upstream
  * repository and the commit it is pinned to. The sources themselves are never
  * vendored: they are cloned once into `evals/.cache/repos/` (gitignored) and
- * reused from there.
+ * reused from there. A manifest may add `sparse` paths, which turn the clone
+ * into a sparse checkout of just those directories; a multi-gigabyte monorepo
+ * pin then costs only the fixture's own slice.
  *
  * The offline contract lives in two halves. `hasCheckout` is the cheap local
  * probe `run.ts` uses to decide whether an external fixture can run at all:
@@ -35,6 +37,14 @@ export interface ExternalManifest {
   repository: string
   /** The full commit SHA the fixture is pinned to. */
   commit: string
+  /**
+   * Optional sparse-checkout paths. When present, the blobless clone starts
+   * with `--no-checkout`, `git sparse-checkout set` limits the work tree to
+   * these paths, and only then is the pin checked out, so a monorepo fixture
+   * materializes (and downloads blobs for) just the directories it scans.
+   * Fixtures without `sparse` behave exactly as before.
+   */
+  sparse?: string[]
 }
 
 /**
@@ -52,7 +62,19 @@ export function externalManifest(fixtureDir: string): ExternalManifest | undefin
     if (typeof parsed.repository !== 'string' || typeof parsed.commit !== 'string') {
       throw new Error(`${file} must carry string 'repository' and 'commit' fields`)
     }
-    return { repository: parsed.repository, commit: parsed.commit }
+    if (
+      parsed.sparse !== undefined &&
+      (!Array.isArray(parsed.sparse) ||
+        parsed.sparse.length === 0 ||
+        parsed.sparse.some((entry) => typeof entry !== 'string' || entry.trim() === ''))
+    ) {
+      throw new Error(`${file} 'sparse' must be a non-empty array of non-empty path strings`)
+    }
+    return {
+      repository: parsed.repository,
+      commit: parsed.commit,
+      ...(parsed.sparse === undefined ? {} : { sparse: parsed.sparse }),
+    }
   }
   return undefined
 }
@@ -88,9 +110,24 @@ export function ensureCheckout(evalsDir: string, manifest: ExternalManifest): st
     fs.rmSync(dir, { recursive: true, force: true })
     fs.mkdirSync(path.dirname(dir), { recursive: true })
     console.log(`fetching ${manifest.repository} at ${manifest.commit} into evals/.cache/repos/`)
-    execFileSync('git', ['clone', '--filter=blob:none', manifest.repository, dir], {
-      stdio: ['ignore', 'inherit', 'inherit'],
-    })
+    // With `sparse`, nothing is checked out until the sparse patterns are in
+    // place, so the checkout below fetches blobs for those paths alone.
+    execFileSync(
+      'git',
+      [
+        'clone',
+        '--filter=blob:none',
+        ...(manifest.sparse === undefined ? [] : ['--no-checkout']),
+        manifest.repository,
+        dir,
+      ],
+      { stdio: ['ignore', 'inherit', 'inherit'] },
+    )
+    if (manifest.sparse !== undefined) {
+      execFileSync('git', ['-C', dir, 'sparse-checkout', 'set', ...manifest.sparse], {
+        stdio: ['ignore', 'ignore', 'inherit'],
+      })
+    }
     execFileSync('git', ['-C', dir, 'checkout', '--detach', manifest.commit], {
       stdio: ['ignore', 'ignore', 'inherit'],
     })
