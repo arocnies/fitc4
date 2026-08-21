@@ -1,0 +1,147 @@
+// Online Boutique (GoogleCloudPlatform/microservices-demo, Apache-2.0),
+// pinned at v0.10.6. The relationships transcribe the service graph the
+// pinned kubernetes-manifests/ declare themselves: every env var named
+// *_SERVICE_ADDR in a service's manifest is one outbound edge, and the env
+// var's value names the target service. Nothing here is invented; see the
+// fixture README for the transcription oracle and its two documented
+// leftovers (REDIS_ADDR and FRONTEND_ADDR, which do not match the naming
+// convention the manifests use for service-to-service edges).
+//
+// Each service owns its build directory src/<name>/, the same directory
+// ownership the non-ts fixture uses, because fitc4 ownership is a directory
+// prefix and the flat manifest files cannot own themselves. The service's
+// Dockerfile inside that directory stands in for it wherever a fact needs a
+// file. redis is the one deliberate exception: its Deployment ships inside
+// cartservice.yaml and it has no src/ directory at this pin, so it stays a
+// description-only element and is expected to surface as unobserved.
+
+specification {
+  element system
+  element service
+}
+
+model {
+  boutique = system 'Online Boutique' {
+    frontend = service 'Frontend' {
+      description 'HTTP storefront; fans out to most other services'
+      metadata {
+        sources 'src/frontend/**'
+      }
+    }
+
+    adservice = service 'Ad service' {
+      description 'Serves contextual text ads'
+      metadata {
+        sources 'src/adservice/**'
+      }
+    }
+
+    cartservice = service 'Cart service' {
+      description 'Stores shopping carts; backed by the redis-cart Deployment in its own manifest'
+      metadata {
+        sources 'src/cartservice/**'
+      }
+    }
+
+    checkoutservice = service 'Checkout service' {
+      description 'Orchestrates an order across cart, catalog, payment, shipping, email and currency'
+      metadata {
+        sources 'src/checkoutservice/**'
+      }
+    }
+
+    currencyservice = service 'Currency service' {
+      description 'Converts money amounts between currencies'
+      metadata {
+        sources 'src/currencyservice/**'
+      }
+    }
+
+    emailservice = service 'Email service' {
+      description 'Sends order confirmation emails'
+      metadata {
+        sources 'src/emailservice/**'
+      }
+    }
+
+    loadgenerator = service 'Load generator' {
+      description 'Locust load generator; exercises the frontend over plain HTTP'
+      metadata {
+        sources 'src/loadgenerator/**'
+      }
+    }
+
+    paymentservice = service 'Payment service' {
+      description 'Charges the (mock) credit card'
+      metadata {
+        sources 'src/paymentservice/**'
+      }
+    }
+
+    productcatalogservice = service 'Product catalog service' {
+      description 'Serves the product list and per-product lookups'
+      metadata {
+        sources 'src/productcatalogservice/**'
+      }
+    }
+
+    recommendationservice = service 'Recommendation service' {
+      description 'Recommends products based on the cart contents'
+      metadata {
+        sources 'src/recommendationservice/**'
+      }
+    }
+
+    shippingservice = service 'Shipping service' {
+      description 'Quotes and (mock) ships orders'
+      metadata {
+        sources 'src/shippingservice/**'
+      }
+    }
+
+    shoppingassistantservice = service 'Shopping assistant service' {
+      description 'LLM shopping assistant; the frontend addresses it even though its own manifest ships as an optional kustomize component'
+      metadata {
+        sources 'src/shoppingassistantservice/**'
+      }
+    }
+
+    redis = service 'Redis cart cache' {
+      description 'Stock redis image backing the cart; its Deployment ships inside cartservice.yaml and no code in this repository implements it'
+    }
+  }
+
+  // frontend, per frontend.yaml
+  boutique.frontend -> boutique.productcatalogservice 'PRODUCT_CATALOG_SERVICE_ADDR'
+  boutique.frontend -> boutique.currencyservice 'CURRENCY_SERVICE_ADDR'
+  boutique.frontend -> boutique.cartservice 'CART_SERVICE_ADDR'
+  boutique.frontend -> boutique.recommendationservice 'RECOMMENDATION_SERVICE_ADDR'
+  boutique.frontend -> boutique.shippingservice 'SHIPPING_SERVICE_ADDR'
+  boutique.frontend -> boutique.checkoutservice 'CHECKOUT_SERVICE_ADDR'
+  boutique.frontend -> boutique.adservice 'AD_SERVICE_ADDR'
+  boutique.frontend -> boutique.shoppingassistantservice 'SHOPPING_ASSISTANT_SERVICE_ADDR'
+
+  // checkout, per checkoutservice.yaml
+  boutique.checkoutservice -> boutique.productcatalogservice 'PRODUCT_CATALOG_SERVICE_ADDR'
+  boutique.checkoutservice -> boutique.shippingservice 'SHIPPING_SERVICE_ADDR'
+  boutique.checkoutservice -> boutique.paymentservice 'PAYMENT_SERVICE_ADDR'
+  boutique.checkoutservice -> boutique.emailservice 'EMAIL_SERVICE_ADDR'
+  boutique.checkoutservice -> boutique.currencyservice 'CURRENCY_SERVICE_ADDR'
+  boutique.checkoutservice -> boutique.cartservice 'CART_SERVICE_ADDR'
+
+  // recommendation, per recommendationservice.yaml
+  boutique.recommendationservice -> boutique.productcatalogservice 'PRODUCT_CATALOG_SERVICE_ADDR'
+
+  // Documented edges outside the *_SERVICE_ADDR convention, declared for
+  // fidelity to the README's architecture but not exercised by the scan:
+  // cartservice reaches redis via REDIS_ADDR, and the load generator reaches
+  // the frontend via FRONTEND_ADDR.
+  boutique.cartservice -> boutique.redis 'REDIS_ADDR'
+  boutique.loadgenerator -> boutique.frontend 'FRONTEND_ADDR'
+}
+
+views {
+  view index of boutique {
+    include *
+  }
+}

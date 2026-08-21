@@ -1,0 +1,300 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unobserved-elements",
+      "severity": "info",
+      "related": [
+        "boutique.redis"
+      ],
+      "label": "the description-only redis element is reported as unobserved"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "boutique.recommendationservice"
+      },
+      "related": [
+        "boutique.paymentservice"
+      ],
+      "label": "the planted recommendation -> payment edge is undeclared in the model"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/adservice.yaml",
+        "label": "the scan attests to having examined adservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/cartservice.yaml",
+        "label": "the scan attests to having examined cartservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/checkoutservice.yaml",
+        "label": "the scan attests to having examined checkoutservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/currencyservice.yaml",
+        "label": "the scan attests to having examined currencyservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/emailservice.yaml",
+        "label": "the scan attests to having examined emailservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/frontend.yaml",
+        "label": "the scan attests to having examined frontend.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "label": "the scan attests to having examined kustomization.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/loadgenerator.yaml",
+        "label": "the scan attests to having examined loadgenerator.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/paymentservice.yaml",
+        "label": "the scan attests to having examined paymentservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/productcatalogservice.yaml",
+        "label": "the scan attests to having examined productcatalogservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/recommendationservice.yaml",
+        "label": "the scan attests to having examined recommendationservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/shippingservice.yaml",
+        "label": "the scan attests to having examined shippingservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/frontend/Dockerfile",
+        "target": "src/productcatalogservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/frontend/Dockerfile",
+        "target": "src/currencyservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/frontend/Dockerfile",
+        "target": "src/cartservice/src/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/frontend/Dockerfile",
+        "target": "src/recommendationservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/frontend/Dockerfile",
+        "target": "src/shippingservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/frontend/Dockerfile",
+        "target": "src/checkoutservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/frontend/Dockerfile",
+        "target": "src/adservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/frontend/Dockerfile",
+        "target": "src/shoppingassistantservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/checkoutservice/Dockerfile",
+        "target": "src/productcatalogservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/checkoutservice/Dockerfile",
+        "target": "src/shippingservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/checkoutservice/Dockerfile",
+        "target": "src/paymentservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/checkoutservice/Dockerfile",
+        "target": "src/emailservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/checkoutservice/Dockerfile",
+        "target": "src/currencyservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/checkoutservice/Dockerfile",
+        "target": "src/cartservice/src/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/recommendationservice/Dockerfile",
+        "target": "src/productcatalogservice/Dockerfile"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "src/recommendationservice/Dockerfile",
+        "target": "src/paymentservice/Dockerfile",
+        "label": "the scan reports the planted payment edge honestly"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.productcatalogservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.currencyservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.cartservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.recommendationservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.shippingservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.checkoutservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.adservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.shoppingassistantservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.productcatalogservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.shippingservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.paymentservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.emailservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.currencyservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.cartservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.recommendationservice",
+        "target": "boutique.productcatalogservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.recommendationservice",
+        "target": "boutique.paymentservice",
+        "declared": false,
+        "label": "the planted edge resolves onto no declared relationship"
+      }
+    ]
+  }
+}

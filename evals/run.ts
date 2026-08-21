@@ -35,7 +35,16 @@ import { perfect, renderScorecard, scoreFixture, type Expectations, type Fixture
 import { scriptedExec, type ScriptedReply } from './harness/stub.ts'
 
 /** The greenfield → brownfield → beyond-TypeScript → exploration progression, then external fixtures. */
-const FIXTURE_ORDER = ['greenfield', 'brownfield', 'non-ts', 'exploratory', 'ddh/greenfield', 'ddh/brownfield']
+const FIXTURE_ORDER = [
+  'greenfield',
+  'brownfield',
+  'non-ts',
+  'exploratory',
+  'ddh/greenfield',
+  'ddh/brownfield',
+  'boutique/greenfield',
+  'boutique/brownfield',
+]
 
 type FixtureSpec = (exec: AgentExec, root: string) => PipelineConfig | Promise<PipelineConfig>
 
