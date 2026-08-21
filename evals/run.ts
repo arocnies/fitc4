@@ -153,13 +153,17 @@ function execFor(fixture: string): AgentExec {
   // the exec's `id` (which carries the CLI and model) and `fingerprint`, so a
   // reply recorded by one exec is never replayed as another's measurement.
   const directory = path.join(evalsDir, '.cache', 'fitc4-agent')
+  // The external fixtures make big one-shot calls (a whole compose stack or
+  // manifest set in one request); the adapters' 120s default proved tight
+  // enough to time out on the first live pass, so eval runs get 5 minutes.
+  const timeoutMs = 300_000
   if (flags.exec === 'claude') {
-    return cached(claudeCli({ model }), { directory })
+    return cached(claudeCli({ model, timeoutMs }), { directory })
   }
   // No `--model` passes nothing through, deferring to the codex CLI's own
   // default (the adapter runs codex isolated from ~/.codex/config.toml, so
   // that default is the CLI's built-in one; pass --model to override it).
-  return cached(codexCli(model === undefined ? {} : { model }), { directory })
+  return cached(codexCli(model === undefined ? { timeoutMs } : { model, timeoutMs }), { directory })
 }
 
 function readJson(file: string): unknown {

@@ -13,8 +13,11 @@
  * `file` observations, and the dependency-only greenfield scan emits none, so
  * the instructions also ask for one `file` observation per service stand-in.
  * That is the same rule a user drafting from an agent-scan config would have
- * to write. Everything else, the roots, the focus, the env-var oracle, is the
- * greenfield scan verbatim.
+ * to write. The rule must carve out redis-cart explicitly: the manifests
+ * deploy it but no src/ directory implements it, and the first live pass
+ * proved every model otherwise invents a stand-in path the path guard
+ * rejects, killing the whole scan. Everything else, the roots, the focus,
+ * the env-var oracle, is the greenfield scan verbatim.
  *
  * Scoring lives in harness/draft.ts: the drafted elements and relationships
  * against expectations.json, which restates the reference model as data.
@@ -33,7 +36,8 @@ export const DRAFT_INSTRUCTIONS =
   " Additionally, emit one observation of kind 'file' with subject { kind: 'file', id: <stand-in " +
   'file> } for every service a manifest deploys and for every target service of a dependency you ' +
   'report, one observation per distinct stand-in file, citing the manifest that names the ' +
-  'service as evidence.'
+  'service as evidence. Only services with a build directory under src/ have a stand-in file. ' +
+  'redis-cart has none, so it gets no file observation.'
 
 export default function boutiqueDraft(exec: AgentExec, root: string): ResolvedConfig {
   const fixtureDir = path.dirname(root)
