@@ -9,11 +9,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { closestName, findConfig, resolveConfig } from './config.ts'
+import { draft } from './draft.ts'
 import { messageOf } from './errors.ts'
 import { init } from './init.ts'
 import { runPipeline } from './pipeline.ts'
 import { pipelineConfig } from './defaults.ts'
-import { exitCodeFor, renderReport } from './report.ts'
+import { count, exitCodeFor, renderReport } from './report.ts'
 
 const USAGE = `Usage: fitc4 [command] [options]
 
@@ -22,6 +23,16 @@ Commands:
   init             Scaffold fitc4.config.json, a starter arch/model.c4, and
                    an AGENTS.md with the fitc4 norms in the current
                    directory. Never overwrites existing files.
+  draft            Run the configured scan providers and write a first-draft
+                   model.c4 into the configured model directory: one element
+                   per first-level source directory, one relationship per
+                   observed cross-element dependency, one stub element
+                   claiming the observed external packages. Every
+                   relationship is tagged as drift, so the first check is
+                   green and the drift line counts the debt down; untagging
+                   an edge blesses it. A draft to rewrite, never a sync.
+                   Never overwrites: if any model file exists, the draft is
+                   printed to stdout instead.
 
 Options:
   --config <path>  Path to a fitc4 config (.ts, .mts, .js, .mjs, or .json).
@@ -29,6 +40,8 @@ Options:
                    those names in ./, then in ./.fitc4/, then the same in
                    each ancestor. Two configs in one directory is an error.
   --json           Emit the full result as JSON instead of a report.
+  --no-drift       With draft: emit plain relationships instead of
+                   drift-tagged ones.
   --version        Print the version.
   --help           Show this message.
 
@@ -55,13 +68,14 @@ function version(): string {
 interface Arguments {
   help: boolean
   version: boolean
-  command: 'init' | undefined
+  command: 'init' | 'draft' | undefined
   configPath: string | undefined
   json: boolean
+  noDrift: boolean
 }
 
-const KNOWN_OPTIONS = ['--help', '--version', '--config', '--json']
-const KNOWN_COMMANDS = ['init']
+const KNOWN_OPTIONS = ['--help', '--version', '--config', '--json', '--no-drift']
+const KNOWN_COMMANDS = ['init', 'draft']
 
 /**
  * Parse argv, rejecting anything unrecognized.
@@ -78,6 +92,7 @@ function parseArguments(argv: string[]): Arguments {
     command: undefined,
     configPath: undefined,
     json: false,
+    noDrift: false,
   }
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -89,6 +104,8 @@ function parseArguments(argv: string[]): Arguments {
       parsed.version = true
     } else if (argument === '--json') {
       parsed.json = true
+    } else if (argument === '--no-drift') {
+      parsed.noDrift = true
     } else if (argument === '--config') {
       index += 1
       const value = argv[index]
@@ -101,10 +118,16 @@ function parseArguments(argv: string[]): Arguments {
     } else if (argument.startsWith('-')) {
       throw new Error(unknownArgument('option', argument, KNOWN_OPTIONS))
     } else if (parsed.command === undefined && KNOWN_COMMANDS.includes(argument)) {
-      parsed.command = argument as 'init'
+      parsed.command = argument as 'init' | 'draft'
     } else {
       throw new Error(unknownArgument('command', argument, KNOWN_COMMANDS))
     }
+  }
+
+  // A silently ignored flag is the fail-open this parser exists to prevent:
+  // `fitc4 --no-drift` would run the default check and look like a draft ran.
+  if (parsed.noDrift && parsed.command !== 'draft') {
+    throw new Error('--no-drift only applies to the draft command')
   }
 
   return parsed
@@ -131,6 +154,30 @@ function runInit(): void {
   process.stdout.write(`${lines.join('\n')}\n`)
 }
 
+async function runDraft(options: Arguments): Promise<void> {
+  const configPath = options.configPath ?? findConfig(process.cwd())
+  const result = await draft(await resolveConfig(configPath), { drift: !options.noDrift })
+
+  const lines: string[] = []
+  if (result.written === undefined) {
+    lines.push(result.text)
+    lines.push(`note: ${result.refusal ?? 'the draft was not written'}`)
+  } else {
+    lines.push(`created ${path.relative(process.cwd(), result.written)}`)
+    if (!options.noDrift) {
+      lines.push(
+        `every relationship is tagged as drift; run npx fitc4 to see the burn-down, ` +
+          `untag an edge to bless it`,
+      )
+    }
+  }
+  lines.push(
+    `${count(result.elements, 'element')}, ${count(result.edges, 'edge')}, ` +
+      `${count(result.packages, 'package')}`,
+  )
+  process.stdout.write(`${lines.join('\n')}\n`)
+}
+
 async function main(): Promise<void> {
   const options = parseArguments(process.argv.slice(2))
 
@@ -144,6 +191,10 @@ async function main(): Promise<void> {
   }
   if (options.command === 'init') {
     runInit()
+    return
+  }
+  if (options.command === 'draft') {
+    await runDraft(options)
     return
   }
 

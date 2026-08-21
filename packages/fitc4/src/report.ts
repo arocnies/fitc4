@@ -147,9 +147,10 @@ function driftBurnDown(findings: Finding[]): string[] {
   return [`drift: ${declared} declared, ${exercised} exercised, ${unused} unused`]
 }
 
-/** `1 error`, `2 errors`: counted nouns in output pluralize by count. */
-function count(total: number, noun: string): string {
-  return `${total} ${noun}${total === 1 ? '' : 's'}`
+/** `1 error`, `2 errors`, `2 dependencies`: counted nouns in output pluralize by count. */
+export function count(total: number, noun: string): string {
+  const plural = /[^aeiou]y$/.test(noun) ? `${noun.slice(0, -1)}ies` : `${noun}s`
+  return `${total} ${total === 1 ? noun : plural}`
 }
 
 function formatEvidence(evidence: Evidence): string {

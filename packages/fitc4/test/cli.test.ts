@@ -124,6 +124,49 @@ describe('unknown arguments', () => {
   })
 })
 
+describe('draft', () => {
+  test('writes the model, reports the drift default, and ends with the summary', HEAVY, () => {
+    const root = fixturePath('drift')
+    const modelDir = path.join(tempDir(), 'arch')
+    const configPath = path.join(tempDir(), 'fitc4.config.json')
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        version: 1,
+        repositoryRoot: root,
+        model: modelDir,
+        scanRoots: ['src'],
+        tsconfig: path.join(root, 'tsconfig.json'),
+      }),
+    )
+
+    const { status, stdout } = runCli(['draft', '--config', configPath])
+
+    expect(status).toBe(0)
+    expect(stdout).toContain('created')
+    expect(stdout).toContain('untag an edge to bless it')
+    expect(stdout).toContain('3 elements, 2 edges, 0 packages')
+    expect(fs.readFileSync(path.join(modelDir, 'model.c4'), 'utf8')).toContain('#drift')
+  })
+
+  test('refuses to overwrite an existing model and prints the draft instead', HEAVY, () => {
+    // configFor points `model` at the fixture root, which holds model.c4.
+    const { status, stdout } = runCli(['draft', '--config', configFor('drift')])
+
+    expect(status).toBe(0)
+    expect(stdout).toContain('specification {')
+    expect(stdout).toContain('note: model.c4 already exists')
+    expect(stdout).toContain('3 elements, 2 edges, 0 packages')
+  })
+
+  test('--no-drift without the draft command is an error', () => {
+    const { status, stderr } = runCli(['--no-drift'])
+
+    expect(status).toBe(1)
+    expect(stderr).toContain('fitc4: --no-drift only applies to the draft command')
+  })
+})
+
 describe('--help', () => {
   test('prints usage and exits 0', () => {
     const { status, stdout } = runCli(['--help'])

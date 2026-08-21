@@ -70,6 +70,12 @@ npx fitc4
 
 Most projects add a `"fitc4": "fitc4"` script and run `npm run fitc4` in CI.
 
+## Draft a model from existing code
+
+`init` scaffolds a placeholder. `npx fitc4 draft` goes further on a brownfield repository: it runs the configured scan providers, no model needed, and writes a first-draft model from what they observed. One element per first-level directory under each scan root, one relationship per observed cross-element dependency (the dependency count rides a trailing comment), and one stub element claiming every observed external package so the resolve tier is quiet on day one. It consumes the observation contract, not TypeScript specifics, so it drafts from whatever scan providers the config composes, `fitc4-dependency-cruiser` and the agent scanners included. Drafting with agent scan providers needs the agent CLI available.
+
+Every relationship is tagged as drift by default, so the very first gate run is green and the drift line becomes the adoption burn-down. Untagging an edge is the human act of blessing it as intended architecture; `--no-drift` emits plain relationships instead. The draft is a starting point to rewrite, never a sync: rename the elements, write the real descriptions, split what a directory lumps together. It writes into the configured model directory only when no model file exists there. If one does, it prints the draft to stdout and says why, same never-overwrite rule as `init`.
+
 A clean run prints a summary and exits 0. A file in `src/core` importing from `src/interface` is a dependency the model does not declare, so the run exits 1:
 
 ```text

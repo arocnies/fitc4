@@ -6,7 +6,7 @@ A [LikeC4](https://likec4.dev) model is a user-defined contract. It says which c
 
 Two situations the design leans into:
 
-- **Brownfield code.** Declare the dependencies that really exist and tag them as drift. The model shows the debt as edges in the diagram, the report counts it down, and declared drift can only shrink. See [tolerated drift](#tolerated-drift).
+- **Brownfield code.** Declare the dependencies that really exist and tag them as drift. The model shows the debt as edges in the diagram, the report counts it down, and declared drift can only shrink. See [tolerated drift](#tolerated-drift). `npx fitc4 draft` writes that first drift-tagged model from what the scan observes, so adoption starts from a green gate and a burn-down instead of hand-authoring every edge.
 - **Agent-written code.** Agents are held to the same contract through the same CLI, and they can extend the gate with providers. The agent providers let them prototype new model domains that graduate to deterministic providers later.
 
 ## A complete example
@@ -93,7 +93,7 @@ Agents get the same treatment as humans: the CLI is the interface, failing repor
 
 ## Where things live
 
-`fitc4.config.json` goes at your project root, beside `tsconfig.json`. `npx fitc4 init` scaffolds it along with a starter model. Discovery starts at the working directory and checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json`, first directly and then under `.fitc4/`, repeating up each ancestor. That way the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.
+`fitc4.config.json` goes at your project root, beside `tsconfig.json`. `npx fitc4 init` scaffolds it along with a starter model. On a repository with real history, `npx fitc4 draft` generates the first model from the observed code instead, every relationship drift-tagged so the first run is green. Like init it never overwrites, so if a model file already exists, placeholder included, it prints the draft rather than writing it. Discovery starts at the working directory and checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json`, first directly and then under `.fitc4/`, repeating up each ancestor. That way the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.
 
 A module-form config is what lets you add custom providers. It default-exports the same fields plus optional `scan`, `resolve`, and `validate` provider arrays. A phase that is present replaces the defaults for that phase; absent means the default. Merge semantics are yours, in your config file, where you can see them. Module configs load as ES modules, so a CommonJS package names its config `fitc4.config.mts`. See [`docs/providers.md`](docs/providers.md) for the provider contract and a worked example.
 

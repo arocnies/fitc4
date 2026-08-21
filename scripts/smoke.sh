@@ -95,6 +95,29 @@ case "$init_err" in
   *"    at "*) echo "FAIL: config error printed a stack trace" >&2; exit 1 ;;
 esac
 
+echo "== draft refuses to overwrite an existing model"
+draft_out="$(cd "$fresh" && npx fitc4 draft)"
+case "$draft_out" in
+  *"never overwrites"*) ;;
+  *) echo "FAIL: draft beside an existing model did not refuse: $draft_out" >&2; exit 1 ;;
+esac
+
+echo "== draft writes a drift-tagged model that gates green"
+rm "$fresh/arch/model.c4"
+mkdir -p "$fresh/src/api"
+printf "import { started } from '../index.js'\nexport const api = started\n" \
+  > "$fresh/src/api/server.ts"
+(cd "$fresh" && npx fitc4 draft)
+case "$(cat "$fresh/arch/model.c4")" in
+  *"#drift"*) ;;
+  *) echo "FAIL: the drafted model carries no drift tag" >&2; exit 1 ;;
+esac
+draft_run="$(cd "$fresh" && npx fitc4)"
+case "$draft_run" in
+  *"drift: 1 declared, 1 exercised, 0 unused"*) ;;
+  *) echo "FAIL: the drafted model did not gate as counted drift: $draft_run" >&2; exit 1 ;;
+esac
+
 echo "== --version matches the manifest"
 version="$(cd "$consumer" && npx fitc4 --version)"
 # Path passed as an argument, not embedded in the expression: Git Bash on
