@@ -100,6 +100,14 @@ Three forms, one shape ([`config.ts`](../packages/fitc4/src/config.ts)). `fitc4.
 
 Discovery starts at the working directory and checks the module names, then the JSON name. It looks in the directory itself, then under `.fitc4/`, and repeats up each ancestor. Root-adjacent wins over `.fitc4/`. Two configs in one directory is an error, because whichever lost a silent tiebreak would be a silently ignored config. `--config` overrides discovery entirely. Every path resolves relative to the config file, so moving the workspace cannot silently repoint the scan. Validation is strict: unknown version, empty `scanRoots`, blank paths, and malformed JSON are errors, never silent defaults.
 
+## Progress narration
+
+Two layers, both just a string callback. `runPipeline` and `draft` accept an optional `onProgress?: (message: string) => void` and call it at the pipeline's natural seams: model load, each phase start, each provider start, each provider done with a count and elapsed time. The library never touches a console. The CLI wires the callback to stderr on every run, and `--quiet` disconnects it. Stderr because stdout is the contract: the report and `--json` output stay byte-identical whether narration is on, off, or piped away.
+
+The second layer is a provider hook. Every provider context carries an optional `progress?: (message: string) => void`, injected by the pipeline and prefixed with the provider's composed id, so a provider reports `scanned 500 of 1200 files` and never names itself. Providers that ignore it lose nothing. Two use it today: `typescript-imports` reports every 500 files, only on repositories large enough to look hung, and `agentScan` announces each agent call before it starts, since that call is the slow step a user is otherwise left staring at.
+
+A plain string because anything richer is a schema. Percentages, progress objects, and structured events each put a contract between the pipeline and whoever renders it, and the first consumer is a human reading stderr.
+
 ## Deliberately not built
 
 - **Baseline files.** Tolerated drift lives in the model as reviewable, taggable relationships; a generated suppression file is invisible debt that gets regenerated and rubber-stamped.
@@ -107,3 +115,4 @@ Discovery starts at the working directory and checks the module names, then the 
 - **MCP server.** LikeC4 already ships one for querying and authoring the model; FitC4 is the enforcement half, and its agent interface is the CLI report and `--json`.
 - **A provider registry or plugin discovery.** Composition is explicit arrays in a config file the user owns; anything cleverer hides which providers judge the run.
 - **General glob matching for `sources`.** Directory prefixes have survived real use; a glob engine multiplies the silent mismatches the `invalid-sources`/`unmatched-sources` pair exists to close.
+- **Structured progress.** No percentages, progress objects, spinners, or event types; narration is one plain line per seam, and the result object is where structure lives.

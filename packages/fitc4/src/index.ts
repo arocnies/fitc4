@@ -74,6 +74,7 @@ export type {
   LikeC4Model,
   NamedProvider,
   Observation,
+  Progress,
   Ref,
   ResolveContext,
   ResolveProvider,

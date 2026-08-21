@@ -15,6 +15,7 @@
 import { messageOf } from './errors.ts'
 import { findingId, namespaced } from './ids.ts'
 import { loadModel } from './model.ts'
+import { count, elapsed } from './report.ts'
 import { isSeverity } from './types.ts'
 import { withViewerLinks } from './viewer.ts'
 import type {
@@ -23,6 +24,7 @@ import type {
   JsonObject,
   NamedProvider,
   Observation,
+  Progress,
   ResolveProvider,
   ScanProvider,
   ValidateProvider,
@@ -43,6 +45,13 @@ export interface PipelineConfig {
   scan: NamedProvider<ScanProvider>[]
   resolve: NamedProvider<ResolveProvider>[]
   validate: NamedProvider<ValidateProvider>[]
+  /**
+   * Narration hook: one plain line per pipeline event (each phase start, each
+   * provider start, each provider done with elapsed time and counts). The
+   * library never touches a console; the CLI wires this to stderr. Absent
+   * means silent, and the result is identical either way.
+   */
+  onProgress?: Progress
 }
 
 /** The provider ids that composed each phase, in run order. */
@@ -81,9 +90,12 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
   }
 
   const viewer = config.viewerBaseUrl === undefined ? {} : { viewerBaseUrl: config.viewerBaseUrl }
+  const narrate = config.onProgress
 
+  narrate?.(`model: loading ${config.modelDir}`)
   const { model, errors } = await loadModel(config.modelDir)
   if (errors.length > 0) {
+    narrate?.(`model: invalid, ${count(errors.length, 'error')}, stopping`)
     return {
       modelErrors: errors,
       ...viewer,
@@ -96,21 +108,22 @@ export async function runPipeline(config: PipelineConfig): Promise<PipelineResul
 
   const findings: Finding[] = []
 
-  const observations = await runPhase('scan', config.scan, findings, (provider) =>
-    provider({ repositoryRoot: config.repositoryRoot }),
+  const observations = await runPhase('scan', config.scan, findings, narrate, 'observation', (provider, progress) =>
+    provider({ repositoryRoot: config.repositoryRoot, progress }),
   )
 
-  const associations = await runPhase('resolve', config.resolve, findings, (provider) =>
-    provider({ model, observations, repositoryRoot: config.repositoryRoot }),
+  const associations = await runPhase('resolve', config.resolve, findings, narrate, 'association', (provider, progress) =>
+    provider({ model, observations, repositoryRoot: config.repositoryRoot, progress }),
   )
   findings.push(...orphanedAssociations(observations, associations))
 
-  const produced = await runPhase('validate', config.validate, findings, (provider) =>
+  const produced = await runPhase('validate', config.validate, findings, narrate, 'finding', (provider, progress) =>
     provider({
       model,
       observations,
       associations,
       repositoryRoot: config.repositoryRoot,
+      progress,
     }),
   )
   findings.push(...produced)
@@ -142,10 +155,14 @@ async function runPhase<TProvider, TItem extends { id: string; provider: string 
   phase: string,
   providers: NamedProvider<TProvider>[],
   findings: Finding[],
-  invoke: (provider: TProvider) => Promise<TItem[]>,
+  narrate: Progress | undefined,
+  noun: string,
+  invoke: (provider: TProvider, progress: Progress | undefined) => Promise<TItem[]>,
 ): Promise<TItem[]> {
   const items: TItem[] = []
   const seen = new Set<string>()
+
+  narrate?.(`${phase}: ${count(providers.length, 'provider')}`)
 
   for (const provider of providers) {
     // Staged, then committed as a unit. A provider that fails partway
@@ -154,8 +171,15 @@ async function runPhase<TProvider, TItem extends { id: string; provider: string 
     const staged: TItem[] = []
     const stagedIds = new Set<string>()
 
+    narrate?.(`${phase}: ${provider.id}...`)
+    const started = Date.now()
+    // The provider-facing hook carries the provider's composed id, so provider
+    // code narrates its work without knowing what it was composed as.
+    const progress: Progress | undefined =
+      narrate === undefined ? undefined : (message) => narrate(`${provider.id}: ${message}`)
+
     try {
-      for (const item of await invoke(provider.run)) {
+      for (const item of await invoke(provider.run, progress)) {
         const ingested = ingest(provider.id, item)
 
         // Duplicate ids silently overwrite each other in every downstream
@@ -167,10 +191,12 @@ async function runPhase<TProvider, TItem extends { id: string; provider: string 
         staged.push(ingested)
       }
     } catch (error) {
+      narrate?.(`${phase}: ${provider.id} failed, ${elapsed(started)}`)
       findings.push(providerFailure(phase, provider.id, error))
       continue
     }
 
+    narrate?.(`${phase}: ${provider.id} done, ${count(staged.length, noun)}, ${elapsed(started)}`)
     for (const id of stagedIds) seen.add(id)
     items.push(...staged)
   }

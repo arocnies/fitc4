@@ -36,6 +36,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { count } from '../report.ts'
 import type { Evidence, JsonObject, NamedProvider, Observation, Ref, ScanContext, ScanProvider } from '../types.ts'
 import { assemblePack, DEFAULT_PACK_BUDGET_BYTES, fencedExcerpt } from './context-pack.ts'
 import { schemaMismatch, truncate } from './exec.ts'
@@ -193,6 +194,14 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
             schema: REPLY_SCHEMA,
             cwd: context.repositoryRoot,
           }
+
+    // Announce the call before it starts: agent calls are the slow part of a
+    // run, and which shape (and roughly how much) is being sent says why.
+    context.progress?.(
+      options.focus === undefined
+        ? `exploring the repository with ${options.exec.id}, ${count(Math.min(files.length, maxFiles), 'file')} listed`
+        : `asking ${options.exec.id} one-shot, about ${roughKilobytes(request.context)} of instructions and excerpts`,
+    )
 
     const reply = await options.exec.run(request)
 
@@ -525,4 +534,9 @@ function enumerateFiles(repositoryRoot: string, roots: string[]): string[] {
 
 function toPosix(value: string): string {
   return value.split(path.sep).join('/')
+}
+
+/** A rough size for narration: whole kilobytes, never zero. */
+function roughKilobytes(text: string): string {
+  return `${Math.max(1, Math.round(Buffer.byteLength(text, 'utf8') / 1024))} KB`
 }

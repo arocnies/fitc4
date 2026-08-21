@@ -42,6 +42,8 @@ Options:
   --json           Emit the full result as JSON instead of a report.
   --no-drift       With draft: emit plain relationships instead of
                    drift-tagged ones.
+  --quiet          Suppress the progress narration. Narration goes to stderr,
+                   so the report and --json output are unaffected either way.
   --version        Print the version.
   --help           Show this message.
 
@@ -72,9 +74,10 @@ interface Arguments {
   configPath: string | undefined
   json: boolean
   noDrift: boolean
+  quiet: boolean
 }
 
-const KNOWN_OPTIONS = ['--help', '--version', '--config', '--json', '--no-drift']
+const KNOWN_OPTIONS = ['--help', '--version', '--config', '--json', '--no-drift', '--quiet']
 const KNOWN_COMMANDS = ['init', 'draft']
 
 /**
@@ -93,6 +96,7 @@ function parseArguments(argv: string[]): Arguments {
     configPath: undefined,
     json: false,
     noDrift: false,
+    quiet: false,
   }
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -106,6 +110,8 @@ function parseArguments(argv: string[]): Arguments {
       parsed.json = true
     } else if (argument === '--no-drift') {
       parsed.noDrift = true
+    } else if (argument === '--quiet') {
+      parsed.quiet = true
     } else if (argument === '--config') {
       index += 1
       const value = argv[index]
@@ -154,9 +160,24 @@ function runInit(): void {
   process.stdout.write(`${lines.join('\n')}\n`)
 }
 
+/**
+ * Narration goes to stderr, never stdout: the report and `--json` output must
+ * stay byte-identical whether narration is on or off, so a script parsing
+ * stdout never sees a progress line.
+ */
+function narrationFor(options: Arguments): ((message: string) => void) | undefined {
+  if (options.quiet) return undefined
+  return (message) => {
+    process.stderr.write(`${message}\n`)
+  }
+}
+
 async function runDraft(options: Arguments): Promise<void> {
   const configPath = options.configPath ?? findConfig(process.cwd())
-  const result = await draft(await resolveConfig(configPath), { drift: !options.noDrift })
+  const result = await draft(await resolveConfig(configPath), {
+    drift: !options.noDrift,
+    onProgress: narrationFor(options),
+  })
 
   const lines: string[] = []
   if (result.written === undefined) {
@@ -203,7 +224,10 @@ async function main(): Promise<void> {
   // repository it checks. Installed from a package it would resolve inside
   // `node_modules` and find the wrong config, or none.
   const configPath = options.configPath ?? findConfig(process.cwd())
-  const result = await runPipeline(pipelineConfig(await resolveConfig(configPath)))
+  const result = await runPipeline({
+    ...pipelineConfig(await resolveConfig(configPath)),
+    onProgress: narrationFor(options),
+  })
 
   if (options.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)

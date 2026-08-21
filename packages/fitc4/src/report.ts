@@ -153,6 +153,11 @@ export function count(total: number, noun: string): string {
   return `${total} ${total === 1 ? noun : plural}`
 }
 
+/** Seconds since `started` (a `Date.now()` timestamp), formatted for narration: `0.4s`. */
+export function elapsed(started: number): string {
+  return `${((Date.now() - started) / 1000).toFixed(1)}s`
+}
+
 function formatEvidence(evidence: Evidence): string {
   const location =
     evidence.path === undefined

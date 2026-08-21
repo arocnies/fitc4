@@ -104,14 +104,32 @@ export type { LikeC4Model } from './model.ts'
 
 import type { LikeC4Model } from './model.ts'
 
+/**
+ * A narration callback: one plain line per call, no structure to parse.
+ *
+ * Deliberately just a string. Percentages, progress objects, and structured
+ * events would each be a schema some consumer must keep up with; a line of
+ * program output is the whole contract.
+ */
+export type Progress = (message: string) => void
+
 export interface ScanContext {
   repositoryRoot: string
+  /**
+   * Optional narration hook, injected by the pipeline when its caller asked
+   * for progress. Messages are prefixed with the provider's composed id, so a
+   * provider reports `scanned 500 of 1200 files` and never names itself.
+   * Providers that ignore it lose nothing.
+   */
+  progress?: Progress
 }
 
 export interface ResolveContext {
   model: LikeC4Model
   observations: Observation[]
   repositoryRoot: string
+  /** See `ScanContext.progress`. */
+  progress?: Progress
 }
 
 export interface ValidateContext {
@@ -119,6 +137,8 @@ export interface ValidateContext {
   observations: Observation[]
   associations: Association[]
   repositoryRoot: string
+  /** See `ScanContext.progress`. */
+  progress?: Progress
 }
 
 export type ScanProvider = (context: ScanContext) => Promise<Observation[]>

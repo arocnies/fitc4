@@ -30,8 +30,8 @@ import { MODEL_FILENAME } from './init.ts'
 import { packageNameOf, toPackageName } from './model.ts'
 import { DEFAULT_DRIFT_TAG } from './providers/architecture-rules.ts'
 import { ownerOf } from './providers/source-root.ts'
-import { count } from './report.ts'
-import type { Observation } from './types.ts'
+import { count, elapsed } from './report.ts'
+import type { Observation, Progress } from './types.ts'
 
 export interface DraftOptions {
   /**
@@ -42,6 +42,11 @@ export interface DraftOptions {
   drift?: boolean
   /** The drift tag to declare and apply. Defaults to `DEFAULT_DRIFT_TAG`. */
   driftTag?: string
+  /**
+   * Narration hook, same contract as `PipelineConfig.onProgress`: one plain
+   * line per scan provider start and completion, wired to stderr by the CLI.
+   */
+  onProgress?: Progress
 }
 
 export interface DraftResult {
@@ -124,11 +129,23 @@ export async function draft(
 ): Promise<DraftResult> {
   const drift = options.drift ?? true
   const driftTag = options.driftTag ?? DEFAULT_DRIFT_TAG
+  const narrate = options.onProgress
+
+  // The same narration seams as the pipeline's scan phase, because this IS a
+  // scan run: provider start, then done with a count and elapsed time.
+  const scanProviders = pipelineConfig(config).scan
+  narrate?.(`scan: ${count(scanProviders.length, 'provider')}`)
 
   const observations: Observation[] = []
-  for (const provider of pipelineConfig(config).scan) {
+  for (const provider of scanProviders) {
+    narrate?.(`scan: ${provider.id}...`)
+    const started = Date.now()
+    const progress: Progress | undefined =
+      narrate === undefined ? undefined : (message) => narrate(`${provider.id}: ${message}`)
     try {
-      observations.push(...(await provider.run({ repositoryRoot: config.repositoryRoot })))
+      const observed = await provider.run({ repositoryRoot: config.repositoryRoot, progress })
+      narrate?.(`scan: ${provider.id} done, ${count(observed.length, 'observation')}, ${elapsed(started)}`)
+      observations.push(...observed)
     } catch (error) {
       throw new Error(`scan provider ${provider.id} failed: ${messageOf(error)}`)
     }

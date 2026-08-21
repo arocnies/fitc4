@@ -141,6 +141,34 @@ describe('the scan provider over the skip rules', () => {
   })
 })
 
+describe('scan progress', () => {
+  test('a repository over the batch size narrates every 500 files; a small one stays quiet', async () => {
+    const root = scratchRepo(
+      Array.from({ length: 501 }, (_, index) => `src/file${String(index).padStart(3, '0')}.ts`),
+    )
+    fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}\n')
+
+    const scan = typescriptImports({
+      tsconfigPath: path.join(root, 'tsconfig.json'),
+      roots: ['src'],
+    })
+
+    const messages: string[] = []
+    await scan({ repositoryRoot: root, progress: (message) => void messages.push(message) })
+    expect(messages).toEqual(['scanned 500 of 501 files'])
+
+    // Below the batch size the provider says nothing at all.
+    const quiet: string[] = []
+    const small = scratchRepo(['src/one.ts', 'src/two.ts'])
+    fs.writeFileSync(path.join(small, 'tsconfig.json'), '{}\n')
+    await typescriptImports({
+      tsconfigPath: path.join(small, 'tsconfig.json'),
+      roots: ['src'],
+    })({ repositoryRoot: small, progress: (message) => void quiet.push(message) })
+    expect(quiet).toEqual([])
+  })
+})
+
 describe('module reference forms', () => {
   let result: PipelineResult
   beforeAll(async () => {

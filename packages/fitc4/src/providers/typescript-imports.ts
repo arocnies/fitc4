@@ -40,6 +40,12 @@ const ALWAYS_SKIPPED = new Set(['node_modules'])
  */
 const SKIPPED_AT_ROOT = new Set(['dist', 'build', 'out', 'coverage'])
 
+/**
+ * Files between progress reports. Small repositories finish before the first
+ * batch and stay silent; only a scan long enough to look hung narrates.
+ */
+const PROGRESS_BATCH = 500
+
 export interface TypeScriptImportsOptions {
   /** Path to the tsconfig supplying compiler options (paths, baseUrl). */
   tsconfigPath: string
@@ -105,7 +111,12 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
     // same dedup-and-sort contract as a single enumeration over all roots.
     const allFiles = [...new Set([...filesByRoot.values()].flat())].sort()
 
+    let scanned = 0
     for (const relative of allFiles) {
+      scanned += 1
+      if (allFiles.length > PROGRESS_BATCH && scanned % PROGRESS_BATCH === 0) {
+        context.progress?.(`scanned ${scanned} of ${allFiles.length} files`)
+      }
       if (isTestPath(relative)) continue
 
       observations.push({

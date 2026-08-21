@@ -241,6 +241,38 @@ describe('agentScan happy path', () => {
   })
 })
 
+describe('agentScan narration', () => {
+  // Agent calls are the slow part of a run, so the provider announces each
+  // one before it starts, through the context hook the pipeline prefixes.
+  test('agentic mode announces the exploration before the call', async () => {
+    const exec = stubExec([goodReply()])
+    const messages: string[] = []
+
+    await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'x' })],
+      onProgress: (message) => void messages.push(message),
+    })
+
+    expect(messages).toContainEqual(
+      expect.stringMatching(/^agent-scan: exploring the repository with stub\/model, \d+ files listed$/),
+    )
+  })
+
+  test('one-shot mode announces what it is sending and roughly how big', async () => {
+    const exec = stubExec([goodReply()])
+    const messages: string[] = []
+
+    await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'x', focus: ['docs/**'] })],
+      onProgress: (message) => void messages.push(message),
+    })
+
+    expect(messages).toContainEqual(
+      expect.stringMatching(/^agent-scan: asking stub\/model one-shot, about \d+ KB of instructions and excerpts$/),
+    )
+  })
+})
+
 describe('agentScan fails closed', () => {
   test('an exec failure fails the provider — one provider-failure error, not a clean scan', async () => {
     const exec = stubExec([{ ok: false, error: 'not logged in' }])

@@ -108,10 +108,10 @@ describe('unknown arguments', () => {
   })
 
   test('an unknown option with nothing close gets no guess', () => {
-    const { status, stderr } = runCli(['--quiet'])
+    const { status, stderr } = runCli(['--silent'])
 
     expect(status).toBe(1)
-    expect(stderr).toContain("fitc4: unknown option '--quiet'")
+    expect(stderr).toContain("fitc4: unknown option '--silent'")
     expect(stderr).not.toContain('did you mean')
   })
 
@@ -164,6 +164,42 @@ describe('draft', () => {
 
     expect(status).toBe(1)
     expect(stderr).toContain('fitc4: --no-drift only applies to the draft command')
+  })
+})
+
+describe('narration', () => {
+  // Narration is stderr-only, so the report and --json stay byte-identical
+  // whether it is on, off, or piped away.
+  test('a default run narrates the phases on stderr, never stdout', HEAVY, () => {
+    const { status, stdout, stderr } = runCli(['--config', configFor('ok')])
+
+    expect(status).toBe(0)
+    expect(stderr).toContain('scan: typescript-imports...')
+    expect(stderr).toContain('validate: architecture-rules done')
+    expect(stdout).not.toContain('typescript-imports...')
+  })
+
+  test('--json keeps stdout parseable with narration on stderr', HEAVY, () => {
+    const { status, stdout, stderr } = runCli(['--json', '--config', configFor('ok')])
+
+    expect(status).toBe(0)
+    expect(stderr).toContain('scan: typescript-imports...')
+    expect((JSON.parse(stdout) as PipelineResult).modelErrors).toEqual([])
+  })
+
+  test('--quiet suppresses the narration entirely', HEAVY, () => {
+    const { status, stderr } = runCli(['--quiet', '--config', configFor('ok')])
+
+    expect(status).toBe(0)
+    expect(stderr).toBe('')
+  })
+
+  test('draft narrates its scan on stderr too', HEAVY, () => {
+    const { status, stdout, stderr } = runCli(['draft', '--config', configFor('drift')])
+
+    expect(status).toBe(0)
+    expect(stderr).toContain('scan: typescript-imports...')
+    expect(stdout).not.toContain('typescript-imports...')
   })
 })
 

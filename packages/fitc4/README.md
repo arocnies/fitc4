@@ -209,6 +209,8 @@ expect(exitCodeFor(result)).toBe(0)
 
 Providers are plain functions composed into phase arrays: `ScanProvider`, `ResolveProvider`, `ValidateProvider`. `pipelineConfig` is the batteries-included default; to swap a scanner, build your own `PipelineConfig` and pass it to `runPipeline`.
 
+Every CLI run narrates its progress to stderr, one plain line per phase and provider (`scan: typescript-imports...`), so a long scan or a slow agent call never looks hung; `--quiet` turns it off, and the report and `--json` on stdout are byte-identical either way. As a library, pass `onProgress: (message) => ...` in the `PipelineConfig` (or in `draft`'s options) to receive the same lines. Provider contexts carry an optional `progress` hook the pipeline injects, prefixed with the provider id.
+
 ## Agent providers
 
 `fitc4/agent` adds providers that shell out to your locally installed agent CLIs (`claude`, `codex`). Your login, your billing, no API keys in fitc4. `agentOwnershipAdvisor` suggests an owner for every file the model leaves unowned; `agentSemanticReview` judges whether an element's implementation still matches its declared description. Agent findings are additive, and each provider takes a `severity`: advisory by default, part of the gate when you choose `'error'`. At `'error'` a missing or logged-out CLI fails the build instead of being a `warning` nudge. `cached()` makes reruns with unchanged inputs free and identical.
