@@ -24,10 +24,12 @@ Commands:
                    an AGENTS.md with the fitc4 norms in the current
                    directory. Never overwrites existing files.
   draft            Run the configured scan providers and write a first-draft
-                   model.c4 into the configured model directory: one element
-                   per first-level source directory, one relationship per
-                   observed cross-element dependency, one stub element
-                   claiming the observed external packages. Every
+                   model.c4 into the configured model directory. Elements
+                   mirror the structure the observations report: a directory
+                   splits into nested elements where observed dependencies
+                   cross inside it and collapses where none do, observed
+                   fragments become elements of their own, and one stub
+                   element claims the observed external packages. Every
                    relationship is tagged as drift, so the first check is
                    green and the drift line counts the debt down; untagging
                    an edge blesses it. A draft to rewrite, never a sync.

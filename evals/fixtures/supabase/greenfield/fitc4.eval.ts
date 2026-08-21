@@ -44,8 +44,12 @@ export const SCAN_INSTRUCTIONS =
   'file says rather than what looks consistent. Evidence paths and examined entries are plain ' +
   'file paths without fragments; list every file you read in examined.'
 
-/** The `agent-scan` options both variants share; only the workdir differs. */
-export function supabaseScan(exec: AgentExec) {
+/**
+ * The `agent-scan` options every variant shares; only the workdir differs.
+ * The draft variant passes its own instructions, the gate instructions plus
+ * one extra rule; everything else stays identical.
+ */
+export function supabaseScan(exec: AgentExec, instructions: string = SCAN_INSTRUCTIONS) {
   return agentScan({
     exec,
     id: 'compose',
@@ -56,7 +60,7 @@ export function supabaseScan(exec: AgentExec) {
     // bytes at the pin).
     focus: ['docker/docker-compose.yml'],
     excerptChars: 22_000,
-    instructions: SCAN_INSTRUCTIONS,
+    instructions,
   })
 }
 

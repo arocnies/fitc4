@@ -1,16 +1,17 @@
 /**
  * ddh/draft: bootstrap a first model from the pinned domain-driven-hexagon
  * sources with the real TypeScript scanner, and score the draft against the
- * authored reference. Deliberately humbling, and deterministic.
+ * authored reference. Deterministic, and still humbling in the details.
  *
  * Unlike boutique/draft there is no agent anywhere in this variant: the scan
  * provider is the stock `typescript-imports` scanner the default pipeline
  * composes, so stub and live mode run the identical free scan. What the
- * fixture measures is `draft()` itself, at its honest granularity: one
- * element per first-level directory under the scan root. The reference model
- * (../arch/model.c4, restated in expectations.json) lives two and three
- * directory levels deeper, so most of it is out of the draft's reach by
- * construction. The expectations pin that gap explicitly (`expectedMiss`
+ * fixture measures is `draft()` itself, structural splitting included: a
+ * directory splits into nested elements where observed imports cross between
+ * its subdirectories and collapses where none do, which reaches deep into
+ * this codebase's module layout. The remaining gap to the reference model
+ * (../arch/model.c4, restated in expectations.json) is conceptual rather
+ * than mechanical, and the expectations pin it explicitly (`expectedMiss`
  * entries and `expectedExtras`), the same philosophy as ecom pinning a real
  * upstream error: the honest score is the fixture, not a blemish on it.
  *

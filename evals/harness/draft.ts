@@ -82,7 +82,8 @@ export interface DraftExpectations {
   edges: DraftExpectedEdge[]
   /**
    * Drafted output the reference never declares but today's draft is known
-   * to emit: the coarse artifacts of first-level-directory granularity.
+   * to emit: the artifacts of mirroring the observed dependency graph where
+   * the reference chose a different granularity.
    * Counted in the extras column, does not fail the row, stale when absent.
    */
   expectedExtras?: {
@@ -91,7 +92,7 @@ export interface DraftExpectations {
   }
 }
 
-/** One element as the draft rendered it. */
+/** One element as the draft rendered it, its id the full dotted path. */
 interface DraftedElement {
   id: string
   title: string
@@ -107,28 +108,35 @@ interface DraftedEdge {
  * Parse the drafted model text back into elements and edges.
  *
  * This reads the exact line shapes `draft()`'s renderer emits (element
- * headers, their `sources` metadata, and the relationship lines with their
- * trailing dependency-count comments), so a renderer change breaks the eval
- * visibly instead of skewing the score.
+ * headers at their nesting indentation, their `sources` metadata, and the
+ * relationship lines with their trailing dependency-count comments), so a
+ * renderer change breaks the eval visibly instead of skewing the score.
+ * Nesting is recovered from indentation: an element two spaces deeper than
+ * the last one is its child, and ids are the dotted paths the edges use.
  */
 function parseDraft(text: string): { elements: DraftedElement[]; edges: DraftedEdge[] } {
   const elements: DraftedElement[] = []
   const edges: DraftedEdge[] = []
+  const stack: { indent: number; id: string }[] = []
   let current: DraftedElement | undefined
 
   for (const line of text.split('\n')) {
-    const header = /^ {4}([A-Za-z0-9_]+) = component (['"])(.*)\2 \{$/.exec(line)
+    const header = /^( +)([A-Za-z0-9_]+) = component (['"])(.*)\3 \{$/.exec(line)
     if (header !== null) {
-      current = { id: header[1] ?? '', title: header[3] ?? '' }
+      const indent = header[1]?.length ?? 0
+      while (stack.length > 0 && (stack.at(-1)?.indent ?? 0) >= indent) stack.pop()
+      const id = [...stack.map((entry) => entry.id), header[2] ?? ''].join('.')
+      stack.push({ indent, id: header[2] ?? '' })
+      current = { id, title: header[4] ?? '' }
       elements.push(current)
       continue
     }
-    const sources = /^ {8}sources (['"])(.*)\1$/.exec(line)
+    const sources = /^ +sources (['"])(.*)\1$/.exec(line)
     if (sources !== null && current !== undefined) {
       current.sources = sources[2]
       continue
     }
-    const edge = /^ {2}app\.([A-Za-z0-9_]+) -> app\.([A-Za-z0-9_]+)(?: \{ #[^}]+ \})? \/\//.exec(line)
+    const edge = /^ {2}app\.([A-Za-z0-9_.]+) -> app\.([A-Za-z0-9_.]+)(?: \{ #[^}]+ \})? \/\//.exec(line)
     if (edge !== null) {
       edges.push({ from: edge[1] ?? '', to: edge[2] ?? '' })
     }

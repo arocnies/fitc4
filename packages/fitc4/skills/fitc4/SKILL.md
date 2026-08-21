@@ -22,12 +22,13 @@ and import onto that model, and fails where the two disagree.
   first run is green, and an `AGENTS.md` carrying the norms below. It never
   overwrites an existing file.
 - `npx fitc4 draft` generates a first-draft model from the code the
-  configured scan providers observe: one element per first-level source
-  directory, one relationship per observed cross-element dependency, every
-  relationship drift-tagged so the first run is green and the drift line
-  counts the debt down. A draft for the human to rewrite, never a sync; it
-  never overwrites an existing model (`--no-drift` emits plain
-  relationships).
+  configured scan providers observe: elements mirror the observed structure
+  (a directory splits into nested elements where dependencies cross inside
+  it and collapses where none do), one relationship per observed
+  cross-element dependency, every relationship drift-tagged so the first run
+  is green and the drift line counts the debt down. A draft for the human to
+  rewrite, never a sync; it never overwrites an existing model (`--no-drift`
+  emits plain relationships).
 
 Run the gate before handing off changes. Exit 1 is an architecture violation,
 not a flaky tool.

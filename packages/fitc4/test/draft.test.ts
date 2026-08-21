@@ -200,4 +200,158 @@ describe('draft', () => {
     expect(gate.modelErrors).toEqual([])
     expect(errors(gate.findings)).toEqual([])
   })
+
+  /** A config whose scan is the given observations, verbatim. */
+  function stubConfig(observations: Observation[]): ResolvedConfig {
+    return {
+      ...configFor('drift'),
+      providers: {
+        scan: [{ id: 'stub', run: async (_context: ScanContext) => observations }],
+      },
+    }
+  }
+
+  function file(id: string): Observation {
+    return { id: `file:${id}`, kind: 'file', subject: { kind: 'file', id }, provider: 'stub' }
+  }
+
+  function dependency(ordinal: number, from: string, to: { kind: string; id: string }): Observation {
+    return {
+      id: `dep:${ordinal}`,
+      kind: 'dependency',
+      subject: { kind: 'file', id: from },
+      target: to,
+      provider: 'stub',
+    }
+  }
+
+  test('splits a directory where dependencies cross inside it and collapses where none do', HEAVY, async () => {
+    const config = stubConfig([
+      file('src/billing/wiring.ts'),
+      file('src/billing/invoices/create.ts'),
+      file('src/billing/payments/charge.ts'),
+      file('src/reporting/deep/other.ts'),
+      file('src/reporting/deep/nested/report.ts'),
+      // The crossing between invoices and payments splits billing; the
+      // dependency inside reporting stays under its one subdirectory, so
+      // reporting collapses however deep its folders go.
+      dependency(1, 'src/billing/invoices/create.ts', { kind: 'file', id: 'src/billing/payments/charge.ts' }),
+      dependency(2, 'src/reporting/deep/other.ts', { kind: 'file', id: 'src/reporting/deep/nested/report.ts' }),
+      dependency(3, 'src/billing/invoices/create.ts', { kind: 'file', id: 'src/reporting/deep/nested/report.ts' }),
+    ])
+
+    const result = await draft(config)
+
+    // billing splits and keeps the catch-all claim for its direct wiring.ts;
+    // longest-prefix ownership hands the subdirectories to the children.
+    expect(result.text).toContain(`sources 'src/billing/**'`)
+    expect(result.text).toContain(`sources 'src/billing/invoices/**'`)
+    expect(result.text).toContain(`sources 'src/billing/payments/**'`)
+    // reporting collapses into one element; no subdirectory element appears.
+    expect(result.text).toContain(`sources 'src/reporting/**'`)
+    expect(result.text).not.toContain(`sources 'src/reporting/deep/**'`)
+    expect(result.elements).toBe(4)
+
+    // Edges connect the deepest owning elements; the dependency inside the
+    // collapsed reporting element is no crossing at all.
+    expect(result.text).toContain('app.billing.invoices -> app.billing.payments { #drift } // 1 dependency')
+    expect(result.text).toContain('app.billing.invoices -> app.reporting { #drift } // 1 dependency')
+    expect(result.edges).toBe(2)
+
+    const gate = await runPipeline(pipelineConfig(config))
+    expect(gate.modelErrors).toEqual([])
+    expect(errors(gate.findings)).toEqual([])
+    expect(gate.findings.filter((finding) => finding.ruleId === 'drift-relationship')).toHaveLength(2)
+    expect(gate.findings.filter((finding) => finding.ruleId === 'unused-drift')).toEqual([])
+  })
+
+  test('a split directory with no direct files is a pure container and gates clean', HEAVY, async () => {
+    const config = stubConfig([
+      file('src/billing/invoices/create.ts'),
+      file('src/billing/payments/charge.ts'),
+      dependency(1, 'src/billing/invoices/create.ts', { kind: 'file', id: 'src/billing/payments/charge.ts' }),
+    ])
+
+    const result = await draft(config)
+
+    // No file sits directly in billing, so the container claims nothing and
+    // carries no metadata block; the children own everything.
+    expect(result.text).toContain(`billing = component 'billing'`)
+    expect(result.text).not.toContain(`sources 'src/billing/**'`)
+    expect(result.text).toContain(`sources 'src/billing/invoices/**'`)
+
+    // A container with claiming children is structural, not unobserved.
+    const gate = await runPipeline(pipelineConfig(config))
+    expect(gate.modelErrors).toEqual([])
+    expect(errors(gate.findings)).toEqual([])
+    expect(ruleIds(gate.findings)).toEqual(['drift-relationship'])
+  })
+
+  test('fragment subjects become their own elements under the containing file', HEAVY, async () => {
+    const compose = 'src/stack/compose.yml'
+    const config = stubConfig([
+      file(compose),
+      file('src/tools/deploy.ts'),
+      file(`${compose}#services.web`),
+      file(`${compose}#services.api`),
+      // A fragment edge inside the one file, and a plain dependency on the
+      // same file, which keeps resolving to the directory-derived owner.
+      dependency(1, `${compose}#services.web`, { kind: 'file', id: `${compose}#services.api` }),
+      dependency(2, 'src/tools/deploy.ts', { kind: 'file', id: compose }),
+    ])
+
+    const result = await draft(config)
+
+    // One element per distinct fragment, claiming the full locator verbatim,
+    // nested under a container for the file inside the directory element.
+    expect(result.text).toContain(`compose_yml = component 'compose.yml'`)
+    expect(result.text).toContain(`web = component 'web'`)
+    expect(result.text).toContain(`sources 'src/stack/compose.yml#services.web'`)
+    expect(result.text).toContain(`sources 'src/stack/compose.yml#services.api'`)
+    // stack, tools, the file container, and the two fragments.
+    expect(result.elements).toBe(5)
+
+    expect(result.text).toContain(
+      'app.stack.compose_yml.web -> app.stack.compose_yml.api { #drift } // 1 dependency',
+    )
+    expect(result.text).toContain('app.tools -> app.stack { #drift } // 1 dependency')
+    expect(result.edges).toBe(2)
+
+    const gate = await runPipeline(pipelineConfig(config))
+    expect(gate.modelErrors).toEqual([])
+    expect(errors(gate.findings)).toEqual([])
+    expect(gate.findings.filter((finding) => finding.ruleId === 'drift-relationship')).toHaveLength(2)
+    expect(gate.findings.filter((finding) => finding.ruleId === 'unused-drift')).toEqual([])
+  })
+
+  test('dependency targets of other kinds become boundary elements', HEAVY, async () => {
+    const config = stubConfig([
+      file('src/api/client.ts'),
+      dependency(1, 'src/api/client.ts', { kind: 'system', id: 'stripe' }),
+      dependency(2, 'src/api/client.ts', { kind: 'system', id: 'stripe' }),
+      dependency(3, 'src/api/client.ts', { kind: 'service', id: 'redis-cart' }),
+    ])
+
+    const result = await draft(config)
+
+    // One description-only element per distinct kind and id, citing the kind.
+    expect(result.text).toContain(`stripe = component 'stripe'`)
+    expect(result.text).toContain('the scan observed this system only at the boundary')
+    expect(result.text).toContain(`redis_cart = component 'redis-cart'`)
+    expect(result.text).toContain('the scan observed this service only at the boundary')
+    expect(result.elements).toBe(3)
+
+    // Boundary edges stay untagged: the gate resolves nothing onto a
+    // description-only element, so a drift tag would be born unused.
+    expect(result.text).toContain('app.api -> app.stripe // 2 dependencies')
+    expect(result.text).toContain('app.api -> app.redis_cart // 1 dependency')
+    expect(result.text).not.toContain('app.api -> app.stripe { #drift }')
+    expect(result.edges).toBe(2)
+
+    // Green with only the unobserved-elements info listing the stubs.
+    const gate = await runPipeline(pipelineConfig(config))
+    expect(gate.modelErrors).toEqual([])
+    expect(ruleIds(gate.findings)).toEqual(['unobserved-elements'])
+    expect(gate.findings.every((finding) => finding.severity === 'info')).toBe(true)
+  })
 })

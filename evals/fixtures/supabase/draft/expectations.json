@@ -1,0 +1,34 @@
+{
+  "elements": [
+    { "name": "studio", "sources": "docker/docker-compose.yml#services.studio" },
+    { "name": "apiGw", "sources": "docker/docker-compose.yml#services.api-gw" },
+    { "name": "auth", "sources": "docker/docker-compose.yml#services.auth" },
+    { "name": "rest", "sources": "docker/docker-compose.yml#services.rest" },
+    { "name": "realtime", "sources": "docker/docker-compose.yml#services.realtime" },
+    { "name": "storage", "sources": "docker/docker-compose.yml#services.storage" },
+    { "name": "imgproxy", "sources": "docker/docker-compose.yml#services.imgproxy" },
+    { "name": "meta", "sources": "docker/docker-compose.yml#services.meta" },
+    { "name": "functions", "sources": "docker/docker-compose.yml#services.functions" },
+    { "name": "db", "sources": "docker/docker-compose.yml#services.db" },
+    { "name": "supavisor", "sources": "docker/docker-compose.yml#services.supavisor" }
+  ],
+  "edges": [
+    { "from": "apiGw", "to": "studio" },
+    { "from": "auth", "to": "db" },
+    { "from": "rest", "to": "db" },
+    { "from": "realtime", "to": "db" },
+    { "from": "storage", "to": "db" },
+    { "from": "storage", "to": "rest" },
+    { "from": "storage", "to": "imgproxy" },
+    { "from": "meta", "to": "db" },
+    { "from": "functions", "to": "apiGw" },
+    { "from": "supavisor", "to": "db" },
+    { "from": "studio", "to": "meta" },
+    { "from": "studio", "to": "apiGw" }
+  ],
+  "expectedExtras": {
+    "elements": [
+      { "title": "docker-compose.yml" }
+    ]
+  }
+}

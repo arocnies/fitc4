@@ -77,6 +77,16 @@ Resolution ([`source-root.ts`](../packages/fitc4/src/providers/source-root.ts)) 
 
 An element with neither `sources` nor `packages` is legal. It may be an external system, a person, or a pure-thought abstraction. But it is silently unenforced, indistinguishable from a typo'd claim key. One `unobserved-elements` info finding per run lists the leaf elements in that state, so deliberate abstraction stays legal but visible, and chosen rather than accidental. Parents whose children carry claims are structural, not unobserved; only leaves count.
 
+## Drafting
+
+`fitc4 draft` ([`draft.ts`](../packages/fitc4/src/draft.ts)) bootstraps a first model on a brownfield repository: it runs the configured scan providers with no model loaded and renders their observations as a starting point the human rewrites, never a sync. The governing principle: the draft mirrors the structure the observations report, not the filesystem hierarchy. Three consequences:
+
+- **Structural splitting.** Each scan root splits into its first-level directories; below that, a directory splits into nested child elements only where an observed dependency crosses between two of its subdirectories, and collapses into a single element where none does, however deep its folders go. Granularity comes from the code's own dependency graph, with no depth knob to configure. A split directory holding files of its own keeps a `<dir>/**` claim, and longest-prefix ownership hands each subdirectory to its child element, so the parent ends up owning exactly its direct files; a split directory without direct files is a pure container with no claim.
+- **Fragment elements.** A `file` observation whose subject carries a fragment locator becomes its own element, nested under an element for the containing file and claiming the locator verbatim. No option gates this: emitting fragments is already opt-in at the scan instructions, so their presence in the observations is the request.
+- **Boundary elements.** A dependency target of a kind that is not a repository path or an npm package (a `system`, a `service`) becomes a description-only element beside the vendor stub, one per distinct kind and id.
+
+Elements derive from `file` observations and never from listing the filesystem, so every emitted claim matches something observed. Edges resolve through the same longest-claim ownership the gate uses and connect the deepest owning elements. Every relationship the gate can observe is tagged as tolerated drift, so the drafted model gates green by construction with the debt as the burn-down; the edges to boundary elements are the one exception, emitted plain because the gate resolves nothing onto a description-only element and a drift tag there would be born `unused-drift`.
+
 ## Agent provider tiers
 
 `fitc4/agent` is a separate entry point the core never imports; composing an agent provider into a phase is an explicit act in a config file. The exec layer shells out to locally installed agent CLIs (`claude`, `codex`), on the user's own login and billing, with no API keys. Replies are schema-enforced JSON, and `cached()` replays them keyed on everything the model saw.
