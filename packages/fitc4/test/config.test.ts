@@ -180,5 +180,8 @@ describe('finding the config', () => {
     // something to pass silently.
     expect(() => findConfig(directory)).toThrow(CONFIG_FILENAME)
     expect(() => findConfig(directory)).toThrow(directory)
+    // And names the next step: a list of filenames leaves the most likely
+    // reader, someone in a project fitc4 was never set up in, to guess.
+    expect(() => findConfig(directory)).toThrow("Run 'npx fitc4 init' to scaffold one.")
   })
 })

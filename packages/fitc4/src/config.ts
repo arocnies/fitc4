@@ -383,9 +383,13 @@ export function findConfig(from: string): string {
 
     const parent = path.dirname(directory)
     if (parent === directory) {
+      // Names the next step, not only the dead end: the most likely reader of
+      // this message is someone running fitc4 in a project it was never set
+      // up in, and listing filenames leaves them to guess which to write.
       throw new Error(
         `No ${CONFIG_FILENAMES.join(', ')} found in ${path.resolve(from)}, ` +
-          `its ${CONFIG_DIRECTORY}/ directory, or any ancestor.`,
+          `its ${CONFIG_DIRECTORY}/ directory, or any ancestor. ` +
+          `Run 'npx fitc4 init' to scaffold one.`,
       )
     }
     directory = parent

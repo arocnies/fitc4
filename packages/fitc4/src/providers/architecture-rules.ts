@@ -426,6 +426,13 @@ function dependencyRule(
 
   // The model declares the opposite direction. A stronger signal than a missing
   // relationship: this dependency was modelled backwards.
+  //
+  // The remedy offers the code fix first and the model edit second, matching
+  // the norms this package ships (the scaffolded AGENTS.md and the fitc4
+  // skill both say fixing the code is the default and a model edit is a
+  // design decision). The old wording said only "declare the dependency that
+  // the code actually has", which named the one fix those norms call the
+  // exception, in the message a reader is most likely to act on directly.
   const reversed = hasRelationship(declared, targetId, sourceId)
   if (reversed !== undefined) {
     return {
@@ -434,7 +441,9 @@ function dependencyRule(
       severity: severityOf('relationship-direction', 'error'),
       description:
         `${sourceId} depends on ${targetId}, but the model declares only ` +
-        `${targetId} -> ${sourceId}. Declare the dependency that the code actually has.`,
+        `${targetId} -> ${sourceId}. Reroute or remove the import so the dependency flows ` +
+        `the way the model declares; if the architecture genuinely changed, declare the ` +
+        `dependency the code has instead.`,
       subject: { kind: 'element', id: sourceId },
       related: [
         { kind: 'element', id: targetId },

@@ -81,6 +81,11 @@ describe('a model whose implementation contradicts the contract', () => {
       kind: 'relationship',
       id: 'fixture.app.interface::_::fixture.app.core',
     })
+    // The remedy offers the code fix first and the model edit as the
+    // deliberate alternative, matching the norms this package ships. The old
+    // text named only the model edit, in the message a reader acts on.
+    expect(finding?.description).toContain('Reroute or remove the import')
+    expect(finding?.description).toContain('if the architecture genuinely changed')
   })
 
   test('treats an unowned file as a warning and a contested file as an error', () => {

@@ -25,6 +25,7 @@ export interface CodexCliOptions {
   model?: string
   /** Path to the CLI binary. Default: `codex` on PATH. */
   binary?: string
+  /** Hard per-call timeout. Default: 120 seconds; a big one-shot scan may need more. */
   timeoutMs?: number
 }
 
@@ -195,6 +196,7 @@ export function codexCli(options: CodexCliOptions = {}): AgentExec {
           stdin: composeInput(request),
           cwd: request.cwd,
           timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
+          factory: 'codexCli',
         })
         if (!run.ok) return run
 
