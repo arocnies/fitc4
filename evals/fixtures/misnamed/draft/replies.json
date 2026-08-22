@@ -1,0 +1,32 @@
+[
+  {
+    "when": { "promptIncludes": "claiming 'src/cache/**'" },
+    "reply": {
+      "description": "Holds the permission table and authorizes every action against it, refusing any request whose principal holds no permitted role. Other components depend on it to stop unpermitted work before it happens."
+    }
+  },
+  {
+    "when": { "promptIncludes": "claiming 'src/utils/**'" },
+    "reply": {
+      "description": "Settles and reverses payments, posting one immutable ledger entry per movement and reporting the balance per currency. This is the only path by which money becomes final."
+    }
+  },
+  {
+    "when": { "promptIncludes": "claiming 'src/legacy/**'" },
+    "reply": {
+      "description": "The process entry point and request router: it dispatches every incoming request to settlement or to the balance query, and turns a refused authorization into a 403 instead of a crash."
+    }
+  },
+  {
+    "when": { "promptIncludes": "Element app.cache declares" },
+    "reply": { "matches": true, "issues": [] }
+  },
+  {
+    "when": { "promptIncludes": "Element app.utils declares" },
+    "reply": { "matches": true, "issues": [] }
+  },
+  {
+    "when": { "promptIncludes": "Element app.legacy declares" },
+    "reply": { "matches": true, "issues": [] }
+  }
+]

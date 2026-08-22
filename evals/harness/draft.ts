@@ -17,6 +17,12 @@
  * endpoint to the reference element it matched; an edge with an unmapped
  * endpoint can only score as an extra.
  *
+ * A fixture that opts into the describe pass may also give an element
+ * `describeMust` / `describeMustNot` substrings, which turns
+ * `draft-descriptions` from a presence check into one that can fail on
+ * content: the description must name the real responsibility and must not
+ * echo a misleading name. See `describeViolations`.
+ *
  * The result is two scorecard rows in the harness's usual vocabulary:
  * `draft-elements` (which known elements the draft produced) and
  * `draft-edges` (which known relationships its edges covered). Extras are
@@ -33,7 +39,10 @@
  * stub mode so the fixture gets updated instead of rotting silently.
  */
 
-import type { DraftResult } from 'fitc4'
+import { defaultValidate, pipelineConfig, runPipeline } from 'fitc4'
+import type { DraftResult, ResolvedConfig } from 'fitc4'
+import { agentSemanticReview, AGENT_SEMANTIC_REVIEW_PROVIDER_ID } from 'fitc4/agent'
+import type { AgentExec } from 'fitc4/agent'
 
 import type { FixtureScore, ProviderScore } from './score.ts'
 
@@ -46,6 +55,18 @@ export interface DraftExpectedElement {
   outsideScan?: boolean
   /** True when today's draft is known to miss this entry (see the module doc). */
   expectedMiss?: boolean
+  /**
+   * Substrings this element's drafted description must contain,
+   * case-insensitive. Every entry must appear, so the description has to name
+   * the element's real responsibility rather than merely be non-empty.
+   */
+  describeMust?: string[]
+  /**
+   * Substrings this element's drafted description must NOT contain,
+   * case-insensitive. This is where a misleading directory name is caught: a
+   * description assembled from the name says the forbidden word.
+   */
+  describeMustNot?: string[]
 }
 
 export interface DraftExpectedEdge {
@@ -85,6 +106,11 @@ export interface DraftExpectations {
    * `draft-descriptions` row: every matched claiming element must carry a
    * description that is not the TODO placeholder, since a described draft
    * with a leftover TODO means a describe call was dropped or refused.
+   *
+   * An element may additionally carry `describeMust` / `describeMustNot`,
+   * which is what makes the row able to fail on quality rather than only on
+   * absence. Elements without them keep the presence-only check, so a fixture
+   * that declares no rules scores exactly as it did before.
    */
   describe?: boolean
   /**
@@ -158,6 +184,94 @@ function parseDraft(text: string): { elements: DraftedElement[]; edges: DraftedE
   return { elements, edges }
 }
 
+/**
+ * Close the describe-to-review loop: does the gate accept what draft wrote?
+ *
+ * The risk this measures is the two agent features feeding each other noise.
+ * `draftDescriber` proposes a description, `agentSemanticReview` critiques
+ * one, and nothing else in the suite runs them in that order. A describer
+ * that writes configuration trivia ("listens on port 8000") produces a
+ * `description-drift` finding the day the port moves, so a describe pass and
+ * a reviewer that disagree by construction would ship as a permanent warning
+ * on every freshly drafted repository.
+ *
+ * A draft fixture opts in with `export const review = true`. The drafted
+ * model is already on disk in the fixture's temp model directory, so the loop
+ * is one more pipeline run over the same project with the reviewer composed
+ * in, and every review finding is an extra: a perfect run flags nothing about
+ * descriptions written moments earlier from the same code.
+ */
+export async function scoreDescribeReview(
+  config: ResolvedConfig,
+  exec: AgentExec,
+  drafted: DraftResult,
+): Promise<ProviderScore> {
+  const row: ProviderScore = { provider: 'draft-review', hits: 0, misses: 0, extras: 0, notes: [] }
+
+  if (drafted.written === undefined) {
+    row.misses += 1
+    row.notes.push(`no model to review, the draft was not written: ${drafted.refusal ?? 'no reason given'}`)
+    return row
+  }
+
+  const result = await runPipeline(
+    pipelineConfig({
+      ...config,
+      providers: { ...config.providers, validate: [...defaultValidate, agentSemanticReview({ exec })] },
+    }),
+  )
+  if (result.modelErrors.length > 0) {
+    row.misses += 1
+    row.notes.push(`the drafted model did not load: ${result.modelErrors.join('; ')}`)
+    return row
+  }
+
+  // Everything the reviewer says counts, not only drift: an `agent-unavailable`
+  // or `agent-truncated` finding means the review did not actually happen, and
+  // a review that never ran must not read as a clean one.
+  const reviewFindings = result.findings.filter(
+    (finding) => finding.provider === AGENT_SEMANTIC_REVIEW_PROVIDER_ID,
+  )
+  const flagged = new Set(
+    reviewFindings
+      .filter((finding) => finding.ruleId === 'description-drift')
+      .map((finding) => finding.subject?.id),
+  )
+  for (const finding of reviewFindings) {
+    row.extras += 1
+    row.notes.push(`${finding.ruleId}: ${finding.description}`)
+  }
+  row.hits = Math.max(drafted.described - flagged.size, 0)
+  return row
+}
+
+/**
+ * How one drafted description breaks its element's rules, if it does.
+ *
+ * An element the fixture wrote no rules for gets no rules applied, and the
+ * check stays what it always was: described at all. Where rules exist,
+ * matching is case-insensitive substring containment, deliberately the
+ * crudest oracle that can fail. The failure it exists to catch is coarse: a
+ * description built from the element's name instead of its code names the
+ * wrong responsibility outright, so it misses the required word and says the
+ * forbidden one. Anything subtler than that is a live judgment call, and this
+ * harness does not pretend to make judgment calls deterministically.
+ */
+function describeViolations(
+  description: string,
+  expected: DraftExpectedElement | undefined,
+): string[] {
+  const haystack = description.toLowerCase()
+  const broken: string[] = []
+  for (const required of expected?.describeMust ?? []) {
+    if (!haystack.includes(required.toLowerCase())) broken.push(`never says '${required}'`)
+  }
+  for (const forbidden of expected?.describeMustNot ?? []) {
+    if (haystack.includes(forbidden.toLowerCase())) broken.push(`says '${forbidden}'`)
+  }
+  return broken
+}
+
 export function scoreDraft(
   fixture: string,
   expectations: DraftExpectations,
@@ -171,6 +285,8 @@ export function scoreDraft(
   // --- elements: match by sources prefix, or by title without one ---
   const referenceName = new Map<string, string>()
   const matchedElements = new Set<DraftedElement>()
+  /** The reference entry each drafted element matched, for the description rules. */
+  const matchedExpectation = new Map<DraftedElement, DraftExpectedElement>()
   for (const expected of expectations.elements) {
     const match = elements.find(
       (element) =>
@@ -191,6 +307,7 @@ export function scoreDraft(
       continue
     }
     matchedElements.add(match)
+    matchedExpectation.set(match, expected)
     referenceName.set(match.id, expected.name)
     elementRow.hits += 1
     if (expected.expectedMiss === true) {
@@ -270,7 +387,7 @@ export function scoreDraft(
     )
   }
 
-  // --- descriptions: every matched claiming element must be described ---
+  // --- descriptions: described at all, and where the fixture says so, right ---
   const rows = [edgeRow, elementRow]
   if (expectations.describe === true) {
     const descriptionRow: ProviderScore = {
@@ -282,14 +399,20 @@ export function scoreDraft(
     }
     for (const element of matchedElements) {
       if (element.sources === undefined) continue
-      if (element.description !== undefined && !element.description.startsWith('TODO')) {
-        descriptionRow.hits += 1
-      } else {
+      const name = referenceName.get(element.id) ?? element.title
+      const description = element.description
+      if (description === undefined || description.startsWith('TODO')) {
         descriptionRow.misses += 1
-        descriptionRow.notes.push(
-          `undescribed element: ${referenceName.get(element.id) ?? element.title} kept the TODO`,
-        )
+        descriptionRow.notes.push(`undescribed element: ${name} kept the TODO`)
+        continue
       }
+      const broken = describeViolations(description, matchedExpectation.get(element))
+      if (broken.length === 0) {
+        descriptionRow.hits += 1
+        continue
+      }
+      descriptionRow.misses += 1
+      descriptionRow.notes.push(`wrong description: ${name} ${broken.join(', ')}`)
     }
     rows.push(descriptionRow)
   }

@@ -42,7 +42,7 @@ import {
   type AgentExec,
 } from 'fitc4/agent'
 
-import { scoreDraft, type DraftExpectations } from './harness/draft.ts'
+import { scoreDescribeReview, scoreDraft, type DraftExpectations } from './harness/draft.ts'
 import { externalManifest, hasCheckout } from './harness/external.ts'
 import { perfect, renderScorecard, scoreFixture, type Expectations, type FixtureScore } from './harness/score.ts'
 import { scriptedExec, type ScriptedReply } from './harness/stub.ts'
@@ -53,6 +53,7 @@ const FIXTURE_ORDER = [
   'brownfield',
   'non-ts',
   'exploratory',
+  'misnamed/draft',
   'ddh/greenfield',
   'ddh/brownfield',
   'ddh/draft',
@@ -200,13 +201,17 @@ for (const fixture of selected) {
     // sight, and scores the drafted text against the reference expectations.
     // A spec that also exports `describe = true` opts into the describe pass:
     // the fixture's exec doubles as the draft describer, and the scorer then
-    // asserts described elements carry non-TODO descriptions.
+    // asserts described elements carry non-TODO descriptions, plus whatever
+    // per-element description rules the expectations declare. A spec that
+    // exports `review = true` additionally gates the drafted model it just
+    // wrote against `agentSemanticReview`, closing the describe-to-review loop.
     // Everything else runs the pipeline exactly as before.
     if (fs.existsSync(path.join(root, 'draft.eval.ts'))) {
       const expectations = readJson(path.join(root, 'expectations.json')) as DraftExpectations
       const specModule = (await import(pathToFileURL(path.join(root, 'draft.eval.ts')).href)) as {
         default: DraftFixtureSpec
         describe?: boolean
+        review?: boolean
       }
       const exec = execFor(fixture)
       const config = await specModule.default(exec, root)
@@ -217,6 +222,10 @@ for (const fixture of selected) {
           : {},
       )
       score = scoreDraft(fixture, expectations, result)
+      if (specModule.review === true) {
+        score.providers.push(await scoreDescribeReview(config, exec, result))
+        score.providers.sort((a, b) => a.provider.localeCompare(b.provider))
+      }
     } else {
       const expectations = readJson(path.join(root, 'expectations.json')) as Expectations
       const specModule = (await import(pathToFileURL(path.join(root, 'fitc4.eval.ts')).href)) as {

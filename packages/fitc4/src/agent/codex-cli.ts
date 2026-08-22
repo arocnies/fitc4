@@ -17,7 +17,17 @@ import os from 'node:os'
 import path from 'node:path'
 
 import type { JsonObject, JsonValue } from '../types.ts'
-import { composeInput, extractJson, finishReply, runCliProcess, schemaMismatch, truncate } from './exec.ts'
+import {
+  composeInput,
+  extractJson,
+  FAILURE_EXCERPT_LIMIT,
+  finishReply,
+  runCliProcess,
+  schemaMismatch,
+  tailExcerpt,
+  truncate,
+  withoutRepeats,
+} from './exec.ts'
 import type { AgentExec, AgentReply, AgentRequest } from './exec.ts'
 
 export interface CodexCliOptions {
@@ -157,6 +167,26 @@ function envelope(schema: JsonObject): JsonObject {
  */
 const FINGERPRINT = 'codex-cli/flags-v3'
 
+/** The non-interactive way in. The CLI's own failure text offers no advice at all. */
+const LOGIN_COMMAND = 'codex login'
+
+/**
+ * The tail of codex's output, with its retry spam collapsed first.
+ *
+ * A logged-out `codex exec` prints a banner (version, workdir, model, sandbox,
+ * session id), then roughly twenty lines of reconnect attempts over about ten
+ * seconds, then the one line that names the cause. There is no envelope to
+ * extract from, so the tail is the answer, but five copies of the same symptom
+ * would crowd the cause out of any budget. Hence the collapse, and nothing
+ * more: this stays a text tail, never a log parser for a format the CLI is
+ * free to change.
+ */
+function explainCodexOutput(output: { stdout: string; stderr: string }): string | undefined {
+  const text = output.stderr || output.stdout
+  if (text.trim() === '') return undefined
+  return tailExcerpt(withoutRepeats(text), FAILURE_EXCERPT_LIMIT)
+}
+
 export function codexCli(options: CodexCliOptions = {}): AgentExec {
   const binary = options.binary ?? 'codex'
   const defaultTimeoutMs = options.timeoutMs ?? 120_000
@@ -197,6 +227,8 @@ export function codexCli(options: CodexCliOptions = {}): AgentExec {
           cwd: request.cwd,
           timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
           factory: 'codexCli',
+          explain: explainCodexOutput,
+          loginCommand: LOGIN_COMMAND,
         })
         if (!run.ok) return run
 

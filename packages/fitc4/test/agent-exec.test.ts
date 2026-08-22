@@ -13,7 +13,7 @@ import { afterAll, afterEach, describe, expect, test } from 'vitest'
 
 import { claudeCli } from '../src/agent/claude-cli.ts'
 import { codexCli, strictSchema } from '../src/agent/codex-cli.ts'
-import { extractJson, finishReply, schemaMismatch } from '../src/agent/exec.ts'
+import { extractJson, finishReply, schemaMismatch, tailExcerpt, withoutRepeats } from '../src/agent/exec.ts'
 import type { JsonObject, JsonValue } from '../src/types.ts'
 
 const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-fake-agent-'))
@@ -324,6 +324,162 @@ describe('codexCli', () => {
 
     expect(!reply.ok && reply.error).toContain('timed out after 0.2s')
     expect(!reply.ok && reply.error).toContain('raise it with codexCli({ timeoutMs })')
+  })
+})
+
+/**
+ * An unusable CLI must say why, in its own words.
+ *
+ * These fakes reproduce output captured from both real CLIs run against an
+ * empty config directory, so they behave as logged out. Nothing here invokes a
+ * real CLI, and nothing here touches anyone's credentials: the shapes are the
+ * ground truth, checked in, and the point is that the reader sees the cause.
+ * Both CLIs bury it: claude puts it in the last field of a JSON envelope that
+ * opens with usage and cost metadata, codex puts it on the last line after a
+ * banner and roughly twenty lines of retry spam.
+ */
+const loggedOutClaude = fakeBinary(
+  'fake-claude-logged-out.cjs',
+  `
+process.stdout.write(
+  JSON.stringify({
+    is_error: true,
+    duration_ms: 812,
+    duration_api_ms: 0,
+    num_turns: 1,
+    stop_reason: 'stop_sequence',
+    session_id: '7c2f0f1e-0d1a-4b9e-9d1b-0f4a2c8e1b33',
+    total_cost_usd: 0,
+    usage: {
+      input_tokens: 4,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      output_tokens: 0,
+      server_tool_use: { web_search_requests: 0 },
+      service_tier: 'standard',
+    },
+    permission_denials: [],
+    modelUsage: {},
+    result: 'Not logged in \\u00b7 Please run /login',
+  }),
+)
+process.exit(1)
+`,
+)
+
+const loggedOutCodex = fakeBinary(
+  'fake-codex-logged-out.cjs',
+  `
+const lines = [
+  'OpenAI Codex v0.146.0',
+  '--------',
+  'workdir: /tmp/fitc4-agent-7f2a',
+  'model: gpt-5.6-luna',
+  'provider: openai',
+  'approval: never',
+  'sandbox: read-only',
+  'reasoning effort: none',
+  'reasoning summaries: none',
+  'session id: 01a0f6d2-1e8c-4f3a-9c21-7b5d0e4a9f11',
+  '--------',
+]
+for (const attempt of [1, 2, 3, 4, 5]) {
+  lines.push('failed to connect to websocket: HTTP error: 401 Unauthorized')
+  lines.push('ERROR: Reconnecting... ' + attempt + '/5')
+}
+for (const attempt of [1, 2, 3, 4, 5]) {
+  lines.push('failed to connect over https: HTTP error: 401 Unauthorized')
+  lines.push('ERROR: Reconnecting... ' + attempt + '/5')
+}
+lines.push(
+  'ERROR: unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, ' +
+    'url: https://api.openai.com/v1/responses, cf-ray: 9a1b2c3d4e5f6789-SEA, request id: req_0a1b2c',
+)
+process.stderr.write(lines.join('\\n') + '\\n')
+process.exit(1)
+`,
+)
+
+describe('an unusable CLI reports its own cause', () => {
+  test("claude's envelope is read, not trimmed, and the login command is named", async () => {
+    const reply = await claudeCli({ binary: loggedOutClaude }).run({ prompt: 'x' })
+
+    expect(reply.ok).toBe(false)
+    if (reply.ok) return
+    // The middot is the CLI's own punctuation. Another tool's message travels
+    // verbatim; restyling it to this project's conventions would misquote it.
+    expect(reply.error).toContain('Not logged in · Please run /login')
+    expect(reply.error).toContain("run 'claude login' first")
+    // The regression this fixes: the envelope's leading usage and cost
+    // metadata used to be the entire message a reader got.
+    expect(reply.error).not.toContain('total_cost_usd')
+  })
+
+  test("codex's last line survives its banner and its retry spam", async () => {
+    const reply = await codexCli({ binary: loggedOutCodex }).run({ prompt: 'x' })
+
+    expect(reply.ok).toBe(false)
+    if (reply.ok) return
+    expect(reply.error).toContain('401 Unauthorized: Missing bearer or basic authentication in header')
+    expect(reply.error).toContain("run 'codex login' first")
+    // The banner used to be the entire message; five identical reconnect
+    // lines would crowd out the cause even reading from the end.
+    expect(reply.error).not.toContain('OpenAI Codex v0.146.0')
+    expect(reply.error.match(/Reconnecting/g)?.length ?? 0).toBeLessThanOrEqual(1)
+  })
+
+  test('a failure that is not about auth gets the cause and no login hint', async () => {
+    // A wrong login hint sends the reader down the wrong path, so detection is
+    // a short explicit marker list and stays silent when nothing matches.
+    const otherClaude = fakeBinary(
+      'fake-claude-other-failure.cjs',
+      `
+process.stdout.write(JSON.stringify({ is_error: true, total_cost_usd: 0, result: 'Credit balance is too low' }))
+process.exit(1)
+`,
+    )
+    const claudeReply = await claudeCli({ binary: otherClaude }).run({ prompt: 'x' })
+    expect(!claudeReply.ok && claudeReply.error).toContain('Credit balance is too low')
+    expect(!claudeReply.ok && claudeReply.error).not.toContain('claude login')
+
+    const otherCodex = fakeBinary(
+      'fake-codex-other-failure.cjs',
+      `
+process.stderr.write(
+  'OpenAI Codex v0.146.0\\n--------\\nmodel: nope\\n--------\\n' +
+    "ERROR: model 'nope' is not supported by this account\\n",
+)
+process.exit(1)
+`,
+    )
+    const codexReply = await codexCli({ binary: otherCodex }).run({ prompt: 'x' })
+    expect(!codexReply.ok && codexReply.error).toContain("model 'nope' is not supported")
+    expect(!codexReply.ok && codexReply.error).not.toContain('codex login')
+  })
+})
+
+describe('tailExcerpt', () => {
+  test('keeps whole lines from the end, announces the dropped head, trims one long line', () => {
+    expect(tailExcerpt('banner\nworkdir: /x\nERROR: the cause', 100)).toBe(
+      'banner workdir: /x ERROR: the cause',
+    )
+    // Over budget: the head goes and the drop is announced inline.
+    expect(tailExcerpt('aaaaaaaa\nbbbb\ncccc', 10)).toBe('… bbbb cccc')
+    // A single line over budget keeps its head, where a message's own subject is.
+    expect(tailExcerpt('ERROR: unexpected status 401, request id: req_9', 20)).toBe(
+      'ERROR: unexpected st…',
+    )
+    expect(tailExcerpt('\n  \n', 100)).toBe('')
+  })
+})
+
+describe('withoutRepeats', () => {
+  test('collapses lines that differ only in digits, first occurrence wins', () => {
+    const collapsed = withoutRepeats(
+      ['retrying 1/5', 'retrying 2/5', 'retrying 3/5', 'ERROR: gave up'].join('\n'),
+    )
+
+    expect(collapsed).toBe('retrying 1/5\nERROR: gave up')
   })
 })
 
