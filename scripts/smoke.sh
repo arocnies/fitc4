@@ -95,11 +95,34 @@ case "$init_err" in
   *"    at "*) echo "FAIL: config error printed a stack trace" >&2; exit 1 ;;
 esac
 
-echo "== draft refuses to overwrite an existing model"
-draft_out="$(cd "$fresh" && npx fitc4 draft)"
+echo "== draft replaces init's untouched placeholder"
+# The onboarding path a user actually walks: init, then the draft init
+# recommends. It used to refuse, because init had written the model file.
+draft_out="$(cd "$fresh" && npx fitc4 draft 2>&1)"
 case "$draft_out" in
+  *"created arch/model.c4"*) ;;
+  *) echo "FAIL: draft did not replace init's placeholder: $draft_out" >&2; exit 1 ;;
+esac
+case "$(cat "$fresh/arch/model.c4")" in
+  *"fitc4 init placeholder"*)
+    echo "FAIL: the drafted model carries the placeholder marker" >&2; exit 1 ;;
+esac
+
+echo "== draft refuses to overwrite the model it just drafted"
+# No marker in a drafted model, so the draft is authored territory now, and
+# stdout stays a clean model while the reason goes to stderr.
+refusal="$(cd "$fresh" && npx fitc4 draft 2>&1 >/dev/null)"
+case "$refusal" in
   *"never overwrites"*) ;;
-  *) echo "FAIL: draft beside an existing model did not refuse: $draft_out" >&2; exit 1 ;;
+  *) echo "FAIL: draft over its own output did not refuse: $refusal" >&2; exit 1 ;;
+esac
+printed="$(cd "$fresh" && npx fitc4 draft 2>/dev/null)"
+case "$printed" in
+  *"note:"*) echo "FAIL: the refused draft printed a note into stdout" >&2; exit 1 ;;
+esac
+case "$printed" in
+  *"specification {"*) ;;
+  *) echo "FAIL: the refused draft printed no model to stdout: $printed" >&2; exit 1 ;;
 esac
 
 echo "== draft writes a drift-tagged model that gates green"

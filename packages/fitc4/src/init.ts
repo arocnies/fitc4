@@ -6,7 +6,8 @@
  * `npx fitc4` is green rather than a wall of unowned files, and an
  * `AGENTS.md` carrying the one norm a coding agent cannot infer from the CLI:
  * the model is the contract, not a knob for silencing findings. The starter
- * model is a placeholder to split, not a suggestion of shape.
+ * model is a placeholder to split, not a suggestion of shape, and it says so
+ * in its first line: see `MODEL_PLACEHOLDER_MARKER`.
  *
  * Never overwrites: an existing config is an error (running init twice is a
  * mistake worth stopping), an existing model file or AGENTS.md is kept with a
@@ -71,14 +72,24 @@ const AGENT_EXEC_IMPORTS: Record<InitAgent, string> = {
 }
 
 /**
- * The module config `init --agent` scaffolds: the worked composition from
- * docs/agent-providers.md, ready to run. Deliberately lean. This becomes the
- * user's config to own, so it carries the composition and the one-line
- * reasons, not a tutorial.
+ * The module config `init --agent` scaffolds: an exec declared once, and
+ * nothing that spends money until a command asks for it.
+ *
+ * The exec is the whole point of this path, since `draft --describe` reads it
+ * and it costs nothing on its own. The agent gate providers ship commented
+ * out beside `agentScan`, with the trade stated where the reader will
+ * uncomment: composing them means every plain `npx fitc4`, the command the
+ * scaffolded AGENTS.md tells every coding agent to run before handoff, makes
+ * live billed calls on every machine, and CI without a logged-in CLI fails on
+ * the fail-closed resolver. A config that bills per gate run is a config a
+ * team turns off, which is worse than one they graduate into deliberately.
+ *
+ * Deliberately lean. This becomes the user's config to own, so it carries the
+ * composition and the one-line reasons, not a tutorial.
  */
 function agentConfigTemplate(agent: InitAgent): string {
-  return `import { defaultResolve, defaultValidate, defineConfig } from 'fitc4'
-import { agentResolve, agentSemanticReview, ${AGENT_EXEC_IMPORTS[agent]} } from 'fitc4/agent'
+  return `import { defineConfig } from 'fitc4'
+import { ${AGENT_EXEC_IMPORTS[agent]} } from 'fitc4/agent'
 
 // This model measured perfect in the fitc4 evals. The exec runs your own
 // ${agent} CLI, on your own login and billing; cached() makes reruns with
@@ -92,12 +103,21 @@ export default defineConfig({
   scanRoots: ['src'],
   tsconfig: 'tsconfig.json',
 
-  // The exec commands use directly, e.g. fitc4 draft --describe.
+  // The exec commands use directly, e.g. fitc4 draft --describe. Declaring it
+  // costs nothing: no call happens until a command asks for one.
   agent: exec,
 
-  // A present phase replaces the defaults, so each spreads them back in.
-  resolve: [...defaultResolve, agentResolve({ exec })],
-  validate: [...defaultValidate, agentSemanticReview({ exec })],
+  // The agent gate providers, one uncomment away. Uncommenting makes every
+  // 'fitc4' run call your ${agent} CLI: that bills per run, and it fails in CI
+  // where no CLI is logged in, since agentResolve is fail-closed and an
+  // unavailable exec is a provider-failure error. So the common pattern is a
+  // second config carrying these two lines, say fitc4.agent.config.mts, run
+  // with --config beside the deterministic one CI runs. A present phase
+  // replaces the defaults, so each spreads them back in: add defaultResolve
+  // and defaultValidate to the fitc4 import, agentResolve and
+  // agentSemanticReview to the fitc4/agent import.
+  // resolve: [...defaultResolve, agentResolve({ exec })],
+  // validate: [...defaultValidate, agentSemanticReview({ exec })],
 
   // An agent scan can observe domains no parser covers (compose files,
   // runbooks), but a scan is only as good as its domain-specific
@@ -121,7 +141,27 @@ export default defineConfig({
 `
 }
 
-const MODEL_TEMPLATE = `specification {
+/**
+ * The first line of the starter model, and the one thing that lets `draft`
+ * write into a model directory that already holds a model file.
+ *
+ * The never-overwrite rule protects authored documentation. An untouched
+ * placeholder this tool wrote itself is not authored documentation, so
+ * replacing it weakens nothing: it resolves the contradiction where `init`
+ * created the very file that made the `draft` it recommends refuse to write.
+ * The marker states both halves of the deal, because a user who edits this
+ * file must be able to tell from the file alone that they now own it.
+ *
+ * One shared constant on purpose. Two copies of this string, one in the
+ * template and one in draft's check, would drift into a placeholder no draft
+ * ever recognizes, which is the silent return of the same contradiction.
+ */
+export const MODEL_PLACEHOLDER_MARKER =
+  `// fitc4 init placeholder. 'fitc4 draft' may replace this file. ` +
+  `Edit it and draft will leave it alone.`
+
+const MODEL_TEMPLATE = `${MODEL_PLACEHOLDER_MARKER}
+specification {
   element system
   element component
 }
@@ -194,9 +234,10 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
     fs.writeFileSync(path.join(target, AGENT_CONFIG_FILENAME), agentConfigTemplate(options.agent))
     result.created.push(AGENT_CONFIG_FILENAME)
     result.notes.push(
-      `${AGENT_CONFIG_FILENAME} is a module config: it composes the ${options.agent} CLI as ` +
-        `resolve and validate providers and declares it as the config's agent exec, ` +
-        `so fitc4 draft --describe works out of the box`,
+      `${AGENT_CONFIG_FILENAME} is a module config: it declares the ${options.agent} CLI as the ` +
+        `config's agent exec, so fitc4 draft --describe works immediately. The agent gate ` +
+        `providers ship commented out, because composing them would call your CLI on every ` +
+        `fitc4 run and fail in CI without a login; the file says how to enable them`,
     )
   }
 

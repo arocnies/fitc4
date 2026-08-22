@@ -30,6 +30,12 @@
  * there would be born as `unused-drift` noise, and they are emitted as plain
  * declared edges instead.
  *
+ * Writing is refused wherever a model file already exists, with one narrow
+ * exception: `init`'s untouched placeholder, which the tool wrote itself. See
+ * `placement`. The drafted output deliberately carries no placeholder marker
+ * of its own. A draft is the user's model to edit from that point on, and a
+ * second `draft` over it would be overwriting authored work.
+ *
  * Elements and edges derive from observations, not from listing the
  * filesystem, so every emitted `sources` claim matches a scanned file or an
  * observed fragment and every emitted relationship covers an observed
@@ -44,7 +50,7 @@ import path from 'node:path'
 import type { ResolvedConfig } from './config.ts'
 import { pipelineConfig } from './defaults.ts'
 import { messageOf } from './errors.ts'
-import { MODEL_FILENAME } from './init.ts'
+import { MODEL_FILENAME, MODEL_PLACEHOLDER_MARKER } from './init.ts'
 import { packageNameOf, toPackageName } from './model.ts'
 import { DEFAULT_DRIFT_TAG } from './providers/architecture-rules.ts'
 import { ownerOf } from './providers/source-root.ts'
@@ -72,8 +78,15 @@ export interface DraftElementFacts {
 }
 
 /**
- * Propose a description for one drafted element, or `undefined` to keep the
- * TODO. Typed structurally here so the core stays free of `fitc4/agent`; the
+ * Propose a description for one drafted element.
+ *
+ * Two outcomes, and the difference is load-bearing. `undefined` is an
+ * abstention: the callback ran and had nothing to propose, so the element
+ * keeps its TODO and the draft carries on. A thrown error means the callback
+ * could not run at all, and it aborts the whole draft (see `describeElements`)
+ * because an agent that is not there does not abstain, it fails.
+ *
+ * Typed structurally here so the core stays free of `fitc4/agent`; the
  * agent-powered implementation is `draftDescriber` in that entry point.
  */
 export type DraftDescribe = (element: DraftElementFacts) => Promise<string | undefined>
@@ -91,10 +104,13 @@ export interface DraftOptions {
    * Replace each eligible element's TODO description with what this callback
    * proposes from the element's own facts. Eligible means a declared `sources`
    * claim plus at least one owned observed file; claimless containers, the
-   * boundary elements, and the vendor stub keep their placeholders. Advisory
-   * by design: a callback that returns `undefined` or throws keeps the TODO
-   * and never fails the draft. Descriptions stay a draft-time proposal, since
-   * the gate only ever critiques descriptions, never rewrites them.
+   * boundary elements, and the vendor stub keep their placeholders.
+   *
+   * `undefined` keeps the element's TODO, narrated and non-fatal: a
+   * placeholder description is an honest state. A thrown error aborts the
+   * draft and writes nothing, because a callback that cannot run is not a
+   * callback that declined. Descriptions stay a draft-time proposal either
+   * way, since the gate only ever critiques descriptions, never rewrites them.
    */
   describe?: DraftDescribe
   /**
@@ -242,14 +258,38 @@ export async function draft(
 
   const edges = draftEdges(observations, elements, packages, vendorId, externals)
 
-  const describeCounts = await describeElements(elements, observations, options.describe, narrate)
+  // Decided before the describe pass, never after: in refusal mode the
+  // descriptions would be paid for, printed to scrollback, and thrown away.
+  // Nobody should be billed for output the tool has already decided to
+  // discard.
+  const decision = placement(config)
+
+  let refusal = decision.refusal
+  let describeCounts = { describeAttempted: 0, described: 0 }
+  if (refusal === undefined) {
+    describeCounts = await describeElements(elements, observations, options.describe, narrate)
+  } else if (options.describe !== undefined) {
+    narrate?.('describe: skipped, the draft will not be written')
+    refusal =
+      `${refusal} The describe pass was skipped: nothing will be written, ` +
+      `so no describe call was worth paying for.`
+  }
 
   const text = render(elements, externals, edges, packages, vendorId, drift ? driftTag : undefined)
-  const placement = place(config, text)
+
+  // Written last, so an aborted describe pass leaves no half-drafted model
+  // behind and init's placeholder marker survives for the retry.
+  let written: string | undefined
+  if (decision.target !== undefined) {
+    fs.mkdirSync(config.modelDir, { recursive: true })
+    fs.writeFileSync(decision.target, text)
+    written = decision.target
+  }
 
   return {
     text,
-    ...placement,
+    ...(written === undefined ? {} : { written }),
+    ...(refusal === undefined ? {} : { refusal }),
     elements: countElements(elements) + externals.length + (vendorId === undefined ? 0 : 1),
     edges: edges.length,
     packages: packages.length,
@@ -268,9 +308,14 @@ export async function draft(
  * ever edits description text: claims, structure, and edges are already
  * fixed, so a misbehaving callback cannot change what the draft gates.
  *
- * Advisory throughout: `undefined` and a thrown callback both keep the TODO,
- * narrated but never fatal. A draft with placeholder descriptions is exactly
- * as correct as one without the pass.
+ * An abstention (`undefined`) keeps the element's TODO, narrated and never
+ * fatal: a draft with placeholder descriptions is exactly as correct as one
+ * without the pass. A thrown callback is the opposite case and aborts on the
+ * first one, without trying the remaining elements. The same reasoning as
+ * `agentSemanticReview`'s single `agent-unavailable` finding: N more calls
+ * against a logged-out CLI are N more pointless waits, and a describe pass
+ * that silently degraded to zero descriptions would report as if every model
+ * had abstained.
  */
 async function describeElements(
   elements: DraftElement[],
@@ -314,19 +359,23 @@ async function describeElements(
   for (const { element, declared, ownedFiles } of eligible) {
     narrate?.(`describe: app.${element.path}...`)
     const started = Date.now()
+    let proposed: string | undefined
     try {
-      const proposed = await describe({ name: element.name, path: element.path, declared, ownedFiles })
-      if (proposed !== undefined && proposed.trim() !== '') {
-        element.description = proposed.trim()
-        described += 1
-        narrate?.(`describe: app.${element.path} done, ${elapsed(started)}`)
-      } else {
-        narrate?.(`describe: app.${element.path} kept the TODO, ${elapsed(started)}`)
-      }
+      proposed = await describe({ name: element.name, path: element.path, declared, ownedFiles })
     } catch (error) {
-      // Advisory tier: the failure is narrated with its cause and the element
-      // keeps its TODO, because a describe pass must never fail the draft.
-      narrate?.(`describe: app.${element.path} failed, ${messageOf(error)}, ${elapsed(started)}`)
+      // Not caught to be swallowed: caught to say which element the describer
+      // was on and that nothing was written, then rethrown so the draft fails.
+      throw new Error(
+        `describe aborted at app.${element.path}: ${messageOf(error)}. ` +
+          `No model was written; fix that, or rerun the draft without --describe.`,
+      )
+    }
+    if (proposed !== undefined && proposed.trim() !== '') {
+      element.description = proposed.trim()
+      described += 1
+      narrate?.(`describe: app.${element.path} done, ${elapsed(started)}`)
+    } else {
+      narrate?.(`describe: app.${element.path} kept the TODO, ${elapsed(started)}`)
     }
   }
 
@@ -852,18 +901,35 @@ function render(
 }
 
 /**
- * Write the draft, or refuse.
+ * Decide where the draft may be written, or why it may not.
  *
- * Init's never-overwrite rule: any model file already in the configured
- * model directory means the directory is authored territory, and the draft
- * is printed for the human to merge instead of written beside or over it.
+ * Separate from the write itself, and computed before the describe pass, so a
+ * refusal costs no agent calls (see `draft`).
+ *
+ * Init's never-overwrite rule stands: a model file in the configured model
+ * directory means the directory is authored territory, and the draft is
+ * printed for the human to merge instead of written beside or over it. The one
+ * exception is the file `init` itself wrote and nobody touched, recognized by
+ * `MODEL_PLACEHOLDER_MARKER` on its first line. That is not a weakening of the
+ * rule: the rule protects authored documentation, and an untouched placeholder
+ * this tool created is not authored documentation. Without the exception
+ * `init`'s own advice was false, since it created the file that made the very
+ * next command refuse.
+ *
+ * The exception is deliberately narrow, and everything else refuses exactly as
+ * before: two or more model files (which of them is the placeholder is not
+ * this tool's guess to make), a first line that was edited or removed, a file
+ * that never carried the marker. The draft replaces the placeholder in place
+ * rather than writing `model.c4` beside a renamed one, so no orphan is left.
  */
-function place(
-  config: ResolvedConfig,
-  text: string,
-): { written?: string; refusal?: string } {
+function placement(config: ResolvedConfig): { target?: string; refusal?: string } {
   const existing = existingModelFiles(config.modelDir)
   const modelDir = path.relative(config.repositoryRoot, config.modelDir).split(path.sep).join('/')
+
+  const only = existing.length === 1 ? existing[0] : undefined
+  if (only !== undefined && isPlaceholderModel(path.join(config.modelDir, only))) {
+    return { target: path.join(config.modelDir, only) }
+  }
 
   if (existing.length > 0) {
     const shown = [modelDir, existing[0]].filter((part) => part !== '').join('/')
@@ -875,10 +941,27 @@ function place(
     }
   }
 
-  const target = path.join(config.modelDir, MODEL_FILENAME)
-  fs.mkdirSync(config.modelDir, { recursive: true })
-  fs.writeFileSync(target, text)
-  return { written: target }
+  return { target: path.join(config.modelDir, MODEL_FILENAME) }
+}
+
+/**
+ * Whether a model file is init's untouched placeholder.
+ *
+ * The marker must be the whole first line, byte for byte: a line the author
+ * appended to or reworded is a line the author owns. A trailing carriage
+ * return is the exception, since that is the checkout's line ending rather
+ * than anything a human wrote. An unreadable file is not a placeholder, which
+ * keeps the failure on the side of refusing to overwrite.
+ */
+function isPlaceholderModel(filePath: string): boolean {
+  let content: string
+  try {
+    content = fs.readFileSync(filePath, 'utf8')
+  } catch {
+    return false
+  }
+  const firstLine = content.split('\n')[0] ?? ''
+  return firstLine.replace(/\r$/, '') === MODEL_PLACEHOLDER_MARKER
 }
 
 /** Model files under the directory, relative to it, dotfiles and node_modules skipped. */

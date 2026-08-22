@@ -1,8 +1,8 @@
 /**
- * The draft describer is judged on its request and its restraint: the context
- * carries the element's owned files under an announced budget, the reply is
- * schema-bound, and every failure shape becomes `undefined`: a kept TODO,
- * never a failed draft.
+ * The draft describer is judged on its request and on the line it draws: the
+ * context carries the element's owned files under an announced budget, the
+ * reply is schema-bound, an abstention becomes `undefined` (a kept TODO), and
+ * a transport failure throws, because an agent that never ran did not decline.
  */
 
 import fs from 'node:fs'
@@ -52,6 +52,12 @@ describe('draftDescriber', () => {
     // recorded reply are self-describing.
     expect(request?.prompt).toContain("core, claiming 'src/core/**'")
     expect(request?.prompt).toContain('one or two plain sentences')
+    // The prompt steers away from the drift it would otherwise invite: a
+    // description built from ports and env vars becomes description-drift the
+    // day a port changes, and one built from the element's name says nothing.
+    expect(request?.prompt).toContain('durable responsibility')
+    expect(request?.prompt).toContain('ports, hostnames, environment')
+    expect(request?.prompt).toContain('Do not restate the element name')
     // A one-shot call: no agentic exploration, everything is in the context.
     expect(request?.agentic).toBeUndefined()
     expect(request?.schema).toEqual({
@@ -69,18 +75,20 @@ describe('draftDescriber', () => {
     expect(context).toContain("export function health(): 'ok'")
   })
 
-  test('an { ok: false } reply keeps the TODO', async () => {
+  // The failure this split exists for: a logged-out CLI used to read as a
+  // model declining to answer, per element, and exit 0.
+  test('an { ok: false } reply throws, naming the exec and the adapter error', async () => {
     const exec = stubExec({ ok: false, error: 'not logged in' })
     const describe = draftDescriber({ exec, repositoryRoot: fixturePath('drift') })
 
-    await expect(describe(CORE)).resolves.toBeUndefined()
+    await expect(describe(CORE)).rejects.toThrow('stub/model could not run: not logged in')
   })
 
   test.each([
     ['an empty description', { description: '' }],
     ['a whitespace description', { description: '  \n ' }],
     ['a non-string description', { description: 7 }],
-  ])('%s keeps the TODO', async (_label, value) => {
+  ])('%s is an abstention and keeps the TODO', async (_label, value) => {
     const exec = stubExec(ok(value))
     const describe = draftDescriber({ exec, repositoryRoot: fixturePath('drift') })
 

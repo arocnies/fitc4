@@ -22,9 +22,14 @@ Commands:
   (none)           Check the code against the LikeC4 architecture model.
   init             Scaffold fitc4.config.json, a starter arch/model.c4, and
                    an AGENTS.md with the fitc4 norms in the current
-                   directory. Never overwrites existing files. With --agent,
-                   scaffolds a fitc4.config.mts module config instead, wired
-                   to that agent CLI and ready for draft --describe.
+                   directory. Never overwrites existing files. The starter
+                   model is marked as a placeholder, so a later draft may
+                   replace it; editing it makes it yours. With --agent,
+                   scaffolds a fitc4.config.mts module config instead,
+                   declaring that agent CLI as the config's exec so
+                   draft --describe works immediately. The agent gate
+                   providers ship commented out, since composing them would
+                   call your CLI on every run.
   draft            Run the configured scan providers and write a first-draft
                    model.c4 into the configured model directory. Elements
                    mirror the structure the observations report: a directory
@@ -35,8 +40,10 @@ Commands:
                    relationship is tagged as drift, so the first check is
                    green and the drift line counts the debt down; untagging
                    an edge blesses it. A draft to rewrite, never a sync.
-                   Never overwrites: if any model file exists, the draft is
-                   printed to stdout instead. With --describe, the config's
+                   Never overwrites an authored model: if a model file
+                   exists, the draft goes to stdout and the reason to
+                   stderr. The one exception is init's untouched placeholder,
+                   which a draft replaces. With --describe, the config's
                    agent exec proposes each element's description.
 
 Options:
@@ -45,16 +52,18 @@ Options:
                    those names in ./, then in ./.fitc4/, then the same in
                    each ancestor. Two configs in one directory is an error.
   --json           Emit the full result as JSON instead of a report.
-  --agent <cli>    With init: scaffold a fitc4.config.mts wired to 'claude'
-                   or 'codex'. The exec runs your own CLI on your own login
-                   and billing.
+  --agent <cli>    With init: scaffold a fitc4.config.mts declaring 'claude'
+                   or 'codex' as the config's agent exec. The exec runs your
+                   own CLI on your own login and billing.
   --no-drift       With draft: emit plain relationships instead of
                    drift-tagged ones.
   --describe       With draft: replace each eligible element's TODO
                    description with one or two sentences proposed by the
                    config's agent exec from the files the element owns. A
-                   failed call keeps the TODO; the draft never fails over a
-                   description.
+                   model that abstains leaves the TODO in place; an exec that
+                   cannot run at all (not logged in, missing CLI, timeout)
+                   aborts the draft and writes nothing. Skipped entirely when
+                   the draft would refuse to write.
   --quiet          Suppress the progress narration. Narration goes to stderr,
                    so the report and --json output are unaffected either way.
   --version        Print the version.
@@ -193,6 +202,27 @@ function unknownArgument(what: string, argument: string, known: string[]): strin
   )
 }
 
+/**
+ * The next step differs by path, because the two paths arrive from different
+ * places. `--agent` exists to make `draft --describe` work, so that is the
+ * step it names. The plain path still points at the model file first, but it
+ * is also how a brownfield user arrives, so it names `draft` as the way to
+ * get a first model out of code that already exists.
+ */
+function nextSteps(agent: InitAgent | undefined): string[] {
+  if (agent !== undefined) {
+    return [
+      `Next: npx fitc4 draft --describe writes a first model from your code, with each`,
+      `element's description proposed by your ${agent} CLI. Then run: npx fitc4`,
+    ]
+  }
+  return [
+    `Next: put your elements in arch/model.c4. 'sources' says what each owns,`,
+    `'->' declares a permitted dependency. On an existing codebase, npx fitc4 draft`,
+    `can generate a first model from the code instead. Then run: npx fitc4`,
+  ]
+}
+
 function runInit(options: Arguments): void {
   const result = init(process.cwd(), options.agent === undefined ? {} : { agent: options.agent })
   const lines = [
@@ -200,8 +230,7 @@ function runInit(options: Arguments): void {
     ...result.skipped.map((file) => `kept ${file} (already exists)`),
     ...result.notes.map((note) => `note: ${note}`),
     '',
-    `Next: put your elements in arch/model.c4. 'sources' says what each owns,`,
-    `'->' declares a permitted dependency. Then run: npx fitc4`,
+    ...nextSteps(options.agent),
   ]
   process.stdout.write(`${lines.join('\n')}\n`)
 }
@@ -227,9 +256,10 @@ async function runDraft(options: Arguments): Promise<void> {
     if (config.agent === undefined) {
       throw new Error(
         `--describe needs an agent exec, and ${configPath} declares none. ` +
-          `The exec lives in a module config: run 'fitc4 init --agent claude' (or codex) in a ` +
-          `fresh project, or add an 'agent' field to your fitc4.config.ts/.mts ` +
-          `(see node_modules/fitc4/README.md#agent-providers)`,
+          `An exec is a function, so it lives in a module config: add an 'agent' field to a ` +
+          `fitc4.config.ts/.mts, such as agent: cached(claudeCli({ model: 'sonnet' })) from ` +
+          `'fitc4/agent' (see node_modules/fitc4/README.md#agent-providers). In a project with ` +
+          `no config yet, 'fitc4 init --agent claude' (or codex) scaffolds one`,
       )
     }
     // Imported dynamically on purpose: the core CLI path stays free of agent
@@ -244,34 +274,43 @@ async function runDraft(options: Arguments): Promise<void> {
     onProgress: narrationFor(options),
   })
 
-  const lines: string[] = []
-  if (result.written === undefined) {
-    lines.push(result.text)
-    lines.push(`note: ${result.refusal ?? 'the draft was not written'}`)
-  } else {
-    lines.push(`created ${path.relative(process.cwd(), result.written)}`)
-    if (!options.noDrift) {
-      lines.push(
-        `every relationship is tagged as drift; run npx fitc4 to see the burn-down, ` +
-          `untag an edge to bless it`,
-      )
-    }
-  }
+  // The human summary, which follows the model text wherever that goes.
+  const summary: string[] = []
   if (options.describe) {
     const kept =
       result.described < result.describeAttempted
         ? result.describeAttempted - result.described
         : 0
-    lines.push(
+    summary.push(
       `described ${result.described} of ${count(result.describeAttempted, 'eligible element')}` +
         (kept === 0 ? '' : `; ${count(kept, 'element')} kept the TODO`),
     )
   }
-  lines.push(
+  summary.push(
     `${count(result.elements, 'element')}, ${count(result.edges, 'edge')}, ` +
       `${count(result.packages, 'package')}`,
   )
-  process.stdout.write(`${lines.join('\n')}\n`)
+
+  // In refusal mode stdout carries the model and nothing else, because
+  // `fitc4 draft > arch/model.c4` is exactly what a refused draft invites and
+  // a note or a count line inside that file is a corrupt model. The note and
+  // the summary go where every other explanatory line goes: stderr.
+  if (result.written === undefined) {
+    process.stdout.write(result.text)
+    process.stderr.write(
+      `${[`note: ${result.refusal ?? 'the draft was not written'}`, ...summary].join('\n')}\n`,
+    )
+    return
+  }
+
+  const lines = [`created ${path.relative(process.cwd(), result.written)}`]
+  if (!options.noDrift) {
+    lines.push(
+      `every relationship is tagged as drift; run npx fitc4 to see the burn-down, ` +
+        `untag an edge to bless it`,
+    )
+  }
+  process.stdout.write(`${[...lines, ...summary].join('\n')}\n`)
 }
 
 async function main(): Promise<void> {
