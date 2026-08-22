@@ -22,9 +22,24 @@ export {
 } from './config.ts'
 export type { FitC4Config, FitC4FileConfig, ResolvedConfig } from './config.ts'
 
-export { init, MODEL_DIR, MODEL_FILENAME, type InitResult } from './init.ts'
+export {
+  init,
+  AGENT_CONFIG_FILENAME,
+  INIT_AGENTS,
+  MODEL_DIR,
+  MODEL_FILENAME,
+  type InitAgent,
+  type InitOptions,
+  type InitResult,
+} from './init.ts'
 
-export { draft, type DraftOptions, type DraftResult } from './draft.ts'
+export {
+  draft,
+  type DraftDescribe,
+  type DraftElementFacts,
+  type DraftOptions,
+  type DraftResult,
+} from './draft.ts'
 
 export { runPipeline } from './pipeline.ts'
 export type { PhaseProviders, PipelineConfig, PipelineResult } from './pipeline.ts'
@@ -58,6 +73,10 @@ export type {
   ArchitectureRulesOptions,
   TypeOnlyImportsPolicy,
 } from './providers/architecture-rules.ts'
+export {
+  missingDescriptions,
+  PROVIDER_ID as MISSING_DESCRIPTIONS_PROVIDER_ID,
+} from './providers/missing-descriptions.ts'
 export { sourceRoot, ownerOf, PROVIDER_ID as SOURCE_ROOT_PROVIDER_ID } from './providers/source-root.ts'
 export {
   typescriptImports,
