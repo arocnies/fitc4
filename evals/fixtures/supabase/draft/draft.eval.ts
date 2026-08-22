@@ -29,6 +29,15 @@ import type { AgentExec } from 'fitc4/agent'
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
 import { supabaseScan, SCAN_INSTRUCTIONS } from '../greenfield/fitc4.eval.ts'
 
+/**
+ * Opt into the describe pass: the harness builds a draft describer from this
+ * fixture's exec, so each drafted service element gets one describe call, and
+ * scoring asserts every claiming element carries a non-TODO description. The
+ * describe replies in replies.json match on the fragment locator each prompt
+ * names.
+ */
+export const describe = true
+
 export const DRAFT_INSTRUCTIONS =
   SCAN_INSTRUCTIONS +
   " Additionally, emit one observation of kind 'file' with subject { kind: 'file', id: " +
