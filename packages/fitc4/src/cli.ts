@@ -258,9 +258,13 @@ async function runDraft(options: Arguments): Promise<void> {
     }
   }
   if (options.describe) {
+    const kept =
+      result.described < result.describeAttempted
+        ? result.describeAttempted - result.described
+        : 0
     lines.push(
-      `described ${result.described} of ${count(result.describeAttempted, 'eligible element')}; ` +
-        `the rest keep the TODO`,
+      `described ${result.described} of ${count(result.describeAttempted, 'eligible element')}` +
+        (kept === 0 ? '' : `; ${count(kept, 'element')} kept the TODO`),
     )
   }
   lines.push(
