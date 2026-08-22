@@ -5,19 +5,19 @@
       "name": "authorization",
       "sources": "src/cache/**",
       "describeMust": ["authoriz"],
-      "describeMustNot": ["cache"]
+      "describeMustNot": ["caching", "cached", "cache layer", "frequently accessed"]
     },
     {
       "name": "settlement",
       "sources": "src/utils/**",
       "describeMust": ["payment", "ledger"],
-      "describeMustNot": ["util", "helper"]
+      "describeMustNot": ["utility", "utilities", "helper", "miscellaneous", "shared function"]
     },
     {
       "name": "entrypoint",
       "sources": "src/legacy/**",
       "describeMust": ["entry point"],
-      "describeMustNot": ["legacy", "deprecated", "obsolete"]
+      "describeMustNot": ["deprecated", "obsolete", "no longer", "superseded", "backwards compatibility"]
     }
   ],
   "edges": [
