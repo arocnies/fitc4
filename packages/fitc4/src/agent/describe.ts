@@ -18,6 +18,9 @@
  * redrafted repository re-describe only the elements whose files changed.
  */
 
+import fs from 'node:fs'
+import path from 'node:path'
+
 import type { DraftDescribe, DraftElementFacts } from '../draft.ts'
 import type { JsonObject } from '../types.ts'
 import { assemblePack, fencedExcerpt } from './context-pack.ts'
@@ -62,6 +65,13 @@ export function draftDescriber(options: DraftDescriberOptions): DraftDescribe {
 
   return async (element: DraftElementFacts): Promise<string | undefined> => {
     const excerpted = element.ownedFiles.slice(0, maxFiles)
+    // A fragment element's owned file is the whole containing file, but its
+    // subject is one section of it, and a head-of-file excerpt routinely
+    // misses that section entirely. Measured on the first live run: a compose
+    // stack's fragment elements each saw the file header and the first
+    // service, and the honest models could only reply "cannot be determined".
+    // So a fragment claim anchors the excerpt at the fragment instead.
+    const anchor = fragmentAnchor(element.declared)
     const pack = assemblePack(
       [
         {
@@ -74,9 +84,17 @@ export function draftDescriber(options: DraftDescriberOptions): DraftDescribe {
           what: 'element facts',
         },
         {
-          header: '### Owned-file excerpts (code-first)',
+          header:
+            anchor === undefined
+              ? '### Owned-file excerpts (code-first)'
+              : '### Owned-file excerpts (anchored at the claimed fragment)',
           items: excerpted.map(
-            (file) => `### ${file}\n${fencedExcerpt(repositoryRoot, file, excerptChars)}`,
+            (file) =>
+              `### ${file}\n${
+                anchor === undefined
+                  ? fencedExcerpt(repositoryRoot, file, excerptChars)
+                  : anchoredExcerpt(repositoryRoot, file, anchor, excerptChars)
+              }`,
           ),
           what: `owned files of app.${element.path}`,
           alreadyDropped: element.ownedFiles.length - excerpted.length,
@@ -110,4 +128,85 @@ export function draftDescriber(options: DraftDescriberOptions): DraftDescribe {
     const flattened = description.replace(/\s+/g, ' ').trim()
     return flattened === '' ? undefined : flattened
   }
+}
+
+/**
+ * The last dot-segment of a fragment claim, or undefined for a plain claim.
+ *
+ * `docker/docker-compose.yml#services.auth` anchors on `auth`: the last
+ * segment names the thing itself, and the leading segments name the path a
+ * reader took to it, which the excerpt window's surrounding lines already
+ * show. An empty final segment (a trailing dot) yields no anchor rather than
+ * an anchor that matches everything.
+ */
+function fragmentAnchor(declared: string): string | undefined {
+  const hash = declared.indexOf('#')
+  if (hash <= 0 || hash === declared.length - 1) return undefined
+  const segment = declared.slice(hash + 1).split('.').at(-1) ?? ''
+  return segment === '' ? undefined : segment
+}
+
+/**
+ * A fenced excerpt of one file starting at the claimed fragment.
+ *
+ * The window begins at the first line containing the anchor, so the fragment's
+ * own definition is what the model reads instead of whatever happens to sit at
+ * the head of the file. The anchoring is announced inline, and so is the
+ * fallback: an anchor the file does not contain drops back to the code-first
+ * head with a note saying so, because a model told it is looking at the
+ * fragment while it is not would describe the wrong thing with confidence.
+ */
+function anchoredExcerpt(
+  repositoryRoot: string,
+  relative: string,
+  anchor: string,
+  excerptChars: number,
+): string {
+  let content: string
+  try {
+    content = fs.readFileSync(path.join(repositoryRoot, relative), 'utf8')
+  } catch {
+    return '```\n(unreadable)\n```'
+  }
+
+  const lines = content.split('\n')
+  // Prefer the line that defines the fragment over one that merely mentions
+  // it: in a compose file the first occurrence of `db` is routinely another
+  // service's depends_on entry, and a window opened there describes the
+  // referrer, not the fragment. Measured on the live run: the thin
+  // descriptions were exactly the services whose first mention was a
+  // reference. A candidate line starts with the anchor at a word boundary,
+  // and among candidates the shallowest indentation wins, because references
+  // nest inside other definitions (a mapping-form depends_on entry also
+  // starts with the anchor, but deeper than the definition). Any mention is
+  // the fallback.
+  const candidates = lines
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => {
+      const trimmed = line.trimStart()
+      if (!trimmed.startsWith(anchor)) return false
+      const next = trimmed.charAt(anchor.length)
+      return next === '' || !/[A-Za-z0-9_-]/.test(next)
+    })
+  let definition = -1
+  for (const candidate of candidates) {
+    const depth = candidate.line.length - candidate.line.trimStart().length
+    const best = definition === -1 ? undefined : lines[definition]
+    const bestDepth = best === undefined ? Infinity : best.length - best.trimStart().length
+    if (depth < bestDepth) definition = candidate.index
+  }
+  const at = definition === -1 ? lines.findIndex((line) => line.includes(anchor)) : definition
+  if (at === -1) {
+    return (
+      `[fragment anchor '${anchor}' not found in the file; showing the head instead]\n` +
+      fencedExcerpt(repositoryRoot, relative, excerptChars)
+    )
+  }
+
+  const body = lines.slice(at).join('\n')
+  const text = body.length <= excerptChars ? body : body.slice(0, excerptChars)
+  const dropped = body.length - text.length
+  const notes = [`[anchored at '${anchor}', line ${at + 1}; ${at} earlier lines not shown]`]
+  const tail = dropped > 0 ? `\n… ${dropped} more characters not shown` : ''
+  return `${notes.join('\n')}\n\`\`\`\n${text}${tail}\n\`\`\``
 }

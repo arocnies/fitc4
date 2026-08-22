@@ -5,6 +5,10 @@
  * never a failed draft.
  */
 
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+
 import { describe, expect, test } from 'vitest'
 
 import { draftDescriber } from '../src/agent/describe.ts'
@@ -114,6 +118,93 @@ describe('draftDescriber', () => {
     expect(context).not.toContain('### src/legacy/older.ts')
     // The budget bounds the whole pack, headers and notes aside.
     expect(Buffer.byteLength(context, 'utf8')).toBeLessThan(1200)
+  })
+
+  test('a fragment claim anchors the excerpt at the fragment, not the file head', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-describe-'))
+    const compose = [
+      '# header comment',
+      'services:',
+      '  studio:',
+      '    image: studio-image',
+      ...Array.from({ length: 80 }, (_, index) => `    padding_${index}: value`),
+      '  auth:',
+      '    image: auth-image',
+      '    command: serve',
+    ].join('\n')
+    fs.mkdirSync(path.join(root, 'docker'))
+    fs.writeFileSync(path.join(root, 'docker', 'compose.yml'), compose)
+
+    const exec = stubExec(ok({ description: 'Runs the auth service.' }))
+    const describe = draftDescriber({ exec, repositoryRoot: root, excerptChars: 200 })
+
+    await describe({
+      name: 'auth',
+      path: 'compose_yml.auth',
+      declared: 'docker/compose.yml#services.auth',
+      ownedFiles: ['docker/compose.yml'],
+    })
+
+    const context = exec.requests[0]?.context ?? ''
+    // The window starts at the fragment and says so; the head-of-file padding
+    // that would have crowded out the fragment is announced, not shown.
+    expect(context).toContain('anchored at the claimed fragment')
+    expect(context).toContain("[anchored at 'auth', line 85; 84 earlier lines not shown]")
+    expect(context).toContain('image: auth-image')
+    expect(context).not.toContain('image: studio-image')
+  })
+
+  test('the anchor prefers the defining line over an earlier mention', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-describe-'))
+    const compose = [
+      'services:',
+      '  storage:',
+      '    depends_on:',
+      '      - imgproxy',
+      '      imgproxy:',
+      '        condition: service_started',
+      '  imgproxy:',
+      '    image: imgproxy-image',
+    ].join('\n')
+    fs.mkdirSync(path.join(root, 'docker'))
+    fs.writeFileSync(path.join(root, 'docker', 'compose.yml'), compose)
+
+    const exec = stubExec(ok({ description: 'Proxies images.' }))
+    const describe = draftDescriber({ exec, repositoryRoot: root, excerptChars: 200 })
+
+    await describe({
+      name: 'imgproxy',
+      path: 'compose_yml.imgproxy',
+      declared: 'docker/compose.yml#services.imgproxy',
+      ownedFiles: ['docker/compose.yml'],
+    })
+
+    const context = exec.requests[0]?.context ?? ''
+    // Storage's depends_on mentions imgproxy twice first, once list-form and
+    // once mapping-form; the mapping-form entry starts with the anchor too,
+    // but the shallower definition line is where the window must open.
+    expect(context).toContain("[anchored at 'imgproxy', line 7; 6 earlier lines not shown]")
+    expect(context).toContain('image: imgproxy-image')
+  })
+
+  test('a fragment anchor the file does not contain falls back to the head, announced', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-describe-'))
+    fs.mkdirSync(path.join(root, 'docker'))
+    fs.writeFileSync(path.join(root, 'docker', 'compose.yml'), 'services:\n  studio: {}\n')
+
+    const exec = stubExec(ok({ description: 'Something.' }))
+    const describe = draftDescriber({ exec, repositoryRoot: root })
+
+    await describe({
+      name: 'ghost',
+      path: 'compose_yml.ghost',
+      declared: 'docker/compose.yml#services.ghost',
+      ownedFiles: ['docker/compose.yml'],
+    })
+
+    const context = exec.requests[0]?.context ?? ''
+    expect(context).toContain("[fragment anchor 'ghost' not found in the file; showing the head instead]")
+    expect(context).toContain('studio: {}')
   })
 
   test('an unreadable owned file degrades to an announced unreadable excerpt', async () => {
