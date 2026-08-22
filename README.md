@@ -75,7 +75,7 @@ Now add `example/src/core/bad.ts` importing the other way, with `Core` reaching 
 rules: node_modules/fitc4/README.md#rules
 
 error (1)
-  relationship-direction  example.app.core depends on example.app.interface, but the model declares only example.app.interface -> example.app.core. Declare the dependency that the code actually has.
+  relationship-direction  example.app.core depends on example.app.interface, but the model declares only example.app.interface -> example.app.core. Reroute or remove the import so the dependency flows the way the model declares; if the architecture genuinely changed, declare the dependency the code has instead.
     architecture-rules  architecture-rules/relationship-direction/example.app.core->example.app.interface
     src/core/bad.ts:1  ../interface/index.js
 
@@ -93,7 +93,7 @@ Agents get the same treatment as humans: the CLI is the interface, failing repor
 
 ## Where things live
 
-`fitc4.config.json` goes at your project root, beside `tsconfig.json`. `npx fitc4 init` scaffolds it along with a starter model. On a repository with real history, `npx fitc4 draft` generates the first model from the observed code instead, every relationship drift-tagged so the first run is green. Like init it never overwrites, so if a model file already exists, placeholder included, it prints the draft rather than writing it. Discovery starts at the working directory and checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json`, first directly and then under `.fitc4/`, repeating up each ancestor. That way the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.
+`fitc4.config.json` goes at your project root, beside `tsconfig.json`. `npx fitc4 init` scaffolds it along with a starter model. On a repository with real history, `npx fitc4 draft` generates the first model from the observed code instead, every relationship drift-tagged so the first run is green. It never overwrites an authored model: if a model file already exists it prints the draft to stdout and explains itself on stderr. The one exception is init's own starter model while nobody has edited it, which carries a marker comment saying so on its first line, so `init` followed by `draft` works instead of refusing. Discovery starts at the working directory and checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json`, first directly and then under `.fitc4/`, repeating up each ancestor. That way the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.
 
 A module-form config is what lets you add custom providers. It default-exports the same fields plus optional `scan`, `resolve`, and `validate` provider arrays. A phase that is present replaces the defaults for that phase; absent means the default. Merge semantics are yours, in your config file, where you can see them. Module configs load as ES modules, so a CommonJS package names its config `fitc4.config.mts`. See [`docs/providers.md`](docs/providers.md) for the provider contract and a worked example.
 

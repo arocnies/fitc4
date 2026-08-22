@@ -27,8 +27,9 @@ and import onto that model, and fails where the two disagree.
   it and collapses where none do), one relationship per observed
   cross-element dependency, every relationship drift-tagged so the first run
   is green and the drift line counts the debt down. A draft for the human to
-  rewrite, never a sync; it never overwrites an existing model (`--no-drift`
-  emits plain relationships).
+  rewrite, never a sync; it never overwrites an authored model, though it may
+  replace `init`'s untouched placeholder, which says so on its first line
+  (`--no-drift` emits plain relationships).
 
 Run the gate before handing off changes. Exit 1 is an architecture violation,
 not a flaky tool.
