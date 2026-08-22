@@ -205,6 +205,126 @@ export function truncate(text: string, limit: number): string {
   return collapsed.length <= limit ? collapsed : `${collapsed.slice(0, limit)}…`
 }
 
+/**
+ * How much of a failing CLI's output one error message carries.
+ *
+ * One budget shared by every failure path, so a reader gets the same amount of
+ * evidence whichever path produced the message.
+ */
+export const FAILURE_EXCERPT_LIMIT = 300
+
+/**
+ * Turn a failed CLI's captured output into the human-meaningful error.
+ *
+ * An adapter supplies one when its CLI's output has a known machine-readable
+ * shape, because extracting the field that carries the message beats trimming
+ * bytes off a blob. Returning `undefined` means the output was not that shape,
+ * and `runCliProcess` falls back to the trimmed tail.
+ */
+export type CliExplain = (output: { stdout: string; stderr: string }) => string | undefined
+
+/**
+ * The informative END of a CLI's output, collapsed onto one line.
+ *
+ * The head of a failing CLI's output is a banner: version, working directory,
+ * model, session id, usage counters. The cause is last. Trimming the first N
+ * bytes therefore shows a reader everything except the reason, which is the
+ * whole complaint this function answers, and it is general rather than
+ * auth-specific: any CLI that prints a banner had its real error trimmed away.
+ * So the excerpt grows backwards from the end, whole non-empty lines at a
+ * time, until the budget is spent, and a dropped head is announced. Within a
+ * single line the head is the informative part (`ERROR: unexpected status 401
+ * Unauthorized` before a request id), so one over-budget line is trimmed from
+ * its end exactly like `truncate` does.
+ */
+export function tailExcerpt(text: string, limit: number): string {
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+  if (lines.length === 0) return ''
+
+  const kept: string[] = []
+  let used = 0
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index] ?? ''
+    const cost = kept.length === 0 ? line.length : line.length + 1
+    if (used + cost > limit) break
+    kept.unshift(line)
+    used += cost
+  }
+  if (kept.length === 0) return truncate(lines.at(-1) ?? '', limit)
+
+  const dropped = lines.length - kept.length
+  return dropped > 0 ? `… ${kept.join(' ')}` : kept.join(' ')
+}
+
+/**
+ * Collapse repeated lines, counting two lines the same when they differ only
+ * in digits.
+ *
+ * A CLI that retries prints one line per attempt (`Reconnecting... 1/5`
+ * through `5/5`, each preceded by the same connection error), and five copies
+ * of a symptom crowd the one line that names the cause out of any excerpt.
+ * First occurrence wins and order is preserved, so the real error still lands
+ * last. Digit-insensitive rather than a log parser: attempt counters, elapsed
+ * times, and ids are what vary between otherwise identical lines, and what a
+ * CLI's log format means is its own business, not ours to model.
+ */
+export function withoutRepeats(text: string): string {
+  const seen = new Set<string>()
+  const kept: string[] = []
+  for (const line of text.split('\n')) {
+    const key = line.trim().replace(/\d+/g, '#')
+    if (key !== '' && seen.has(key)) continue
+    seen.add(key)
+    kept.push(line)
+  }
+  return kept.join('\n')
+}
+
+/**
+ * The markers that make a failure look like an auth failure.
+ *
+ * Ground truth from probing both CLIs logged out: claude answers `Not logged
+ * in · Please run /login`, codex answers `unexpected status 401 Unauthorized:
+ * Missing bearer or basic authentication in header`. Deliberately a short
+ * explicit list rather than a heuristic, because a login hint on an unrelated
+ * failure sends the reader down the wrong path. The status code is matched at
+ * word boundaries so a line number or a byte count named 401 does not read as
+ * a login problem.
+ */
+const AUTH_MARKERS = [
+  /not logged in/i,
+  /please run \/login/i,
+  /\b401\b/,
+  /unauthorized/i,
+  /missing bearer/i,
+]
+
+/** True when a CLI's output carries one of the `AUTH_MARKERS`. */
+export function looksLikeAuthFailure(output: string): boolean {
+  return AUTH_MARKERS.some((marker) => marker.test(output))
+}
+
+/**
+ * Append the login command when the failure looks like an auth failure.
+ *
+ * `output` is the FULL captured output, never the trimmed excerpt, so a cause
+ * that display dropped is still detected. Each adapter names its own command
+ * because neither CLI's own text offers non-interactive advice: claude points
+ * at the interactive `/login` slash command, and codex says nothing actionable
+ * at all. Nothing is appended when nothing matches.
+ */
+export function withLoginHint(
+  error: string,
+  output: string,
+  loginCommand: string | undefined,
+): string {
+  if (loginCommand === undefined || !looksLikeAuthFailure(output)) return error
+  return `${error}; this looks like an auth failure, run '${loginCommand}' first`
+}
+
 /** A duration for a human: `120s`, `0.2s`, never `120000ms`. */
 function seconds(milliseconds: number): string {
   const value = milliseconds / 1000
@@ -266,11 +386,24 @@ function runProcess(
  * governs this call. A timeout that reports neither how long it waited nor
  * which knob changes it leaves the reader with a symptom and no fix, and the
  * default is documented nowhere they are looking.
+ *
+ * `explain` and `loginCommand` are the adapter's contribution to a legible
+ * failure, and they apply on the failure paths only: a successful run's output
+ * belongs to the caller to interpret.
  */
 export async function runCliProcess(
   binary: string,
   args: string[],
-  options: { stdin?: string; cwd?: string; timeoutMs: number; factory: string },
+  options: {
+    stdin?: string
+    cwd?: string
+    timeoutMs: number
+    factory: string
+    /** Extracts this CLI's real error from its captured output; see `CliExplain`. */
+    explain?: CliExplain
+    /** The non-interactive command that logs this CLI in, e.g. `claude login`. */
+    loginCommand?: string
+  },
 ): Promise<{ ok: true; result: ProcessResult } | { ok: false; error: string }> {
   let result: ProcessResult
   try {
@@ -279,18 +412,36 @@ export async function runCliProcess(
     return { ok: false, error: `${binary}: ${messageOf(error)}` }
   }
 
+  // Both failure paths read the whole capture for the auth hint, the timeout
+  // included: a CLI killed mid-retry has already printed why it was retrying,
+  // and "timed out after 10s" alone would hide a login problem behind a
+  // symptom that looks like slowness.
+  const captured = `${result.stdout}\n${result.stderr}`
+
   if (result.timedOut) {
     return {
       ok: false,
-      error:
+      error: withLoginHint(
         `${binary} timed out after ${seconds(options.timeoutMs)}; ` +
-        `raise it with ${options.factory}({ timeoutMs })`,
+          `raise it with ${options.factory}({ timeoutMs })`,
+        captured,
+        options.loginCommand,
+      ),
     }
   }
   if (result.code !== 0) {
+    // stderr first, as before: a CLI that says anything on stderr is saying
+    // why it failed. The tail rather than the head, because that is where the
+    // reason is.
+    const explained = options.explain?.(result)
+    const excerpt = explained ?? tailExcerpt(result.stderr || result.stdout, FAILURE_EXCERPT_LIMIT)
     return {
       ok: false,
-      error: `${binary} exited ${result.code}: ${truncate(result.stderr || result.stdout, 300)}`,
+      error: withLoginHint(
+        `${binary} exited ${result.code}: ${excerpt}`,
+        captured,
+        options.loginCommand,
+      ),
     }
   }
   return { ok: true, result }

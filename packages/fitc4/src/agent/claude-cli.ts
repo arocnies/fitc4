@@ -11,7 +11,14 @@
  * work opts into a stronger model per instance.
  */
 
-import { composeInput, finishReply, runCliProcess, truncate } from './exec.ts'
+import {
+  composeInput,
+  FAILURE_EXCERPT_LIMIT,
+  finishReply,
+  runCliProcess,
+  truncate,
+  withLoginHint,
+} from './exec.ts'
 import type { AgentExec, AgentReply, AgentRequest } from './exec.ts'
 
 export const DEFAULT_CLAUDE_MODEL = 'haiku'
@@ -38,6 +45,34 @@ const READ_ONLY_TOOLS = 'Read,Grep,Glob'
  * a response cache stops replaying replies recorded against the old setup.
  */
 const FINGERPRINT = 'claude-cli/system-prompt-v1/flags-v1'
+
+/** The non-interactive way in. The CLI's own text names the `/login` slash command instead. */
+const LOGIN_COMMAND = 'claude login'
+
+/**
+ * The real error inside a `--output-format json` envelope.
+ *
+ * The envelope leads with usage and cost metadata and puts the message last,
+ * in `result`, so an excerpt taken off the front shows a reader the token
+ * counts and nothing else: a logged-out CLI used to report `total_cost_usd`
+ * and hide `Not logged in · Please run /login`. Whatever the field says
+ * travels verbatim, punctuation included. It is another tool's message, and
+ * restyling it to our own conventions would misquote it.
+ *
+ * `undefined` when the output is not an envelope or carries no usable field,
+ * which drops `runCliProcess` back to the trimmed tail.
+ */
+function explainEnvelope(output: { stdout: string; stderr: string }): string | undefined {
+  let envelope: unknown
+  try {
+    envelope = JSON.parse(output.stdout)
+  } catch {
+    return undefined
+  }
+  const message = (envelope as { result?: unknown }).result
+  if (typeof message !== 'string' || message.trim() === '') return undefined
+  return truncate(message, FAILURE_EXCERPT_LIMIT)
+}
 
 export function claudeCli(options: ClaudeCliOptions = {}): AgentExec {
   const model = options.model ?? DEFAULT_CLAUDE_MODEL
@@ -68,6 +103,8 @@ export function claudeCli(options: ClaudeCliOptions = {}): AgentExec {
         cwd: request.cwd,
         timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
         factory: 'claudeCli',
+        explain: explainEnvelope,
+        loginCommand: LOGIN_COMMAND,
       })
       if (!run.ok) return run
 
@@ -82,9 +119,20 @@ export function claudeCli(options: ClaudeCliOptions = {}): AgentExec {
         }
       }
 
+      // An error envelope on a zero exit gets the same treatment as a non-zero
+      // one: the message the envelope carries, not the metadata around it.
       const record = envelope as { is_error?: unknown; result?: unknown }
       if (record.is_error === true || typeof record.result !== 'string') {
-        return { ok: false, error: `${binary} reported an error: ${truncate(JSON.stringify(envelope), 300)}` }
+        const explained =
+          explainEnvelope(run.result) ?? truncate(JSON.stringify(envelope), FAILURE_EXCERPT_LIMIT)
+        return {
+          ok: false,
+          error: withLoginHint(
+            `${binary} reported an error: ${explained}`,
+            run.result.stdout,
+            LOGIN_COMMAND,
+          ),
+        }
       }
 
       return finishReply(request, record.result)
