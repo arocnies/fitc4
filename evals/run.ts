@@ -53,6 +53,7 @@ const FIXTURE_ORDER = [
   'brownfield',
   'non-ts',
   'exploratory',
+  'misnamed/draft',
   'ddh/greenfield',
   'ddh/brownfield',
   'ddh/draft',

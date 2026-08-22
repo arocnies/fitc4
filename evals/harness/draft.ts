@@ -17,6 +17,12 @@
  * endpoint to the reference element it matched; an edge with an unmapped
  * endpoint can only score as an extra.
  *
+ * A fixture that opts into the describe pass may also give an element
+ * `describeMust` / `describeMustNot` substrings, which turns
+ * `draft-descriptions` from a presence check into one that can fail on
+ * content: the description must name the real responsibility and must not
+ * echo a misleading name. See `describeViolations`.
+ *
  * The result is two scorecard rows in the harness's usual vocabulary:
  * `draft-elements` (which known elements the draft produced) and
  * `draft-edges` (which known relationships its edges covered). Extras are
@@ -46,6 +52,18 @@ export interface DraftExpectedElement {
   outsideScan?: boolean
   /** True when today's draft is known to miss this entry (see the module doc). */
   expectedMiss?: boolean
+  /**
+   * Substrings this element's drafted description must contain,
+   * case-insensitive. Every entry must appear, so the description has to name
+   * the element's real responsibility rather than merely be non-empty.
+   */
+  describeMust?: string[]
+  /**
+   * Substrings this element's drafted description must NOT contain,
+   * case-insensitive. This is where a misleading directory name is caught: a
+   * description assembled from the name says the forbidden word.
+   */
+  describeMustNot?: string[]
 }
 
 export interface DraftExpectedEdge {
@@ -85,6 +103,11 @@ export interface DraftExpectations {
    * `draft-descriptions` row: every matched claiming element must carry a
    * description that is not the TODO placeholder, since a described draft
    * with a leftover TODO means a describe call was dropped or refused.
+   *
+   * An element may additionally carry `describeMust` / `describeMustNot`,
+   * which is what makes the row able to fail on quality rather than only on
+   * absence. Elements without them keep the presence-only check, so a fixture
+   * that declares no rules scores exactly as it did before.
    */
   describe?: boolean
   /**
@@ -158,6 +181,33 @@ function parseDraft(text: string): { elements: DraftedElement[]; edges: DraftedE
   return { elements, edges }
 }
 
+/**
+ * How one drafted description breaks its element's rules, if it does.
+ *
+ * An element the fixture wrote no rules for gets no rules applied, and the
+ * check stays what it always was: described at all. Where rules exist,
+ * matching is case-insensitive substring containment, deliberately the
+ * crudest oracle that can fail. The failure it exists to catch is coarse: a
+ * description built from the element's name instead of its code names the
+ * wrong responsibility outright, so it misses the required word and says the
+ * forbidden one. Anything subtler than that is a live judgment call, and this
+ * harness does not pretend to make judgment calls deterministically.
+ */
+function describeViolations(
+  description: string,
+  expected: DraftExpectedElement | undefined,
+): string[] {
+  const haystack = description.toLowerCase()
+  const broken: string[] = []
+  for (const required of expected?.describeMust ?? []) {
+    if (!haystack.includes(required.toLowerCase())) broken.push(`never says '${required}'`)
+  }
+  for (const forbidden of expected?.describeMustNot ?? []) {
+    if (haystack.includes(forbidden.toLowerCase())) broken.push(`says '${forbidden}'`)
+  }
+  return broken
+}
+
 export function scoreDraft(
   fixture: string,
   expectations: DraftExpectations,
@@ -171,6 +221,8 @@ export function scoreDraft(
   // --- elements: match by sources prefix, or by title without one ---
   const referenceName = new Map<string, string>()
   const matchedElements = new Set<DraftedElement>()
+  /** The reference entry each drafted element matched, for the description rules. */
+  const matchedExpectation = new Map<DraftedElement, DraftExpectedElement>()
   for (const expected of expectations.elements) {
     const match = elements.find(
       (element) =>
@@ -191,6 +243,7 @@ export function scoreDraft(
       continue
     }
     matchedElements.add(match)
+    matchedExpectation.set(match, expected)
     referenceName.set(match.id, expected.name)
     elementRow.hits += 1
     if (expected.expectedMiss === true) {
@@ -270,7 +323,7 @@ export function scoreDraft(
     )
   }
 
-  // --- descriptions: every matched claiming element must be described ---
+  // --- descriptions: described at all, and where the fixture says so, right ---
   const rows = [edgeRow, elementRow]
   if (expectations.describe === true) {
     const descriptionRow: ProviderScore = {
@@ -282,14 +335,20 @@ export function scoreDraft(
     }
     for (const element of matchedElements) {
       if (element.sources === undefined) continue
-      if (element.description !== undefined && !element.description.startsWith('TODO')) {
-        descriptionRow.hits += 1
-      } else {
+      const name = referenceName.get(element.id) ?? element.title
+      const description = element.description
+      if (description === undefined || description.startsWith('TODO')) {
         descriptionRow.misses += 1
-        descriptionRow.notes.push(
-          `undescribed element: ${referenceName.get(element.id) ?? element.title} kept the TODO`,
-        )
+        descriptionRow.notes.push(`undescribed element: ${name} kept the TODO`)
+        continue
       }
+      const broken = describeViolations(description, matchedExpectation.get(element))
+      if (broken.length === 0) {
+        descriptionRow.hits += 1
+        continue
+      }
+      descriptionRow.misses += 1
+      descriptionRow.notes.push(`wrong description: ${name} ${broken.join(', ')}`)
     }
     rows.push(descriptionRow)
   }

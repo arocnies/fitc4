@@ -1,0 +1,28 @@
+{
+  "describe": true,
+  "elements": [
+    {
+      "name": "authorization",
+      "sources": "src/cache/**",
+      "describeMust": ["authoriz"],
+      "describeMustNot": ["cache"]
+    },
+    {
+      "name": "settlement",
+      "sources": "src/utils/**",
+      "describeMust": ["payment", "ledger"],
+      "describeMustNot": ["util", "helper"]
+    },
+    {
+      "name": "entrypoint",
+      "sources": "src/legacy/**",
+      "describeMust": ["entry point"],
+      "describeMustNot": ["legacy", "deprecated", "obsolete"]
+    }
+  ],
+  "edges": [
+    { "from": "entrypoint", "to": "authorization" },
+    { "from": "entrypoint", "to": "settlement" },
+    { "from": "settlement", "to": "authorization" }
+  ]
+}
