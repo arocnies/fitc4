@@ -1,7 +1,7 @@
 /**
  * The draft describer is judged on its request and its restraint: the context
  * carries the element's owned files under an announced budget, the reply is
- * schema-bound, and every failure shape becomes `undefined` — a kept TODO,
+ * schema-bound, and every failure shape becomes `undefined`: a kept TODO,
  * never a failed draft.
  */
 
