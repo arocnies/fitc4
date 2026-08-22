@@ -1,0 +1,46 @@
+// The description states of the missing-descriptions rule: one element per
+// state. The wrapping system deliberately has no description either, so the
+// rule's per-element scope (containers included) is pinned.
+specification {
+  element system
+  element component
+}
+
+model {
+  demo = system 'Demo' {
+    described = component 'Described' {
+      description 'Adds numbers for the demo'
+      metadata {
+        sources 'src/described/**'
+      }
+    }
+
+    todo = component 'Todo' {
+      description 'TODO: what is this component responsible for?'
+      metadata {
+        sources 'src/todo/**'
+      }
+    }
+
+    // LikeC4 normalizes a whitespace-only description away entirely, so this
+    // element reaches the rule with no description at all, same as silent.
+    blank = component 'Blank' {
+      description ' '
+      metadata {
+        sources 'src/blank/**'
+      }
+    }
+
+    silent = component 'Silent' {
+      metadata {
+        sources 'src/silent/**'
+      }
+    }
+  }
+}
+
+views {
+  view index of demo {
+    include *
+  }
+}
