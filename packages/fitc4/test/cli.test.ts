@@ -15,6 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, test } from 'vitest'
 
+import { loadModel } from '../src/model.ts'
 import type { PipelineResult } from '../src/pipeline.ts'
 import { fixturePath, ruleIds } from './helpers.ts'
 
@@ -149,14 +150,32 @@ describe('draft', () => {
     expect(fs.readFileSync(path.join(modelDir, 'model.c4'), 'utf8')).toContain('#drift')
   })
 
-  test('refuses to overwrite an existing model and prints the draft instead', HEAVY, () => {
+  // `fitc4 draft > arch/model.c4` is exactly what a refused draft invites, so
+  // stdout carries the model and nothing else: a note or a count line inside
+  // that file is a corrupt model.
+  test('refuses to overwrite an existing model and keeps the printed draft pure', HEAVY, () => {
     // configFor points `model` at the fixture root, which holds model.c4.
-    const { status, stdout } = runCli(['draft', '--config', configFor('drift')])
+    const { status, stdout, stderr } = runCli(['draft', '--config', configFor('drift')])
 
     expect(status).toBe(0)
     expect(stdout).toContain('specification {')
-    expect(stdout).toContain('note: model.c4 already exists')
-    expect(stdout).toContain('3 elements, 2 edges, 0 packages')
+    expect(stdout.trimEnd().endsWith('}')).toBe(true)
+    expect(stdout).not.toContain('note:')
+    expect(stdout).not.toMatch(/\d+ elements?, /)
+    // The explanation and the counts go where every other narration line goes.
+    expect(stderr).toContain('note: model.c4 already exists')
+    expect(stderr).toContain('3 elements, 2 edges, 0 packages')
+  })
+
+  test('the refused draft on stdout parses as a model', HEAVY, async () => {
+    const { stdout } = runCli(['draft', '--config', configFor('drift')])
+
+    const modelDir = tempDir()
+    fs.writeFileSync(path.join(modelDir, 'model.c4'), stdout)
+    const loaded = await loadModel(modelDir)
+
+    expect(loaded.errors).toEqual([])
+    expect([...loaded.model.elements()].length).toBeGreaterThan(0)
   })
 
   test('--no-drift without the draft command is an error', () => {
@@ -180,8 +199,71 @@ describe('draft --describe', () => {
 
     expect(status).toBe(1)
     expect(stderr).toContain('--describe needs an agent exec')
-    expect(stderr).toContain("fitc4 init --agent claude")
     expect(stderr).toContain("'agent' field")
+    // init --agent is offered for a project with no config, not as advice to
+    // someone who already has one: that routed users into the old trap where
+    // init created the model that made the next draft refuse.
+    expect(stderr).toContain('no config yet')
+    expect(stderr).toContain('fitc4 init --agent claude')
+  })
+
+  // The failure that used to read as eleven models declining to answer.
+  test('an exec that cannot run aborts the draft, exits nonzero, and writes nothing', HEAVY, () => {
+    const root = fixturePath('drift')
+    const modelDir = path.join(tempDir(), 'arch')
+    const configPath = path.join(tempDir(), 'fitc4.config.ts')
+    fs.writeFileSync(
+      configPath,
+      `export default {
+  version: 1,
+  repositoryRoot: ${JSON.stringify(root)},
+  model: ${JSON.stringify(modelDir)},
+  scanRoots: ['src'],
+  tsconfig: ${JSON.stringify(path.join(root, 'tsconfig.json'))},
+  agent: {
+    id: 'stub/model',
+    run: async () => ({ ok: false, error: 'not logged in' }),
+  },
+}
+`,
+    )
+
+    const { status, stdout, stderr } = runCli(['draft', '--describe', '--config', configPath])
+
+    expect(status).toBe(1)
+    expect(stderr).toContain('describe aborted at app.')
+    expect(stderr).toContain('stub/model could not run: not logged in')
+    expect(stdout).toBe('')
+    expect(fs.existsSync(modelDir)).toBe(false)
+  })
+
+  test('an abstaining exec keeps the TODOs and still exits 0', HEAVY, () => {
+    const root = fixturePath('drift')
+    const modelDir = path.join(tempDir(), 'arch')
+    const configPath = path.join(tempDir(), 'fitc4.config.ts')
+    fs.writeFileSync(
+      configPath,
+      `export default {
+  version: 1,
+  repositoryRoot: ${JSON.stringify(root)},
+  model: ${JSON.stringify(modelDir)},
+  scanRoots: ['src'],
+  tsconfig: ${JSON.stringify(path.join(root, 'tsconfig.json'))},
+  agent: {
+    id: 'stub/model',
+    run: async () => ({ ok: true, value: { description: '' }, raw: '' }),
+  },
+}
+`,
+    )
+
+    const { status, stdout } = runCli(['draft', '--describe', '--config', configPath])
+
+    expect(status).toBe(0)
+    expect(stdout).toContain('described 0 of 3 eligible elements; 3 elements kept the TODO')
+    expect(fs.readFileSync(path.join(modelDir, 'model.c4'), 'utf8')).toContain(
+      'TODO: what is this component responsible for?',
+    )
   })
 
   test('with a module config declaring a stub exec, descriptions land in the draft', HEAVY, () => {
@@ -244,10 +326,50 @@ describe('init --agent', () => {
     expect(status).toBe(0)
     expect(stdout).toContain('created fitc4.config.mts')
     expect(stdout).toContain('module config')
-    expect(stdout).toContain('fitc4 draft --describe')
+    // The next step is the point of this path, and the caveat is stated here
+    // too, not only inside the file.
+    expect(stdout).toContain('Next: npx fitc4 draft --describe')
+    expect(stdout).toContain('commented out')
     expect(fs.readFileSync(path.join(directory, 'fitc4.config.mts'), 'utf8')).toContain(
       `claudeCli({ model: 'sonnet' })`,
     )
+  })
+})
+
+describe('init', () => {
+  // The plain path is also how a brownfield user arrives, and a hand-written
+  // model of an existing codebase is the harder way in.
+  test('the plain path names the model file first and draft as the brownfield way in', () => {
+    const { status, stdout } = runCli(['init'], tempDir())
+
+    expect(status).toBe(0)
+    expect(stdout).toContain(`put your elements in arch/model.c4`)
+    expect(stdout).toContain('npx fitc4 draft')
+  })
+
+  // init used to create the very file that made the next command refuse.
+  test('a draft straight after init replaces the placeholder it wrote', HEAVY, () => {
+    const directory = tempDir()
+    fs.mkdirSync(path.join(directory, 'src'))
+    fs.writeFileSync(path.join(directory, 'src', 'index.ts'), 'export const started = true\n')
+    fs.writeFileSync(
+      path.join(directory, 'tsconfig.json'),
+      JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext' } }),
+    )
+    expect(runCli(['init'], directory).status).toBe(0)
+
+    const { status, stdout } = runCli(['draft'], directory)
+
+    expect(status).toBe(0)
+    expect(stdout).toContain('created arch/model.c4')
+    const model = fs.readFileSync(path.join(directory, 'arch', 'model.c4'), 'utf8')
+    expect(model).not.toContain('fitc4 init placeholder')
+    expect(model).toContain(`sources 'src/**'`)
+
+    // And the drafted model is authored territory now: a second draft refuses.
+    const second = runCli(['draft'], directory)
+    expect(second.stderr).toContain('never overwrites')
+    expect(fs.readFileSync(path.join(directory, 'arch', 'model.c4'), 'utf8')).toBe(model)
   })
 })
 

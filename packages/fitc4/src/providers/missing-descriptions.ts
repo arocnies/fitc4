@@ -16,6 +16,7 @@
  */
 
 import { findingId } from '../ids.ts'
+import { isPlaceholderDescription } from '../model.ts'
 import type { Finding, NamedProvider, ValidateContext, ValidateProvider } from '../types.ts'
 
 export const PROVIDER_ID = 'missing-descriptions'
@@ -49,11 +50,18 @@ export function missingDescriptions(): NamedProvider<ValidateProvider> {
   return { id: PROVIDER_ID, run }
 }
 
-/** Why an element counts as undescribed, or undefined when it is described. */
+/**
+ * Why an element counts as undescribed, or undefined when it is described.
+ *
+ * The placeholder test itself comes from `isPlaceholderDescription` in the
+ * core model vocabulary, so this rule and the agent tier's semantic review
+ * cannot disagree about what a scaffolded `TODO` is. Only the wording of each
+ * reason belongs to this rule.
+ */
 function undescribedReason(description: string | undefined): string | undefined {
   if (description === undefined) return 'has no description'
   if (description.trim() === '') return 'has an empty description'
-  if (description.trimStart().startsWith('TODO')) return 'still carries a TODO description'
+  if (isPlaceholderDescription(description)) return 'still carries a TODO description'
   return undefined
 }
 

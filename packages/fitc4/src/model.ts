@@ -31,6 +31,31 @@ export const SOURCES_KEY = 'sources'
  */
 export const PACKAGES_KEY = 'packages'
 
+/**
+ * The prefix marking a description as a scaffolded placeholder.
+ *
+ * `init` and `draft` both write `TODO: ...` descriptions, and three tiers need
+ * to agree on what that means, so the test lives here in the shared model
+ * vocabulary rather than in whichever of them tested for it first.
+ */
+const PLACEHOLDER_PREFIX = 'TODO'
+
+/**
+ * Whether a description says nothing: absent, blank, or still a placeholder.
+ *
+ * One definition, deliberately. `missing-descriptions` counts these
+ * deterministically, and `agentSemanticReview` must skip exactly the same set,
+ * because paying a model to report that the tool's own `TODO` states no
+ * responsibility is waste (and on a freshly drafted repository it was waste
+ * once per element). Two copies of this test would drift into a review that
+ * bills for placeholders the rule already counted.
+ */
+export function isPlaceholderDescription(description: string | undefined): boolean {
+  if (description === undefined) return true
+  const trimmed = description.trim()
+  return trimmed === '' || trimmed.startsWith(PLACEHOLDER_PREFIX)
+}
+
 export interface LoadedModel {
   model: LikeC4Model
   errors: string[]

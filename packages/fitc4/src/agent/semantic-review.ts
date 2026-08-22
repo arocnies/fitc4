@@ -4,8 +4,10 @@
  * Judges whether each element's implementation still matches its declared
  * description. This is the drift that relationships cannot express: the
  * "read-only reporting layer" that started writing, the "adapter" that grew
- * business logic. Only elements that have both a description and owned files are
- * reviewed; there is nothing to judge against otherwise.
+ * business logic. Only elements that have both a real description and owned
+ * files are reviewed; there is nothing to judge against otherwise, and a
+ * scaffolded `TODO` placeholder is nothing to judge against either (see
+ * `describedElements`).
  *
  * One call per element rather than one batch, so a response cache keyed on
  * inputs re-reviews only the elements whose files actually changed. Calls run
@@ -22,6 +24,7 @@
  */
 
 import { findingId } from '../ids.ts'
+import { isPlaceholderDescription } from '../model.ts'
 import type {
   Evidence,
   Finding,
@@ -167,7 +170,19 @@ interface ReviewableElement {
   files: string[]
 }
 
-/** Elements with a description and resolved file ownership, in id order. */
+/**
+ * Elements with a real description and resolved file ownership, in id order.
+ *
+ * A placeholder description is skipped, not reviewed. `init` and `draft` write
+ * `TODO: what is this component responsible for?` themselves, so reviewing one
+ * bills a call to be told that the tool's own placeholder states no
+ * responsibility. That is a known-absent description, which the deterministic
+ * `missing-descriptions` rule already counts, and paying a model to rediscover
+ * it is waste: on a freshly drafted repository it was waste up to `maxElements`
+ * times per run. The predicate comes from the core model vocabulary rather than
+ * being restated here, so the two tiers cannot disagree about what a
+ * placeholder is.
+ */
 function describedElements(context: ValidateContext): ReviewableElement[] {
   const observations = new Map(context.observations.map((entry) => [entry.id, entry]))
   const owned = new Map<string, Set<string>>()
@@ -187,7 +202,8 @@ function describedElements(context: ValidateContext): ReviewableElement[] {
   for (const element of context.model.elements()) {
     const description = elementText(element.description)
     const files = owned.get(element.id)
-    if (description === undefined || description === '' || files === undefined) continue
+    if (description === undefined || files === undefined) continue
+    if (isPlaceholderDescription(description)) continue
     result.push({ id: element.id, description, files: [...files].sort() })
   }
   return result.sort((a, b) => a.id.localeCompare(b.id))

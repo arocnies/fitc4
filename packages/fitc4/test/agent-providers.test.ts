@@ -279,6 +279,24 @@ describe('agentSemanticReview', () => {
     expect(result.findings).toEqual([])
   })
 
+  // A placeholder is a known-absent description, already counted by the
+  // deterministic missing-descriptions rule. Reviewing one bought a warning
+  // that the tool's own TODO states no responsibility, per element, per run.
+  test('placeholder descriptions are skipped, not billed for', async () => {
+    const exec = stubExec([ok({ matches: true, issues: [] })])
+
+    const result = await runFixture('todo-descriptions', {
+      validate: [agentSemanticReview({ exec })],
+    })
+
+    // One call, for the one element with a real description. The TODO, the
+    // whitespace-only, and the absent ones were never asked about.
+    expect(exec.requests).toHaveLength(1)
+    expect(exec.requests[0]?.prompt).toContain('demo.described')
+    expect(exec.requests[0]?.prompt).toContain('Adds numbers for the demo')
+    expect(result.findings).toEqual([])
+  })
+
   // The fixture has two described elements on purpose: without the second,
   // this passes even if the provider keeps calling a dead CLI per element.
   test('the first exec failure stops the run with one finding', async () => {

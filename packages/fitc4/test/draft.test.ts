@@ -12,6 +12,7 @@ import { afterAll, describe, expect, test } from 'vitest'
 import type { ResolvedConfig } from '../src/config.ts'
 import { draft } from '../src/draft.ts'
 import { pipelineConfig } from '../src/defaults.ts'
+import { MODEL_PLACEHOLDER_MARKER } from '../src/init.ts'
 import { runPipeline } from '../src/pipeline.ts'
 import type { Observation, ScanContext } from '../src/types.ts'
 import { fixturePath, ruleIds } from './helpers.ts'
@@ -368,7 +369,7 @@ describe('draft', () => {
       ])
     }
 
-    test('proposed descriptions land on eligible elements; undefined and a throw keep the TODO', HEAVY, async () => {
+    test('proposed descriptions land on eligible elements; an abstention keeps the TODO', HEAVY, async () => {
       const config = describeConfig()
       const offered: import('../src/draft.ts').DraftElementFacts[] = []
       const messages: string[] = []
@@ -378,7 +379,6 @@ describe('draft', () => {
         describe: async (element) => {
           offered.push(element)
           if (element.path === 'billing.invoices') return '  Creates and stores invoices.\n'
-          if (element.path === 'billing.payments') throw new Error('boom')
           return undefined
         },
       })
@@ -416,9 +416,6 @@ describe('draft', () => {
       )
       expect(messages).toContainEqual(
         expect.stringMatching(/^describe: app\.billing kept the TODO, \d+\.\ds$/),
-      )
-      expect(messages).toContainEqual(
-        expect.stringMatching(/^describe: app\.billing\.payments failed, boom, \d+\.\ds$/),
       )
 
       // A described draft still gates green: describe edits description text only.
@@ -466,6 +463,122 @@ describe('draft', () => {
       expect(result.describeAttempted).toBe(0)
       expect(result.described).toBe(0)
       expect(result.text.match(/TODO: what is this component responsible for\?/g)).toHaveLength(3)
+    })
+
+    // The transport-failure contract: a callback that cannot run is not a
+    // callback that declined, so the draft fails and leaves nothing behind.
+    test('a thrown callback aborts on the first element and writes nothing', HEAVY, async () => {
+      const config = describeConfig()
+      const offered: string[] = []
+
+      await expect(
+        draft(config, {
+          describe: async (element) => {
+            offered.push(element.path)
+            throw new Error('claude-cli/sonnet could not run: not logged in')
+          },
+        }),
+      ).rejects.toThrow(/describe aborted at app\.billing.*not logged in.*No model was written/s)
+
+      // One call, not one per element: N more calls against a dead CLI are N
+      // more pointless waits.
+      expect(offered).toHaveLength(1)
+      expect(fs.readdirSync(config.modelDir)).toEqual([])
+    })
+
+    // Refusal mode costs nothing: the descriptions would have been paid for,
+    // printed to scrollback, and discarded.
+    test('a draft that will refuse to write skips the describe pass entirely', HEAVY, async () => {
+      const config = describeConfig()
+      fs.writeFileSync(path.join(config.modelDir, 'authored.c4'), '// authored\n')
+      let calls = 0
+
+      const result = await draft(config, {
+        describe: async () => {
+          calls += 1
+          return 'Never asked for.'
+        },
+      })
+
+      expect(calls).toBe(0)
+      expect(result.describeAttempted).toBe(0)
+      expect(result.described).toBe(0)
+      expect(result.written).toBeUndefined()
+      // The note says why, so a skipped pass is never mistaken for a free one.
+      expect(result.refusal).toContain('never overwrites')
+      expect(result.refusal).toContain('The describe pass was skipped')
+    })
+  })
+
+  describe("init's placeholder", () => {
+    /** The marker line plus the rest of init's starter model. */
+    function placeholderModel(): string {
+      return `${MODEL_PLACEHOLDER_MARKER}\nspecification {\n  element system\n}\n\nmodel {\n  app = system 'App'\n}\n`
+    }
+
+    test('a model directory holding only the untouched placeholder is drafted over', HEAVY, async () => {
+      const config = configFor('drift')
+      const placeholder = path.join(config.modelDir, 'model.c4')
+      fs.writeFileSync(placeholder, placeholderModel())
+
+      const result = await draft(config)
+
+      expect(result.refusal).toBeUndefined()
+      expect(result.written).toBe(placeholder)
+      expect(fs.readdirSync(config.modelDir)).toEqual(['model.c4'])
+      // The draft is the user's model from here on, so it carries no marker of
+      // its own: a second draft over it would be overwriting authored work.
+      expect(result.text).not.toContain(MODEL_PLACEHOLDER_MARKER)
+      expect(result.text).not.toContain('fitc4 init placeholder')
+      expect(fs.readFileSync(placeholder, 'utf8')).toBe(result.text)
+    })
+
+    test('the placeholder is replaced in place, leaving no orphan beside a renamed one', HEAVY, async () => {
+      const config = configFor('drift')
+      fs.writeFileSync(path.join(config.modelDir, 'architecture.c4'), placeholderModel())
+
+      const result = await draft(config)
+
+      expect(result.written).toBe(path.join(config.modelDir, 'architecture.c4'))
+      expect(fs.readdirSync(config.modelDir)).toEqual(['architecture.c4'])
+    })
+
+    test('an edited marker line means the file is authored now, so the draft refuses', HEAVY, async () => {
+      const config = configFor('drift')
+      const edited = placeholderModel().replace(
+        MODEL_PLACEHOLDER_MARKER,
+        `${MODEL_PLACEHOLDER_MARKER} Mine now.`,
+      )
+      fs.writeFileSync(path.join(config.modelDir, 'model.c4'), edited)
+
+      const result = await draft(config)
+
+      expect(result.written).toBeUndefined()
+      expect(result.refusal).toContain('never overwrites')
+      expect(fs.readFileSync(path.join(config.modelDir, 'model.c4'), 'utf8')).toBe(edited)
+    })
+
+    test('a marker anywhere but the first line does not count', HEAVY, async () => {
+      const config = configFor('drift')
+      const buried = `// notes\n${placeholderModel()}`
+      fs.writeFileSync(path.join(config.modelDir, 'model.c4'), buried)
+
+      const result = await draft(config)
+
+      expect(result.written).toBeUndefined()
+      expect(fs.readFileSync(path.join(config.modelDir, 'model.c4'), 'utf8')).toBe(buried)
+    })
+
+    test('a placeholder beside a second model file refuses: which one is the placeholder is not a guess', HEAVY, async () => {
+      const config = configFor('drift')
+      fs.writeFileSync(path.join(config.modelDir, 'model.c4'), placeholderModel())
+      fs.writeFileSync(path.join(config.modelDir, 'authored.c4'), '// authored\n')
+
+      const result = await draft(config)
+
+      expect(result.written).toBeUndefined()
+      expect(result.refusal).toContain('never overwrites')
+      expect(fs.readFileSync(path.join(config.modelDir, 'model.c4'), 'utf8')).toBe(placeholderModel())
     })
   })
 })

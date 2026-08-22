@@ -11,7 +11,7 @@ import { afterAll, describe, expect, test } from 'vitest'
 
 import { loadConfig, resolveConfig } from '../src/config.ts'
 import { pipelineConfig } from '../src/defaults.ts'
-import { AGENT_CONFIG_FILENAME, init } from '../src/init.ts'
+import { AGENT_CONFIG_FILENAME, init, MODEL_PLACEHOLDER_MARKER } from '../src/init.ts'
 import { runPipeline } from '../src/pipeline.ts'
 
 const roots: string[] = []
@@ -46,6 +46,19 @@ describe('init', () => {
     const config = loadConfig(path.join(root, 'fitc4.config.json'))
     expect(config.scanRoots).toEqual(['src'])
     expect(config.modelDir).toBe(path.join(root, 'arch'))
+  })
+
+  // The marker is what resolves the old contradiction, where init created the
+  // file that made the draft it recommends refuse to write. It has to say both
+  // halves: replaceable, and yours once you edit it.
+  test('the starter model opens with the placeholder marker', () => {
+    const root = scratch()
+    init(root)
+
+    const model = fs.readFileSync(path.join(root, 'arch', 'model.c4'), 'utf8')
+    expect(model.split('\n')[0]).toBe(MODEL_PLACEHOLDER_MARKER)
+    expect(MODEL_PLACEHOLDER_MARKER).toContain('may replace this file')
+    expect(MODEL_PLACEHOLDER_MARKER).toContain('Edit it')
   })
 
   test('the first check run on a scaffolded project is green', async () => {
@@ -130,17 +143,25 @@ describe('init --agent', () => {
     // The measured-perfect model, one shared exec, declared as the agent.
     expect(config).toContain(`const exec = cached(claudeCli({ model: 'sonnet' }))`)
     expect(config).toContain('agent: exec,')
-    expect(config).toContain('resolve: [...defaultResolve, agentResolve({ exec })]')
-    expect(config).toContain('validate: [...defaultValidate, agentSemanticReview({ exec })]')
-    // agentScan ships commented out: a fail-closed scanner with placeholder
-    // instructions would be worse than none.
+    // The gate providers ship commented out: composing them would make every
+    // plain `fitc4` run bill a live call and fail in CI without a login.
+    expect(config).not.toMatch(/^\s{2}resolve:/m)
+    expect(config).not.toMatch(/^\s{2}validate:/m)
+    expect(config).toContain('// resolve: [...defaultResolve, agentResolve({ exec })]')
+    expect(config).toContain('// validate: [...defaultValidate, agentSemanticReview({ exec })]')
+    expect(config).toContain('bills per run')
+    expect(config).toContain('--config')
+    // agentScan ships commented out too: a fail-closed scanner with
+    // placeholder instructions would be worse than none.
     expect(config).not.toMatch(/^\s{2}scan:/m)
     expect(config).toContain('// scan: [')
     expect(config).toContain('write yours before enabling this')
 
-    // The agent path says what changed: a module config, and draft --describe.
+    // The agent path says what changed: a module config, draft --describe, and
+    // the caveat on the providers it deliberately did not compose.
     expect(result.notes.join('\n')).toContain('module config')
     expect(result.notes.join('\n')).toContain('fitc4 draft --describe')
+    expect(result.notes.join('\n')).toContain('commented out')
   })
 
   test('scaffolds the codex CLI around its measured model', () => {
@@ -149,7 +170,8 @@ describe('init --agent', () => {
 
     const config = fs.readFileSync(path.join(root, AGENT_CONFIG_FILENAME), 'utf8')
     expect(config).toContain(`const exec = cached(codexCli({ model: 'gpt-5.6-luna' }))`)
-    expect(config).toContain('agentResolve({ exec })')
+    expect(config).toContain('// resolve: [...defaultResolve, agentResolve({ exec })]')
+    expect(config).toContain('call your codex CLI')
   })
 
   // The template is a working config, not pseudocode: rewrite its package
@@ -178,16 +200,15 @@ describe('init --agent', () => {
 
       const resolved = await resolveConfig(configPath)
       expect(resolved.agent?.id).toBe(agent === 'claude' ? 'claude-cli/sonnet' : 'codex-cli/gpt-5.6-luna')
-      // Defaults spread plus one agent provider per extended phase; scan absent.
-      expect(resolved.providers?.resolve?.map((provider) => provider.id)).toEqual([
-        'source-root',
-        'agent-resolve',
-      ])
-      expect(resolved.providers?.validate?.map((provider) => provider.id)).toEqual([
+      // The exec is declared and no phase is: every phase falls back to the
+      // deterministic defaults, so the plain gate makes zero live calls.
+      expect(resolved.providers).toBeUndefined()
+      expect(pipelineConfig(resolved).validate.map((provider) => provider.id)).toEqual([
         'architecture-rules',
-        'agent-semantic-review',
       ])
-      expect(resolved.providers?.scan).toBeUndefined()
+      expect(pipelineConfig(resolved).resolve.map((provider) => provider.id)).toEqual([
+        'source-root',
+      ])
       expect(resolved.scanRoots).toEqual(['src'])
     },
   )

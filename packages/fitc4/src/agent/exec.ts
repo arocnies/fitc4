@@ -205,6 +205,12 @@ export function truncate(text: string, limit: number): string {
   return collapsed.length <= limit ? collapsed : `${collapsed.slice(0, limit)}…`
 }
 
+/** A duration for a human: `120s`, `0.2s`, never `120000ms`. */
+function seconds(milliseconds: number): string {
+  const value = milliseconds / 1000
+  return `${Number.isInteger(value) ? value : Number(value.toFixed(1))}s`
+}
+
 interface ProcessResult {
   code: number | null
   stdout: string
@@ -255,11 +261,16 @@ function runProcess(
  * Run an agent CLI and fold every transport-level failure into the adapters'
  * shared `{ ok: false }` shape: spawn error, timeout, non-zero exit.
  * On success the caller still owns interpreting the output.
+ *
+ * `factory` names the exported adapter factory whose `timeoutMs` option
+ * governs this call. A timeout that reports neither how long it waited nor
+ * which knob changes it leaves the reader with a symptom and no fix, and the
+ * default is documented nowhere they are looking.
  */
 export async function runCliProcess(
   binary: string,
   args: string[],
-  options: { stdin?: string; cwd?: string; timeoutMs: number },
+  options: { stdin?: string; cwd?: string; timeoutMs: number; factory: string },
 ): Promise<{ ok: true; result: ProcessResult } | { ok: false; error: string }> {
   let result: ProcessResult
   try {
@@ -269,7 +280,12 @@ export async function runCliProcess(
   }
 
   if (result.timedOut) {
-    return { ok: false, error: `${binary} timed out` }
+    return {
+      ok: false,
+      error:
+        `${binary} timed out after ${seconds(options.timeoutMs)}; ` +
+        `raise it with ${options.factory}({ timeoutMs })`,
+    }
   }
   if (result.code !== 0) {
     return {

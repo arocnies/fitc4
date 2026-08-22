@@ -158,10 +158,14 @@ describe('claudeCli', () => {
     expect(reply.ok).toBe(false)
   })
 
-  test('a hung CLI is killed at the timeout', async () => {
+  test('a hung CLI is killed at the timeout, which names the wait and the knob', async () => {
     const reply = await claudeCli({ binary: slowBinary, timeoutMs: 200 }).run({ prompt: 'x' })
 
-    expect(!reply.ok && reply.error).toContain('timed out')
+    // A bare "timed out" is a symptom with no fix: the duration says whether
+    // the call was slow or the default is too low, and the factory name says
+    // where to change it.
+    expect(!reply.ok && reply.error).toContain('timed out after 0.2s')
+    expect(!reply.ok && reply.error).toContain('raise it with claudeCli({ timeoutMs })')
   })
 })
 
@@ -315,10 +319,11 @@ describe('codexCli', () => {
     expect(!silent.ok && silent.error).toContain('wrote no reply')
   })
 
-  test('a hung CLI is killed at the timeout', async () => {
+  test("a hung CLI is killed at the timeout, which names this adapter's knob", async () => {
     const reply = await codexCli({ binary: slowBinary, timeoutMs: 200 }).run({ prompt: 'x' })
 
-    expect(!reply.ok && reply.error).toContain('timed out')
+    expect(!reply.ok && reply.error).toContain('timed out after 0.2s')
+    expect(!reply.ok && reply.error).toContain('raise it with codexCli({ timeoutMs })')
   })
 })
 

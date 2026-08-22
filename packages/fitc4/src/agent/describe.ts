@@ -7,10 +7,16 @@
  * only ever proposes description text, at draft time, and the gate never
  * rewrites a description; `agentSemanticReview` only critiques one.
  *
- * Advisory by construction, matching `DraftOptions.describe`: any exec
- * failure, off-schema reply, or empty proposal returns `undefined`, which
- * keeps the element's TODO and never fails the draft. A placeholder is an
- * honest state; a draft aborted over a description would not be.
+ * Abstention and failure are kept apart, permanently, because collapsing them
+ * hid the most common first-run problem there is. A logged-out CLI used to
+ * produce "kept the TODO" per element and "described 0 of 11", exit 0, which
+ * reads as eleven models declining to answer rather than as one CLI that never
+ * ran. So a schema-conforming reply with an empty or non-string description is
+ * an abstention and returns `undefined`, keeping the element's TODO, while
+ * every transport failure (spawn error, not logged in, non-zero exit, timeout,
+ * off-schema reply) throws and aborts the draft. A placeholder description is
+ * an honest state. A draft that quietly kept every placeholder because nothing
+ * was ever asked is not.
  *
  * Each request is a context pack over the element's owned files, so the same
  * attestation rules hold as everywhere else: truncation is announced inline,
@@ -111,14 +117,23 @@ export function draftDescriber(options: DraftDescriberOptions): DraftDescribe {
         `The context shows one element of a drafted architecture model: ` +
         `${element.name}, claiming '${element.declared}'. Write one or two plain sentences ` +
         'stating what this component is responsible for, based only on the files shown. ' +
-        'Describe demonstrated responsibility, not implementation detail; do not speculate ' +
-        'beyond what the files show.',
+        'State durable responsibility: what this element does for the rest of the system, ' +
+        'and why something else would depend on it. Leave out configuration that can change ' +
+        'without the responsibility changing, such as ports, hostnames, environment ' +
+        'variables, image tags, and file layout. Do not restate the element name or its ' +
+        'technology as if it were a responsibility, and do not speculate beyond the files ' +
+        'shown: if they support little, say only that little.',
       context: pack.text,
       schema: REPLY_SCHEMA,
       cwd: repositoryRoot,
     })
 
-    if (!reply.ok) return undefined
+    // A transport failure is not an abstention. It aborts the draft, carrying
+    // the exec id and whatever the adapter said, which is where "not logged
+    // in" actually lives.
+    if (!reply.ok) {
+      throw new Error(`${options.exec.id} could not run: ${reply.error}`)
+    }
 
     const description = (reply.value as { description?: unknown }).description
     if (typeof description !== 'string') return undefined

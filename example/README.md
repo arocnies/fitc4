@@ -34,7 +34,7 @@ Rerun `npm run fitc4 -w example`. Exit code 1:
 
 ```text
 error (1)
-  relationship-direction  example.app.core depends on example.app.interface, but the model declares only example.app.interface -> example.app.core. Declare the dependency that the code actually has.
+  relationship-direction  example.app.core depends on example.app.interface, but the model declares only example.app.interface -> example.app.core. Reroute or remove the import so the dependency flows the way the model declares; if the architecture genuinely changed, declare the dependency the code has instead.
     architecture-rules  architecture-rules/relationship-direction/example.app.core->example.app.interface
     src/core/bad.ts:1  ../interface/index.js
 ```
