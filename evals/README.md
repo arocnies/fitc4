@@ -129,4 +129,22 @@ haiku's extras were the familiar pair: the semantic reviewer flagged the healthy
 
 The draft eval's live numbers: sonnet drafted 12/12 elements and 15/15 edges with 0 extras, gpt-5.6-luna the same, haiku 11/12 elements and 14/15 edges with 0 extras.
 
+### 2026-08-22: describe, and the first oracle that can lose
+
+Two measurements the same day the describe pass landed.
+
+First, `supabase/draft`'s describe leg, re-measured after each change to the request. The initial run exposed a defect stub mode could not see: a fragment element's owned file is the whole containing file, so a head-of-file excerpt routinely missed the very section the element claims. sonnet said so honestly ("cannot be determined from the shown files"); gpt-5.6-luna filled the gap with plausible sentences assembled from the element's name. Anchoring the excerpt window at the claimed fragment, preferring its definition line over an earlier reference to it, took both models to 11 of 11 accurate descriptions. A later prompt change, steering toward durable responsibility and away from configuration, measurably reduced trivia: sonnet's mentions of ports, environment variables, and image tags fell from 6 to 2 across the same eleven elements, and the descriptions moved from listing settings to stating why another component would depend on this one.
+
+Second, `misnamed/draft`, whose whole purpose is to be losable. Its rules demand the real responsibility and forbid the wrong concept, so a description assembled from a misleading directory name fails a row rather than passing for being non-empty.
+
+| exec · model | rows perfect | divergences |
+|---|---|---|
+| claude · sonnet | 4/4 | none |
+| codex · gpt-5.6-luna | 4/4 | none |
+| claude · haiku | 3/4 | described the entry point's mechanics and never its role, see below |
+
+None of the three fell for a misleading name, so gullibility is not what this fixture caught. haiku's `src/legacy/` description was accurate about mechanics and silent about architecture: "handles HTTP requests for payment settlement, refunds, and ledger balance lookups, enforcing principal-based authorization and converting authorization failures into HTTP 403 responses", never that this is the process entry point through which every request arrives. sonnet and gpt-5.6-luna both said it. This is a fourth measured haiku failure mode, and the one most specific to this tool's purpose: a description that omits an element's architectural role is exactly the description an architecture model cannot use.
+
+The review row paid for itself on the same run. gpt-5.6-luna described the ledger as immutable, and the semantic reviewer, reading the code behind that claim, reported that `postEntry` stored the caller's mutable object reference, so entries could be rewritten after recording. It was right: the fixture's own code contradicted its own comment. The fix was to copy and freeze the entry, after which the row went clean. Two things worth recording. The describe-to-review loop's first live outing produced a true positive rather than the feedback noise it was built to detect, and haiku reviewed its own near-identical immutability claim without objection, so a reviewer's strength matters as much as a describer's.
+
 The corrected reading. The earlier claim that a measured divergence is always an extra, never a miss, is falsified. sonnet-class and luna-class models measure perfect across the whole suite. haiku-class models both over-report and, newly measured, under-report on subtle single-line signals in large files. The two failure directions are not symmetric: an extra surfaces for a human to dismiss, but an agent-scan miss is a fail-open outcome the gate cannot see, because nothing downstream can flag an observation that never arrived. That is the measured argument for the advisory-first stance, whose failure mode is noise, and for graduating proven domains to deterministic providers; for a fail-closed scan that gates a merge, it is also the measured case for a sonnet-class model over the cheap default.
