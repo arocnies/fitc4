@@ -48,6 +48,16 @@ import type { AgentExec } from 'fitc4/agent'
  */
 export const describe = true
 
+/**
+ * Opt into the describe-to-review loop as well: after drafting, the harness
+ * gates the drafted model against `agentSemanticReview` and expects it to
+ * flag nothing. The two agent features run in sequence nowhere else in the
+ * suite, and the risk worth measuring is that describe writes trivia the
+ * reviewer then reports as drift, so the two feed each other noise on every
+ * freshly drafted repository. See `scoreDescribeReview` in harness/draft.ts.
+ */
+export const review = true
+
 export default function misnamedDraft(_exec: AgentExec, root: string): ResolvedConfig {
   const project = path.dirname(root)
   return {

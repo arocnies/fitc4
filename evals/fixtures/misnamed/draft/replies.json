@@ -16,5 +16,17 @@
     "reply": {
       "description": "The process entry point and request router: it dispatches every incoming request to settlement or to the balance query, and turns a refused authorization into a 403 instead of a crash."
     }
+  },
+  {
+    "when": { "promptIncludes": "Element app.cache declares" },
+    "reply": { "matches": true, "issues": [] }
+  },
+  {
+    "when": { "promptIncludes": "Element app.utils declares" },
+    "reply": { "matches": true, "issues": [] }
+  },
+  {
+    "when": { "promptIncludes": "Element app.legacy declares" },
+    "reply": { "matches": true, "issues": [] }
   }
 ]

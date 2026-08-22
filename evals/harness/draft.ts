@@ -39,7 +39,10 @@
  * stub mode so the fixture gets updated instead of rotting silently.
  */
 
-import type { DraftResult } from 'fitc4'
+import { defaultValidate, pipelineConfig, runPipeline } from 'fitc4'
+import type { DraftResult, ResolvedConfig } from 'fitc4'
+import { agentSemanticReview, AGENT_SEMANTIC_REVIEW_PROVIDER_ID } from 'fitc4/agent'
+import type { AgentExec } from 'fitc4/agent'
 
 import type { FixtureScore, ProviderScore } from './score.ts'
 
@@ -179,6 +182,67 @@ function parseDraft(text: string): { elements: DraftedElement[]; edges: DraftedE
   }
 
   return { elements, edges }
+}
+
+/**
+ * Close the describe-to-review loop: does the gate accept what draft wrote?
+ *
+ * The risk this measures is the two agent features feeding each other noise.
+ * `draftDescriber` proposes a description, `agentSemanticReview` critiques
+ * one, and nothing else in the suite runs them in that order. A describer
+ * that writes configuration trivia ("listens on port 8000") produces a
+ * `description-drift` finding the day the port moves, so a describe pass and
+ * a reviewer that disagree by construction would ship as a permanent warning
+ * on every freshly drafted repository.
+ *
+ * A draft fixture opts in with `export const review = true`. The drafted
+ * model is already on disk in the fixture's temp model directory, so the loop
+ * is one more pipeline run over the same project with the reviewer composed
+ * in, and every review finding is an extra: a perfect run flags nothing about
+ * descriptions written moments earlier from the same code.
+ */
+export async function scoreDescribeReview(
+  config: ResolvedConfig,
+  exec: AgentExec,
+  drafted: DraftResult,
+): Promise<ProviderScore> {
+  const row: ProviderScore = { provider: 'draft-review', hits: 0, misses: 0, extras: 0, notes: [] }
+
+  if (drafted.written === undefined) {
+    row.misses += 1
+    row.notes.push(`no model to review, the draft was not written: ${drafted.refusal ?? 'no reason given'}`)
+    return row
+  }
+
+  const result = await runPipeline(
+    pipelineConfig({
+      ...config,
+      providers: { ...config.providers, validate: [...defaultValidate, agentSemanticReview({ exec })] },
+    }),
+  )
+  if (result.modelErrors.length > 0) {
+    row.misses += 1
+    row.notes.push(`the drafted model did not load: ${result.modelErrors.join('; ')}`)
+    return row
+  }
+
+  // Everything the reviewer says counts, not only drift: an `agent-unavailable`
+  // or `agent-truncated` finding means the review did not actually happen, and
+  // a review that never ran must not read as a clean one.
+  const reviewFindings = result.findings.filter(
+    (finding) => finding.provider === AGENT_SEMANTIC_REVIEW_PROVIDER_ID,
+  )
+  const flagged = new Set(
+    reviewFindings
+      .filter((finding) => finding.ruleId === 'description-drift')
+      .map((finding) => finding.subject?.id),
+  )
+  for (const finding of reviewFindings) {
+    row.extras += 1
+    row.notes.push(`${finding.ruleId}: ${finding.description}`)
+  }
+  row.hits = Math.max(drafted.described - flagged.size, 0)
+  return row
 }
 
 /**
