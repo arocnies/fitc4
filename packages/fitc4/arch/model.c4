@@ -59,7 +59,14 @@ model {
 
   fitc4.lib.core -> fitc4.lib.providers 'composes and re-exports (defaults.ts, index.ts)'
   fitc4.lib.providers -> fitc4.lib.core 'reads the shared contracts (types, model, ids, kinds)'
-  fitc4.lib.agent -> fitc4.lib.core 'reads the shared contracts; nothing in core imports it back'
+  fitc4.lib.agent -> fitc4.lib.core 'reads the shared contracts'
+
+  // The one sanctioned reach into the agent tier: a type-only import of the
+  // AgentExec shape (config.ts, erased at compile time) and the dynamic
+  // import behind `draft --describe` (cli.ts), which loads agent code only
+  // when the user explicitly asked for the describe pass. The default check
+  // path never crosses this edge at runtime.
+  fitc4.lib.core -> fitc4.lib.agent 'declares the agent exec type; loads the draft describer on --describe only'
 }
 
 views {
