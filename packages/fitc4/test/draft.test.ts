@@ -354,4 +354,118 @@ describe('draft', () => {
     expect(ruleIds(gate.findings)).toEqual(['unobserved-elements'])
     expect(gate.findings.every((finding) => finding.severity === 'info')).toBe(true)
   })
+
+  describe('the describe pass', () => {
+    /** The composite scenario: a split directory, a vendor stub, a boundary element. */
+    function describeConfig(): ResolvedConfig {
+      return stubConfig([
+        file('src/billing/wiring.ts'),
+        file('src/billing/invoices/create.ts'),
+        file('src/billing/payments/charge.ts'),
+        dependency(1, 'src/billing/invoices/create.ts', { kind: 'file', id: 'src/billing/payments/charge.ts' }),
+        dependency(2, 'src/billing/invoices/create.ts', { kind: 'module', id: 'stripe-js' }),
+        dependency(3, 'src/billing/invoices/create.ts', { kind: 'system', id: 'stripe' }),
+      ])
+    }
+
+    test('proposed descriptions land on eligible elements; undefined and a throw keep the TODO', HEAVY, async () => {
+      const config = describeConfig()
+      const offered: import('../src/draft.ts').DraftElementFacts[] = []
+      const messages: string[] = []
+
+      const result = await draft(config, {
+        onProgress: (message) => void messages.push(message),
+        describe: async (element) => {
+          offered.push(element)
+          if (element.path === 'billing.invoices') return '  Creates and stores invoices.\n'
+          if (element.path === 'billing.payments') throw new Error('boom')
+          return undefined
+        },
+      })
+
+      // Eligible: the three claiming elements, each with owned observed files.
+      // The vendor stub and the boundary element were never offered.
+      expect(offered.map((element) => element.path).sort()).toEqual([
+        'billing',
+        'billing.invoices',
+        'billing.payments',
+      ])
+      const invoices = offered.find((element) => element.path === 'billing.invoices')
+      expect(invoices).toEqual({
+        name: 'invoices',
+        path: 'billing.invoices',
+        declared: 'src/billing/invoices/**',
+        ownedFiles: ['src/billing/invoices/create.ts'],
+      })
+
+      // The proposal replaced the TODO, trimmed; the rest kept theirs, and the
+      // structure (claims, edges) is untouched.
+      expect(result.describeAttempted).toBe(3)
+      expect(result.described).toBe(1)
+      expect(result.text).toContain(`description 'Creates and stores invoices.'`)
+      expect(result.text).toContain(`sources 'src/billing/invoices/**'`)
+      expect(result.text.match(/TODO: what is this component responsible for\?/g)).toHaveLength(2)
+      expect(result.text).toContain('TODO: split these packages')
+      expect(result.text).toContain('only at the boundary')
+
+      // The narration matches the run: a count, then one line per element.
+      expect(messages).toContain('describe: 3 elements')
+      expect(messages).toContain('describe: app.billing.invoices...')
+      expect(messages).toContainEqual(
+        expect.stringMatching(/^describe: app\.billing\.invoices done, \d+\.\ds$/),
+      )
+      expect(messages).toContainEqual(
+        expect.stringMatching(/^describe: app\.billing kept the TODO, \d+\.\ds$/),
+      )
+      expect(messages).toContainEqual(
+        expect.stringMatching(/^describe: app\.billing\.payments failed, boom, \d+\.\ds$/),
+      )
+
+      // A described draft still gates green: describe edits description text only.
+      const gate = await runPipeline(pipelineConfig(config))
+      expect(gate.modelErrors).toEqual([])
+      expect(errors(gate.findings)).toEqual([])
+    })
+
+    test('fragment elements are eligible, with the containing file as their owned file', HEAVY, async () => {
+      const compose = 'src/stack/compose.yml'
+      const config = stubConfig([
+        file(compose),
+        file(`${compose}#services.web`),
+        file(`${compose}#services.api`),
+        dependency(1, `${compose}#services.web`, { kind: 'file', id: `${compose}#services.api` }),
+      ])
+      const offered: string[] = []
+
+      const result = await draft(config, {
+        describe: async (element) => {
+          offered.push(element.path)
+          expect(element.ownedFiles).toEqual([compose])
+          if (element.declared.endsWith('#services.web')) return 'Serves the web UI.'
+          return undefined
+        },
+      })
+
+      // The stack directory owns the plain compose observation; each fragment
+      // owns its locator, stripped to the readable file. The claimless
+      // file-container element is never offered.
+      expect(offered.sort()).toEqual([
+        'stack',
+        'stack.compose_yml.api',
+        'stack.compose_yml.web',
+      ])
+      expect(result.describeAttempted).toBe(3)
+      expect(result.described).toBe(1)
+      expect(result.text).toContain(`description 'Serves the web UI.'`)
+      expect(result.text).toContain(`sources 'src/stack/compose.yml#services.web'`)
+    })
+
+    test('without a describe callback the counts are zero and every description is the TODO', HEAVY, async () => {
+      const result = await draft(describeConfig())
+
+      expect(result.describeAttempted).toBe(0)
+      expect(result.described).toBe(0)
+      expect(result.text.match(/TODO: what is this component responsible for\?/g)).toHaveLength(3)
+    })
+  })
 })
