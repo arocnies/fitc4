@@ -51,6 +51,33 @@ import { ownerOf } from './providers/source-root.ts'
 import { count, elapsed } from './report.ts'
 import type { Observation, Progress } from './types.ts'
 
+/**
+ * The facts one drafted element offers a describe callback: everything the
+ * callback needs to propose a description, and nothing that would let it
+ * change anything else.
+ */
+export interface DraftElementFacts {
+  /** The element title, the directory, file, or fragment name as observed. */
+  name: string
+  /** The dot-joined identifier path under the wrapping system, e.g. `billing.invoices`. */
+  path: string
+  /** The `sources` claim the element declares. */
+  declared: string
+  /**
+   * Repository-relative paths of the observed files that resolve to this
+   * element, by the same longest-claim ownership the edges use. For a fragment
+   * element this is the containing file; the fragment locator is `declared`.
+   */
+  ownedFiles: string[]
+}
+
+/**
+ * Propose a description for one drafted element, or `undefined` to keep the
+ * TODO. Typed structurally here so the core stays free of `fitc4/agent`; the
+ * agent-powered implementation is `draftDescriber` in that entry point.
+ */
+export type DraftDescribe = (element: DraftElementFacts) => Promise<string | undefined>
+
 export interface DraftOptions {
   /**
    * Tag every emitted relationship as tolerated drift (the default). The
@@ -60,6 +87,16 @@ export interface DraftOptions {
   drift?: boolean
   /** The drift tag to declare and apply. Defaults to `DEFAULT_DRIFT_TAG`. */
   driftTag?: string
+  /**
+   * Replace each eligible element's TODO description with what this callback
+   * proposes from the element's own facts. Eligible means a declared `sources`
+   * claim plus at least one owned observed file; claimless containers, the
+   * boundary elements, and the vendor stub keep their placeholders. Advisory
+   * by design: a callback that returns `undefined` or throws keeps the TODO
+   * and never fails the draft. Descriptions stay a draft-time proposal, since
+   * the gate only ever critiques descriptions, never rewrites them.
+   */
+  describe?: DraftDescribe
   /**
    * Narration hook, same contract as `PipelineConfig.onProgress`: one plain
    * line per scan provider start and completion, wired to stderr by the CLI.
@@ -80,6 +117,10 @@ export interface DraftResult {
   edges: number
   /** External package names claimed by the stub element. */
   packages: number
+  /** Elements offered to the `describe` callback; 0 when none was configured. */
+  describeAttempted: number
+  /** Elements whose TODO description the callback replaced. */
+  described: number
 }
 
 /** The extensions LikeC4 treats as model files. */
@@ -136,6 +177,8 @@ interface DraftElement {
   prefix?: string
   /** The `sources` value to declare, when the element claims one. */
   declared?: string
+  /** A proposed description from the `describe` callback; TODO otherwise. */
+  description?: string
   /** Nested child elements: split subdirectories, files, fragments. */
   children: DraftElement[]
   /** Deterministic ordering key inside the parent scope. */
@@ -199,6 +242,8 @@ export async function draft(
 
   const edges = draftEdges(observations, elements, packages, vendorId, externals)
 
+  const describeCounts = await describeElements(elements, observations, options.describe, narrate)
+
   const text = render(elements, externals, edges, packages, vendorId, drift ? driftTag : undefined)
   const placement = place(config, text)
 
@@ -208,7 +253,84 @@ export async function draft(
     elements: countElements(elements) + externals.length + (vendorId === undefined ? 0 : 1),
     edges: edges.length,
     packages: packages.length,
+    ...describeCounts,
   }
+}
+
+/**
+ * Run the optional describe pass over the eligible drafted elements.
+ *
+ * Eligibility is having something to describe from: a declared `sources`
+ * claim and at least one observed file resolving to it, which covers
+ * directory elements, root catch-alls, and fragment elements. Claimless
+ * containers have no files of their own, and the boundary and vendor stubs
+ * are not `DraftElement`s at all, so none of them are offered. The pass only
+ * ever edits description text: claims, structure, and edges are already
+ * fixed, so a misbehaving callback cannot change what the draft gates.
+ *
+ * Advisory throughout: `undefined` and a thrown callback both keep the TODO,
+ * narrated but never fatal. A draft with placeholder descriptions is exactly
+ * as correct as one without the pass.
+ */
+async function describeElements(
+  elements: DraftElement[],
+  observations: Observation[],
+  describe: DraftDescribe | undefined,
+  narrate: Progress | undefined,
+): Promise<{ describeAttempted: number; described: number }> {
+  if (describe === undefined) return { describeAttempted: 0, described: 0 }
+
+  const prefixes = claimedPrefixes(elements)
+  const owned = new Map<string, Set<string>>()
+  for (const observation of observations) {
+    if (observation.kind !== 'file' || observation.subject?.kind !== 'file') continue
+    const subjectId = observation.subject.id
+    const owner = ownerOf(subjectId, prefixes)
+    if (owner.status !== 'resolved') continue
+    // A fragment subject resolves onto its fragment element, but what the
+    // describer can read is the containing file, so the locator is stripped;
+    // the fragment itself rides along as the element's declared claim.
+    const hash = subjectId.indexOf('#')
+    const filePath = hash === -1 ? subjectId : subjectId.slice(0, hash)
+    if (!owned.has(owner.elementId)) owned.set(owner.elementId, new Set())
+    owned.get(owner.elementId)?.add(filePath)
+  }
+
+  const eligible: { element: DraftElement; declared: string; ownedFiles: string[] }[] = []
+  const collect = (scope: DraftElement[]): void => {
+    for (const element of scope) {
+      const files = owned.get(element.path)
+      if (element.declared !== undefined && files !== undefined && files.size > 0) {
+        eligible.push({ element, declared: element.declared, ownedFiles: [...files].sort() })
+      }
+      collect(element.children)
+    }
+  }
+  collect(elements)
+
+  narrate?.(`describe: ${count(eligible.length, 'element')}`)
+
+  let described = 0
+  for (const { element, declared, ownedFiles } of eligible) {
+    narrate?.(`describe: app.${element.path}...`)
+    const started = Date.now()
+    try {
+      const proposed = await describe({ name: element.name, path: element.path, declared, ownedFiles })
+      if (proposed !== undefined && proposed.trim() !== '') {
+        element.description = proposed.trim()
+        described += 1
+        narrate?.(`describe: app.${element.path} done, ${elapsed(started)}`)
+      } else {
+        narrate?.(`describe: app.${element.path} kept the TODO, ${elapsed(started)}`)
+      }
+    } catch (error) {
+      // Advisory tier: the failure is narrated with its cause and the element
+      // keeps its TODO, because a describe pass must never fail the draft.
+      narrate?.(`describe: app.${element.path} failed, ${messageOf(error)}, ${elapsed(started)}`)
+    }
+  }
+
+  return { describeAttempted: eligible.length, described }
 }
 
 /** All elements in a subtree, the element itself included. */
@@ -537,16 +659,7 @@ function draftEdges(
   vendorId: string | undefined,
   externals: DraftExternal[],
 ): DraftEdge[] {
-  const prefixes: { elementId: string; prefix: string; declared: string }[] = []
-  const collect = (scope: DraftElement[]): void => {
-    for (const element of scope) {
-      if (element.prefix !== undefined && element.declared !== undefined) {
-        prefixes.push({ elementId: element.path, prefix: element.prefix, declared: element.declared })
-      }
-      collect(element.children)
-    }
-  }
-  collect(elements)
+  const prefixes = claimedPrefixes(elements)
 
   const externalIds = new Map(
     externals.map((external) => [`${external.kind} ${external.targetId}`, external.elementId]),
@@ -597,6 +710,27 @@ function sameOrNestedPath(a: string, b: string): boolean {
   return a === b || a.startsWith(`${b}.`) || b.startsWith(`${a}.`)
 }
 
+/**
+ * Every claiming element's ownership prefix, in `ownerOf` shape, so the edge
+ * resolution and the describe pass judge ownership by the exact same rule the
+ * gate will.
+ */
+function claimedPrefixes(
+  elements: DraftElement[],
+): { elementId: string; prefix: string; declared: string }[] {
+  const prefixes: { elementId: string; prefix: string; declared: string }[] = []
+  const collect = (scope: DraftElement[]): void => {
+    for (const element of scope) {
+      if (element.prefix !== undefined && element.declared !== undefined) {
+        prefixes.push({ elementId: element.path, prefix: element.prefix, declared: element.declared })
+      }
+      collect(element.children)
+    }
+  }
+  collect(elements)
+  return prefixes
+}
+
 /** A LikeC4-safe identifier: sanitized, keyword-mangled, deduplicated. */
 function identifier(name: string, taken: Set<string>): string {
   let id = name.replace(/[^A-Za-z0-9_]/g, '_')
@@ -619,7 +753,7 @@ function quoted(value: string): string {
 
 function renderElement(element: DraftElement, indent: string): string[] {
   const lines = [`${indent}${element.id} = component ${quoted(element.name)} {`]
-  lines.push(`${indent}  description ${quoted(TODO_DESCRIPTION)}`)
+  lines.push(`${indent}  description ${quoted(element.description ?? TODO_DESCRIPTION)}`)
   if (element.declared !== undefined) {
     lines.push(`${indent}  metadata {`)
     lines.push(`${indent}    sources ${quoted(element.declared)}`)

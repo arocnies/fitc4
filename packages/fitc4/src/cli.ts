@@ -9,9 +9,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { closestName, findConfig, resolveConfig } from './config.ts'
-import { draft } from './draft.ts'
+import { draft, type DraftDescribe } from './draft.ts'
 import { messageOf } from './errors.ts'
-import { init } from './init.ts'
+import { init, INIT_AGENTS, type InitAgent } from './init.ts'
 import { runPipeline } from './pipeline.ts'
 import { pipelineConfig } from './defaults.ts'
 import { count, exitCodeFor, renderReport } from './report.ts'
@@ -22,7 +22,9 @@ Commands:
   (none)           Check the code against the LikeC4 architecture model.
   init             Scaffold fitc4.config.json, a starter arch/model.c4, and
                    an AGENTS.md with the fitc4 norms in the current
-                   directory. Never overwrites existing files.
+                   directory. Never overwrites existing files. With --agent,
+                   scaffolds a fitc4.config.mts module config instead, wired
+                   to that agent CLI and ready for draft --describe.
   draft            Run the configured scan providers and write a first-draft
                    model.c4 into the configured model directory. Elements
                    mirror the structure the observations report: a directory
@@ -34,7 +36,8 @@ Commands:
                    green and the drift line counts the debt down; untagging
                    an edge blesses it. A draft to rewrite, never a sync.
                    Never overwrites: if any model file exists, the draft is
-                   printed to stdout instead.
+                   printed to stdout instead. With --describe, the config's
+                   agent exec proposes each element's description.
 
 Options:
   --config <path>  Path to a fitc4 config (.ts, .mts, .js, .mjs, or .json).
@@ -42,8 +45,16 @@ Options:
                    those names in ./, then in ./.fitc4/, then the same in
                    each ancestor. Two configs in one directory is an error.
   --json           Emit the full result as JSON instead of a report.
+  --agent <cli>    With init: scaffold a fitc4.config.mts wired to 'claude'
+                   or 'codex'. The exec runs your own CLI on your own login
+                   and billing.
   --no-drift       With draft: emit plain relationships instead of
                    drift-tagged ones.
+  --describe       With draft: replace each eligible element's TODO
+                   description with one or two sentences proposed by the
+                   config's agent exec from the files the element owns. A
+                   failed call keeps the TODO; the draft never fails over a
+                   description.
   --quiet          Suppress the progress narration. Narration goes to stderr,
                    so the report and --json output are unaffected either way.
   --version        Print the version.
@@ -76,10 +87,21 @@ interface Arguments {
   configPath: string | undefined
   json: boolean
   noDrift: boolean
+  describe: boolean
+  agent: InitAgent | undefined
   quiet: boolean
 }
 
-const KNOWN_OPTIONS = ['--help', '--version', '--config', '--json', '--no-drift', '--quiet']
+const KNOWN_OPTIONS = [
+  '--help',
+  '--version',
+  '--config',
+  '--json',
+  '--agent',
+  '--no-drift',
+  '--describe',
+  '--quiet',
+]
 const KNOWN_COMMANDS = ['init', 'draft']
 
 /**
@@ -98,6 +120,8 @@ function parseArguments(argv: string[]): Arguments {
     configPath: undefined,
     json: false,
     noDrift: false,
+    describe: false,
+    agent: undefined,
     quiet: false,
   }
 
@@ -112,6 +136,20 @@ function parseArguments(argv: string[]): Arguments {
       parsed.json = true
     } else if (argument === '--no-drift') {
       parsed.noDrift = true
+    } else if (argument === '--describe') {
+      parsed.describe = true
+    } else if (argument === '--agent') {
+      index += 1
+      const value = argv[index]
+      // The value decides which CLI the scaffolded config bills against, so a
+      // missing or unknown one is an error, never a silent default.
+      if (value === undefined || !(INIT_AGENTS as readonly string[]).includes(value)) {
+        throw new Error(
+          `--agent requires one of: ${INIT_AGENTS.join(', ')}` +
+            (value === undefined ? '' : `; got '${value}'`),
+        )
+      }
+      parsed.agent = value as InitAgent
     } else if (argument === '--quiet') {
       parsed.quiet = true
     } else if (argument === '--config') {
@@ -137,6 +175,12 @@ function parseArguments(argv: string[]): Arguments {
   if (parsed.noDrift && parsed.command !== 'draft') {
     throw new Error('--no-drift only applies to the draft command')
   }
+  if (parsed.describe && parsed.command !== 'draft') {
+    throw new Error('--describe only applies to the draft command')
+  }
+  if (parsed.agent !== undefined && parsed.command !== 'init') {
+    throw new Error('--agent only applies to the init command')
+  }
 
   return parsed
 }
@@ -149,8 +193,8 @@ function unknownArgument(what: string, argument: string, known: string[]): strin
   )
 }
 
-function runInit(): void {
-  const result = init(process.cwd())
+function runInit(options: Arguments): void {
+  const result = init(process.cwd(), options.agent === undefined ? {} : { agent: options.agent })
   const lines = [
     ...result.created.map((file) => `created ${file}`),
     ...result.skipped.map((file) => `kept ${file} (already exists)`),
@@ -176,8 +220,27 @@ function narrationFor(options: Arguments): ((message: string) => void) | undefin
 
 async function runDraft(options: Arguments): Promise<void> {
   const configPath = options.configPath ?? findConfig(process.cwd())
-  const result = await draft(await resolveConfig(configPath), {
+  const config = await resolveConfig(configPath)
+
+  let describe: DraftDescribe | undefined
+  if (options.describe) {
+    if (config.agent === undefined) {
+      throw new Error(
+        `--describe needs an agent exec, and ${configPath} declares none. ` +
+          `The exec lives in a module config: run 'fitc4 init --agent claude' (or codex) in a ` +
+          `fresh project, or add an 'agent' field to your fitc4.config.ts/.mts ` +
+          `(see docs/agent-providers.md)`,
+      )
+    }
+    // Imported dynamically on purpose: the core CLI path stays free of agent
+    // code unless the user explicitly asked for the describe pass.
+    const { draftDescriber } = await import('./agent/describe.ts')
+    describe = draftDescriber({ exec: config.agent, repositoryRoot: config.repositoryRoot })
+  }
+
+  const result = await draft(config, {
     drift: !options.noDrift,
+    ...(describe === undefined ? {} : { describe }),
     onProgress: narrationFor(options),
   })
 
@@ -193,6 +256,12 @@ async function runDraft(options: Arguments): Promise<void> {
           `untag an edge to bless it`,
       )
     }
+  }
+  if (options.describe) {
+    lines.push(
+      `described ${result.described} of ${count(result.describeAttempted, 'eligible element')}; ` +
+        `the rest keep the TODO`,
+    )
   }
   lines.push(
     `${count(result.elements, 'element')}, ${count(result.edges, 'edge')}, ` +
@@ -213,7 +282,7 @@ async function main(): Promise<void> {
     return
   }
   if (options.command === 'init') {
-    runInit()
+    runInit(options)
     return
   }
   if (options.command === 'draft') {

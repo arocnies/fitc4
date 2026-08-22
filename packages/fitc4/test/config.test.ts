@@ -117,6 +117,15 @@ describe('rejecting a malformed config', () => {
     )
   })
 
+  // The same module-only boundary, worded for what 'agent' actually is: not a
+  // provider array, but still a function JSON cannot carry.
+  test('an agent field in JSON is named as a module-form feature', () => {
+    expect(() => loadConfig(writeConfig({ ...VALID, agent: { id: 'x' } }))).toThrow(
+      'only available in the module config forms (.ts/.mts/.js/.mjs). ' +
+        'An agent exec is a function, which JSON cannot carry',
+    )
+  })
+
   test('malformed JSON names the file', () => {
     const configPath = writeConfig('{ not json')
     expect(() => loadConfig(configPath)).toThrow(configPath)

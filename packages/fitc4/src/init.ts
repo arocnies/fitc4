@@ -29,6 +29,20 @@ export interface InitResult {
   notes: string[]
 }
 
+/** The agent CLIs `init --agent` can scaffold a config around. */
+export const INIT_AGENTS = ['claude', 'codex'] as const
+export type InitAgent = (typeof INIT_AGENTS)[number]
+
+export interface InitOptions {
+  /**
+   * Scaffold a `fitc4.config.mts` module config wired to this agent CLI
+   * instead of the JSON config. `.mts` on purpose: it loads as an ES module in
+   * ESM and CommonJS packages alike (see `CONFIG_FILENAMES` in config.ts).
+   * Everything else init does is identical.
+   */
+  agent?: InitAgent
+}
+
 export const MODEL_DIR = 'arch'
 export const MODEL_FILENAME = 'model.c4'
 export const AGENTS_FILENAME = 'AGENTS.md'
@@ -42,6 +56,70 @@ const CONFIG_TEMPLATE = `{
   "tsconfig": "tsconfig.json"
 }
 `
+
+export const AGENT_CONFIG_FILENAME = 'fitc4.config.mts'
+
+/** The exec line per agent CLI. Both models measured perfect in the evals. */
+const AGENT_EXEC_LINES: Record<InitAgent, string> = {
+  claude: `const exec = cached(claudeCli({ model: 'sonnet' }))`,
+  codex: `const exec = cached(codexCli({ model: 'gpt-5.6-luna' }))`,
+}
+
+const AGENT_EXEC_IMPORTS: Record<InitAgent, string> = {
+  claude: 'cached, claudeCli',
+  codex: 'cached, codexCli',
+}
+
+/**
+ * The module config `init --agent` scaffolds: the worked composition from
+ * docs/agent-providers.md, ready to run. Deliberately lean. This becomes the
+ * user's config to own, so it carries the composition and the one-line
+ * reasons, not a tutorial.
+ */
+function agentConfigTemplate(agent: InitAgent): string {
+  return `import { defaultResolve, defaultValidate, defineConfig } from 'fitc4'
+import { agentResolve, agentSemanticReview, ${AGENT_EXEC_IMPORTS[agent]} } from 'fitc4/agent'
+
+// This model measured perfect in the fitc4 evals. The exec runs your own
+// ${agent} CLI, on your own login and billing; cached() makes reruns with
+// unchanged inputs free.
+${AGENT_EXEC_LINES[agent]}
+
+export default defineConfig({
+  version: 1,
+  repositoryRoot: '.',
+  model: '${MODEL_DIR}',
+  scanRoots: ['src'],
+  tsconfig: 'tsconfig.json',
+
+  // The exec commands use directly, e.g. fitc4 draft --describe.
+  agent: exec,
+
+  // A present phase replaces the defaults, so each spreads them back in.
+  resolve: [...defaultResolve, agentResolve({ exec })],
+  validate: [...defaultValidate, agentSemanticReview({ exec })],
+
+  // An agent scan can observe domains no parser covers (compose files,
+  // runbooks), but a scan is only as good as its domain-specific
+  // instructions: write yours before enabling this. Add agentScan to the
+  // fitc4/agent import, and typescriptImports plus
+  // TYPESCRIPT_IMPORTS_PROVIDER_ID to the fitc4 import, since a present scan
+  // phase replaces the default scanner.
+  // scan: [
+  //   {
+  //     id: TYPESCRIPT_IMPORTS_PROVIDER_ID,
+  //     run: typescriptImports({ tsconfigPath: 'tsconfig.json', roots: ['src'] }),
+  //   },
+  //   agentScan({
+  //     exec,
+  //     id: 'compose',
+  //     roots: ['deploy'],
+  //     instructions: 'TODO: say, in prose, exactly what to observe and how to cite it.',
+  //   }),
+  // ],
+})
+`
+}
 
 const MODEL_TEMPLATE = `specification {
   element system
@@ -90,7 +168,7 @@ const AGENTS_TEMPLATE = `# Agent instructions
   server: \`claude mcp add likec4 -- npx likec4 mcp --stdio\`
 `
 
-export function init(directory: string): InitResult {
+export function init(directory: string, options: InitOptions = {}): InitResult {
   const target = path.resolve(directory)
 
   // Only this directory blocks init. An ancestor's config governs a parent
@@ -109,8 +187,18 @@ export function init(directory: string): InitResult {
 
   const result: InitResult = { created: [], skipped: [], notes: [] }
 
-  fs.writeFileSync(path.join(target, CONFIG_FILENAME), CONFIG_TEMPLATE)
-  result.created.push(CONFIG_FILENAME)
+  if (options.agent === undefined) {
+    fs.writeFileSync(path.join(target, CONFIG_FILENAME), CONFIG_TEMPLATE)
+    result.created.push(CONFIG_FILENAME)
+  } else {
+    fs.writeFileSync(path.join(target, AGENT_CONFIG_FILENAME), agentConfigTemplate(options.agent))
+    result.created.push(AGENT_CONFIG_FILENAME)
+    result.notes.push(
+      `${AGENT_CONFIG_FILENAME} is a module config: it composes the ${options.agent} CLI as ` +
+        `resolve and validate providers and declares it as the config's agent exec, ` +
+        `so fitc4 draft --describe works out of the box`,
+    )
+  }
 
   const modelPath = path.join(target, MODEL_DIR, MODEL_FILENAME)
   const modelRelative = `${MODEL_DIR}/${MODEL_FILENAME}`

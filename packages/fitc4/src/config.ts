@@ -16,6 +16,11 @@ import { pathToFileURL } from 'node:url'
 import { messageOf } from './errors.ts'
 import type { NamedProvider, ResolveProvider, ScanProvider, ValidateProvider } from './types.ts'
 
+// Type-only on purpose: the core package never runtime-imports `fitc4/agent`
+// (see the layering note in agent/index.ts), and an erased import keeps it
+// that way while the config field still typechecks against the real contract.
+import type { AgentExec } from './agent/exec.ts'
+
 export const CONFIG_FILENAME = 'fitc4.config.json'
 export const CONFIG_VERSION = 1
 
@@ -91,6 +96,15 @@ export interface FitC4FileConfig {
   resolve?: NamedProvider<ResolveProvider>[]
   /** Replaces the default validate phase; spread `defaultValidate` to keep the standard rules. */
   validate?: NamedProvider<ValidateProvider>[]
+  /**
+   * The agent exec commands like `draft --describe` run on: an `AgentExec`
+   * from `fitc4/agent` (`cached(claudeCli({ ... }))` and friends). Optional
+   * and module-only, since an exec is a function. Declaring it here rather
+   * than per command means one place carries the model choice and billing
+   * surface, and the CLI can say precisely what is missing when a command
+   * needs an exec and the config has none.
+   */
+  agent?: AgentExec
 }
 
 /** A loaded config plus whichever provider phases the config file supplied. */
@@ -100,6 +114,8 @@ export interface ResolvedConfig extends FitC4Config {
     resolve?: NamedProvider<ResolveProvider>[]
     validate?: NamedProvider<ValidateProvider>[]
   }
+  /** The config file's `agent` exec, when it declared one. */
+  agent?: AgentExec
 }
 
 /**
@@ -174,6 +190,8 @@ export async function resolveConfig(configPath: string): Promise<ResolvedConfig>
   if (scan !== undefined || resolve !== undefined || validate !== undefined) {
     config.providers = { scan, resolve, validate }
   }
+  const agent = requireAgent(configPath, record)
+  if (agent !== undefined) config.agent = agent
   return config
 }
 
@@ -188,8 +206,8 @@ const SHARED_KEYS = [
   '$schema',
 ]
 
-/** The provider arrays, legal only where a function can live. */
-const MODULE_KEYS = ['scan', 'resolve', 'validate']
+/** The fields carrying functions, legal only in the module config forms. */
+const MODULE_KEYS = ['scan', 'resolve', 'validate', 'agent']
 
 /**
  * The validation shared by every config form.
@@ -280,9 +298,10 @@ function rejectUnknownKeys(
   for (const key of Object.keys(record)) {
     if (known.includes(key)) continue
     if (form === 'json' && MODULE_KEYS.includes(key)) {
+      const carries = key === 'agent' ? 'An agent exec' : 'A provider'
       throw new Error(
         `${configPath}: '${key}' is only available in the module config forms ` +
-          `(.ts/.mts/.js/.mjs). A provider is a function, which JSON cannot carry`,
+          `(.ts/.mts/.js/.mjs). ${carries} is a function, which JSON cannot carry`,
       )
     }
     const candidates = known.filter((name) => name !== '$schema')
@@ -414,6 +433,30 @@ function requireProviders<T>(
   })
 
   return value as NamedProvider<T>[]
+}
+
+/**
+ * Validate the optional `agent` exec structurally, mirroring the provider
+ * checks: a non-empty string `id` and a function `run`, nothing behavioral.
+ * A malformed exec caught here is blamed on the config that declared it. Left
+ * to surface later, it would fail inside whatever command first calls it,
+ * blamed on the wrong layer.
+ */
+function requireAgent(configPath: string, record: Record<string, unknown>): AgentExec | undefined {
+  const value = record['agent']
+  if (value === undefined) return undefined
+
+  const candidate =
+    typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined
+  const id = candidate?.['id']
+  const run = candidate?.['run']
+  if (candidate === undefined || typeof id !== 'string' || id.trim() === '' || typeof run !== 'function') {
+    throw new Error(
+      `${configPath}: 'agent' must be an agent exec with a string 'id' and a function 'run', ` +
+        `such as cached(claudeCli({ model: 'sonnet' })) from 'fitc4/agent'`,
+    )
+  }
+  return value as AgentExec
 }
 
 function requireStringArray(

@@ -81,6 +81,13 @@ export interface DraftExpectations {
   /** Every relationship of the reference model, as (from, to) pairs. */
   edges: DraftExpectedEdge[]
   /**
+   * True when the fixture's spec opts into the describe pass. Adds a
+   * `draft-descriptions` row: every matched claiming element must carry a
+   * description that is not the TODO placeholder, since a described draft
+   * with a leftover TODO means a describe call was dropped or refused.
+   */
+  describe?: boolean
+  /**
    * Drafted output the reference never declares but today's draft is known
    * to emit: the artifacts of mirroring the observed dependency graph where
    * the reference chose a different granularity.
@@ -97,6 +104,7 @@ interface DraftedElement {
   id: string
   title: string
   sources?: string
+  description?: string
 }
 
 interface DraftedEdge {
@@ -134,6 +142,11 @@ function parseDraft(text: string): { elements: DraftedElement[]; edges: DraftedE
     const sources = /^ +sources (['"])(.*)\1$/.exec(line)
     if (sources !== null && current !== undefined) {
       current.sources = sources[2]
+      continue
+    }
+    const description = /^ +description (['"])(.*)\1$/.exec(line)
+    if (description !== null && current !== undefined) {
+      current.description = description[2]
       continue
     }
     const edge = /^ {2}app\.([A-Za-z0-9_.]+) -> app\.([A-Za-z0-9_.]+)(?: \{ #[^}]+ \})? \/\//.exec(line)
@@ -257,6 +270,30 @@ export function scoreDraft(
     )
   }
 
+  // --- descriptions: every matched claiming element must be described ---
+  const rows = [edgeRow, elementRow]
+  if (expectations.describe === true) {
+    const descriptionRow: ProviderScore = {
+      provider: 'draft-descriptions',
+      hits: 0,
+      misses: 0,
+      extras: 0,
+      notes: [],
+    }
+    for (const element of matchedElements) {
+      if (element.sources === undefined) continue
+      if (element.description !== undefined && !element.description.startsWith('TODO')) {
+        descriptionRow.hits += 1
+      } else {
+        descriptionRow.misses += 1
+        descriptionRow.notes.push(
+          `undescribed element: ${referenceName.get(element.id) ?? element.title} kept the TODO`,
+        )
+      }
+    }
+    rows.push(descriptionRow)
+  }
+
   // Pinned misses and extras stay out of the per-item notes (a deliberately
   // humbling fixture would drown the scorecard); one summary line per row
   // keeps them visible without the noise.
@@ -269,5 +306,5 @@ export function scoreDraft(
     }
   }
 
-  return { fixture, providers: [edgeRow, elementRow].sort((a, b) => a.provider.localeCompare(b.provider)) }
+  return { fixture, providers: rows.sort((a, b) => a.provider.localeCompare(b.provider)) }
 }

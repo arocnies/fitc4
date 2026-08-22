@@ -6,11 +6,12 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterAll, describe, expect, test } from 'vitest'
 
-import { loadConfig } from '../src/config.ts'
+import { loadConfig, resolveConfig } from '../src/config.ts'
 import { pipelineConfig } from '../src/defaults.ts'
-import { init } from '../src/init.ts'
+import { AGENT_CONFIG_FILENAME, init } from '../src/init.ts'
 import { runPipeline } from '../src/pipeline.ts'
 
 const roots: string[] = []
@@ -112,5 +113,97 @@ describe('init', () => {
     // The author merges the norms themselves — the note says where from.
     expect(result.notes.join('\n')).toContain('#for-ai-agents')
     expect(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8')).toBe('# House rules\n')
+  })
+})
+
+describe('init --agent', () => {
+  test('scaffolds a module config wired to the claude CLI, everything else identical', () => {
+    const root = scratch()
+
+    const result = init(root, { agent: 'claude' })
+
+    // The .mts replaces the JSON config; model and AGENTS.md are unchanged.
+    expect(result.created).toEqual([AGENT_CONFIG_FILENAME, 'arch/model.c4', 'AGENTS.md'])
+    expect(fs.existsSync(path.join(root, 'fitc4.config.json'))).toBe(false)
+
+    const config = fs.readFileSync(path.join(root, AGENT_CONFIG_FILENAME), 'utf8')
+    // The measured-perfect model, one shared exec, declared as the agent.
+    expect(config).toContain(`const exec = cached(claudeCli({ model: 'sonnet' }))`)
+    expect(config).toContain('agent: exec,')
+    expect(config).toContain('resolve: [...defaultResolve, agentResolve({ exec })]')
+    expect(config).toContain('validate: [...defaultValidate, agentSemanticReview({ exec })]')
+    // agentScan ships commented out: a fail-closed scanner with placeholder
+    // instructions would be worse than none.
+    expect(config).not.toMatch(/^\s{2}scan:/m)
+    expect(config).toContain('// scan: [')
+    expect(config).toContain('write yours before enabling this')
+
+    // The agent path says what changed: a module config, and draft --describe.
+    expect(result.notes.join('\n')).toContain('module config')
+    expect(result.notes.join('\n')).toContain('fitc4 draft --describe')
+  })
+
+  test('scaffolds the codex CLI around its measured model', () => {
+    const root = scratch()
+    init(root, { agent: 'codex' })
+
+    const config = fs.readFileSync(path.join(root, AGENT_CONFIG_FILENAME), 'utf8')
+    expect(config).toContain(`const exec = cached(codexCli({ model: 'gpt-5.6-luna' }))`)
+    expect(config).toContain('agentResolve({ exec })')
+  })
+
+  // The template is a working config, not pseudocode: rewrite its package
+  // specifiers to the real entry modules and load it through the same
+  // resolveConfig the CLI uses. A named import the entry points do not export
+  // fails right here, at module link time.
+  test.each(['claude', 'codex'] as const)(
+    'the scaffolded %s template loads through resolveConfig',
+    async (agent) => {
+      const root = scratch()
+      init(root, { agent })
+
+      const configPath = path.join(root, AGENT_CONFIG_FILENAME)
+      const template = fs.readFileSync(configPath, 'utf8')
+      expect(template).toContain(`from 'fitc4'`)
+      expect(template).toContain(`from 'fitc4/agent'`)
+
+      const indexUrl = pathToFileURL(path.join(import.meta.dirname, '..', 'src', 'index.ts')).href
+      const agentUrl = pathToFileURL(
+        path.join(import.meta.dirname, '..', 'src', 'agent', 'index.ts'),
+      ).href
+      fs.writeFileSync(
+        configPath,
+        template.replace(`from 'fitc4/agent'`, `from '${agentUrl}'`).replace(`from 'fitc4'`, `from '${indexUrl}'`),
+      )
+
+      const resolved = await resolveConfig(configPath)
+      expect(resolved.agent?.id).toBe(agent === 'claude' ? 'claude-cli/sonnet' : 'codex-cli/gpt-5.6-luna')
+      // Defaults spread plus one agent provider per extended phase; scan absent.
+      expect(resolved.providers?.resolve?.map((provider) => provider.id)).toEqual([
+        'source-root',
+        'agent-resolve',
+      ])
+      expect(resolved.providers?.validate?.map((provider) => provider.id)).toEqual([
+        'architecture-rules',
+        'agent-semantic-review',
+      ])
+      expect(resolved.providers?.scan).toBeUndefined()
+      expect(resolved.scanRoots).toEqual(['src'])
+    },
+  )
+
+  test('never overwrites: any existing config form still blocks init --agent', () => {
+    const root = scratch()
+    fs.writeFileSync(path.join(root, 'fitc4.config.json'), '{}\n')
+
+    expect(() => init(root, { agent: 'claude' })).toThrow(/already configured/)
+    expect(fs.existsSync(path.join(root, AGENT_CONFIG_FILENAME))).toBe(false)
+  })
+
+  test('a scaffolded .mts blocks a later plain init the same way', () => {
+    const root = scratch()
+    init(root, { agent: 'codex' })
+
+    expect(() => init(root)).toThrow(/already configured: fitc4\.config\.mts/)
   })
 })

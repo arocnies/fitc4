@@ -196,6 +196,38 @@ describe('rejecting a malformed config module', () => {
     expect(result.findings.map((finding) => finding.ruleId)).toEqual(['custom/advice'])
   })
 
+  test('a config with an agent exec carries it on the resolved config', async () => {
+    const configPath = writeConfigFile(
+      'fitc4.config.js',
+      moduleSource(
+        'ok',
+        `  agent: { id: 'stub/model', run: async () => ({ ok: false, error: 'never called' }) },\n`,
+      ),
+    )
+
+    const resolved = await resolveConfig(configPath)
+
+    expect(resolved.agent?.id).toBe('stub/model')
+    expect(typeof resolved.agent?.run).toBe('function')
+    // The agent field alone composes no providers.
+    expect(resolved.providers).toBeUndefined()
+  })
+
+  // The same structural strictness as the provider arrays: a malformed exec is
+  // the config's error to fix here, not a crash inside whatever command first
+  // calls it.
+  test.each([
+    ['a non-object', `  agent: 'claude',\n`],
+    ['a missing run function', `  agent: { id: 'stub' },\n`],
+    ['a blank id', `  agent: { id: ' ', run: async () => ({ ok: false, error: 'x' }) },\n`],
+  ])('an agent exec that is %s is an error', async (_label, extra) => {
+    const configPath = writeConfigFile('fitc4.config.js', moduleSource('ok', extra))
+
+    await expect(resolveConfig(configPath)).rejects.toThrow(
+      "'agent' must be an agent exec with a string 'id' and a function 'run'",
+    )
+  })
+
   // The module form gets the same strictness as JSON: a compiler may have
   // seen the file, but nothing forces the author to run one.
   test('the shared fields are validated as strictly as JSON', async () => {

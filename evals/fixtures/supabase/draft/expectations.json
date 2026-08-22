@@ -1,4 +1,5 @@
 {
+  "describe": true,
   "elements": [
     { "name": "studio", "sources": "docker/docker-compose.yml#services.studio" },
     { "name": "apiGw", "sources": "docker/docker-compose.yml#services.api-gw" },

@@ -33,7 +33,14 @@ import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
 import { draft, runPipeline, type PipelineConfig, type ResolvedConfig } from 'fitc4'
-import { cached, claudeCli, codexCli, DEFAULT_CLAUDE_MODEL, type AgentExec } from 'fitc4/agent'
+import {
+  cached,
+  claudeCli,
+  codexCli,
+  DEFAULT_CLAUDE_MODEL,
+  draftDescriber,
+  type AgentExec,
+} from 'fitc4/agent'
 
 import { scoreDraft, type DraftExpectations } from './harness/draft.ts'
 import { externalManifest, hasCheckout } from './harness/external.ts'
@@ -191,13 +198,24 @@ for (const fixture of selected) {
   try {
     // A draft fixture runs `draft()` against the composed config, no model in
     // sight, and scores the drafted text against the reference expectations.
+    // A spec that also exports `describe = true` opts into the describe pass:
+    // the fixture's exec doubles as the draft describer, and the scorer then
+    // asserts described elements carry non-TODO descriptions.
     // Everything else runs the pipeline exactly as before.
     if (fs.existsSync(path.join(root, 'draft.eval.ts'))) {
       const expectations = readJson(path.join(root, 'expectations.json')) as DraftExpectations
       const specModule = (await import(pathToFileURL(path.join(root, 'draft.eval.ts')).href)) as {
         default: DraftFixtureSpec
+        describe?: boolean
       }
-      const result = await draft(await specModule.default(execFor(fixture), root))
+      const exec = execFor(fixture)
+      const config = await specModule.default(exec, root)
+      const result = await draft(
+        config,
+        specModule.describe === true
+          ? { describe: draftDescriber({ exec, repositoryRoot: config.repositoryRoot }) }
+          : {},
+      )
       score = scoreDraft(fixture, expectations, result)
     } else {
       const expectations = readJson(path.join(root, 'expectations.json')) as Expectations

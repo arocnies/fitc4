@@ -55,3 +55,4 @@ export {
   PROVIDER_ID as AGENT_SEMANTIC_REVIEW_PROVIDER_ID,
   type SemanticReviewOptions,
 } from './semantic-review.ts'
+export { draftDescriber, type DraftDescriberOptions } from './describe.ts'

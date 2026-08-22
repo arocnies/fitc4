@@ -65,6 +65,8 @@ A failed provider contributes nothing, not even a half-scan. The other providers
 
 ### A worked config
 
+`npx fitc4 init --agent claude` (or `codex`) scaffolds this composition as a ready-to-run `fitc4.config.mts` in a fresh project: the shared cached exec, the agent resolve and semantic-review providers spread onto the defaults, the exec declared as the config's `agent` for `draft --describe`, and the `agentScan` example commented out until you have written real instructions for it.
+
 ```ts
 import { defineConfig, defaultValidate, typescriptImports, TYPESCRIPT_IMPORTS_PROVIDER_ID } from 'fitc4'
 import { agentScan, cached, claudeCli, codexCli } from 'fitc4/agent'
@@ -163,6 +165,12 @@ Same discipline as `agentScan`, same rationale stated the other way around: a re
 - the reply names an `elementId` that does not exist in the model, or maps one decision twice.
 
 Accepted mappings carry provenance in each fanned-out association's `data` (`{ agent, candidateId, reason? }`). The association's own fields fill the standard envelope: `source`, `target`, `relationship`, `status`. Every validator therefore works against the contract without knowing an agent was involved. The prefilled context (catalog + decisions) is deterministic, so `cached()` composes unchanged. Like `agentScan`, the `id` option suffixes the provider id (`agent-resolve:<id>`) so multiple instances with different instructions coexist.
+
+## Drafting descriptions: `draftDescriber` and `fitc4 draft --describe`
+
+`draftDescriber({ exec, repositoryRoot })` builds the `describe` callback `draft()` accepts: per drafted element that claims sources and owns at least one observed file, one one-shot schema-bound call proposing a one-or-two-sentence description from a context pack of the element's owned files (fragment elements are described from their containing file, with the locator in the prompt). The CLI wires it up as `fitc4 draft --describe`, using the module config's `agent` exec.
+
+The guardrail: the agent proposes descriptions only at draft time; the gate only critiques descriptions, never rewrites them. Accordingly the pass is advisory end to end. A failed exec, an off-schema reply, or an empty proposal keeps the element's TODO placeholder and never fails the draft, and the pass can touch nothing but description text. The context is deterministic, so `cached()` re-describes only the elements whose files changed. To count the TODOs left after a draft, the opt-in `missingDescriptions()` validate rule in the core package makes each one an info finding.
 
 ## Cost and nondeterminism
 

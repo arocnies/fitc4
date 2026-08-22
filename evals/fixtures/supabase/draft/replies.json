@@ -434,5 +434,93 @@
         "docker/docker-compose.yml"
       ]
     }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.studio'"
+    },
+    "reply": {
+      "description": "Serves the Supabase Studio dashboard, the web UI for managing the stack."
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.api-gw'"
+    },
+    "reply": {
+      "description": "The Kong API gateway; routes every external request to the service behind it."
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.auth'"
+    },
+    "reply": {
+      "description": "The GoTrue authentication service; manages users and issues the tokens the stack trusts."
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.rest'"
+    },
+    "reply": {
+      "description": "PostgREST; exposes the database as a REST API."
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.realtime'"
+    },
+    "reply": {
+      "description": "Streams database changes to clients over websockets."
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.storage'"
+    },
+    "reply": {
+      "description": "The storage API; stores and serves files, delegating image work to imgproxy."
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.imgproxy'"
+    },
+    "reply": {
+      "description": "Transforms and resizes images on behalf of the storage service."
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.meta'"
+    },
+    "reply": {
+      "description": "postgres-meta; exposes database metadata for Studio to manage the schema."
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.functions'"
+    },
+    "reply": {
+      "description": "The edge functions runtime; executes user-deployed functions."
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.db'"
+    },
+    "reply": {
+      "description": "The Postgres database every other service reads and writes."
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "claiming 'docker/docker-compose.yml#services.supavisor'"
+    },
+    "reply": {
+      "description": "The connection pooler in front of the Postgres database."
+    }
   }
 ]
