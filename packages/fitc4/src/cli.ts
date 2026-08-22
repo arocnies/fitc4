@@ -229,7 +229,7 @@ async function runDraft(options: Arguments): Promise<void> {
         `--describe needs an agent exec, and ${configPath} declares none. ` +
           `The exec lives in a module config: run 'fitc4 init --agent claude' (or codex) in a ` +
           `fresh project, or add an 'agent' field to your fitc4.config.ts/.mts ` +
-          `(see docs/agent-providers.md)`,
+          `(see node_modules/fitc4/README.md#agent-providers)`,
       )
     }
     // Imported dynamically on purpose: the core CLI path stays free of agent
