@@ -58,7 +58,9 @@ export interface DraftExpectedElement {
   /**
    * Substrings this element's drafted description must contain,
    * case-insensitive. Every entry must appear, so the description has to name
-   * the element's real responsibility rather than merely be non-empty.
+   * the element's real responsibility rather than merely be non-empty. An
+   * entry may offer alternatives as `a|b`, satisfied by any one of them, so a
+   * rule tests the concept and not one spelling of it.
    */
   describeMust?: string[]
   /**
@@ -264,7 +266,15 @@ function describeViolations(
   const haystack = description.toLowerCase()
   const broken: string[] = []
   for (const required of expected?.describeMust ?? []) {
-    if (!haystack.includes(required.toLowerCase())) broken.push(`never says '${required}'`)
+    // `a|b` accepts either wording, so a rule measures the concept rather
+    // than one spelling of it: an element that is the process entry point is
+    // described correctly whether the model writes "entry point" or
+    // "entrypoint", and failing a right answer over a hyphen would make the
+    // oracle a vocabulary test.
+    const alternatives = required.split('|').map((option) => option.trim().toLowerCase())
+    if (!alternatives.some((option) => option !== '' && haystack.includes(option))) {
+      broken.push(`never says '${required}'`)
+    }
   }
   for (const forbidden of expected?.describeMustNot ?? []) {
     if (haystack.includes(forbidden.toLowerCase())) broken.push(`says '${forbidden}'`)

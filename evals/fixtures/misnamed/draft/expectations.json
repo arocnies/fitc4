@@ -16,7 +16,7 @@
     {
       "name": "entrypoint",
       "sources": "src/legacy/**",
-      "describeMust": ["entry point"],
+      "describeMust": ["entry point|entrypoint|only main"],
       "describeMustNot": ["deprecated", "obsolete", "no longer", "superseded", "backwards compatibility"]
     }
   ],

@@ -90,7 +90,7 @@ Stub mode gates this fixture exactly like the others: the recorded ideal scan mu
 
 So an element may now carry two more fields, and the vocabulary is deliberately tiny:
 
-- **`describeMust`** is substrings the description must contain, case-insensitive, all of them. A description that never says `authoriz` did not read `src/cache/`.
+- **`describeMust`** is substrings the description must contain, case-insensitive, all of them. A description that never says `authoriz` did not read `src/cache/`. One entry may offer alternatives as `a|b|c`, satisfied by any one of them, so `entry point|entrypoint|only main` tests whether the model identified the process entry point rather than whether it hyphenated the word the way we did.
 - **`describeMustNot`** is substrings it must not contain. These name the wrong concept (`caching`, `utility`, `deprecated`), never the misleading directory name itself: the describe prompt shows the model its `sources` claim, so a correct description is free to mention `src/cache` while saying the element authorizes. Forbidding the bare name would fail a right answer for quoting the path it was given.
 
 An element with neither keeps the presence-only check, so a fixture that declares no rules scores exactly as before; `supabase/draft` still reads `draft-descriptions 11 0 0 ok`. The traps are fair rather than clever: the code is short and says plainly what it does, so a careful reader gets all three right every time, and stub mode replays the descriptions such a reader would write. Unlike every other draft row, live mode here is expected to be *able* to fail. A live miss on this fixture is the measurement working.
