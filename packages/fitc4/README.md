@@ -15,7 +15,23 @@ npm install --save-dev fitc4
 npx fitc4 init
 ```
 
-`init` scaffolds `fitc4.config.json`, a starter `arch/model.c4` whose single element owns `src/**` so the very first check is green, and an `AGENTS.md` carrying the norms below. Split the placeholder into real components from there, or let [`draft`](#draft-a-model-from-existing-code) replace it wholesale: the starter model's first line marks it as a placeholder, and a draft may overwrite a model directory holding nothing but that. Edit it and it is yours, marker or not. `init` never overwrites existing files. `npx fitc4 init --agent claude` (or `codex`) scaffolds a `fitc4.config.mts` module config instead, declaring one shared cached exec around that CLI's measured model as the config's `agent`, so `fitc4 draft --describe` works immediately. The [agent gate providers](#agent-providers) ship commented out in that file, one uncomment away with the trade stated in place: composing them makes every `fitc4` run call your CLI, which bills per run and fails in CI without a login. The exec runs your own CLI on your own login and billing. Everything else init does is identical. Requires Node >= 22.22.3 (the CLI loads `.ts` configs with Node's native type stripping) and a `tsconfig.json`, whose module resolution the scanner uses. `fitc4` depends on `likec4` as a caret range (`^1.59.2`), so it dedupes with the likec4 your project already installs; an advisory CI leg runs the suite against `likec4@latest` so skew with new releases surfaces there, not in your install.
+`init` writes three files and never overwrites an existing one: `fitc4.config.json`, a starter `arch/model.c4` whose single element owns `src/**` so the very first check is green, and an `AGENTS.md` carrying [the norms](#for-ai-agents). Split the placeholder into real components from there, or let [`draft`](#draft-a-model-from-existing-code) replace it wholesale.
+
+On a brownfield repository the whole path to green is five commands and one edit:
+
+```sh
+npm install --save-dev fitc4
+npx fitc4 init --agent codex     # or claude, or plain init for the JSON config
+npx fitc4 draft --describe       # writes a model from your code
+                                 # then edit arch/model.c4: untag the edges you bless
+npx fitc4
+```
+
+**With `--agent claude` or `--agent codex`**, init scaffolds a `fitc4.config.mts` instead, declaring one shared cached exec around that CLI's measured model as the config's `agent`, so [`draft --describe`](#draft-a-model-from-existing-code) works immediately. The exec runs your own CLI on your own login and billing. No [agent provider](#agent-providers) joins the gate itself, because that would make every `fitc4` run call your CLI, which bills per run and fails in CI without a login. Everything else init does is identical.
+
+**Requirements.** Node >= 22.22.3, since the CLI loads `.ts` configs with Node's native type stripping, and a `tsconfig.json`, whose module resolution the scanner uses.
+
+**Install weight.** `fitc4`'s own build is under 1 MB, but it depends on `likec4` for model parsing, and that package is a CLI and dev server as well as a library, so a fresh install lands around 138 MB: likec4's `@likec4/icons`, `esbuild`, `vite`, `rolldown`, and `playwright` come along for a scan that touches none of them. The dependency is a caret range (`^1.59.2`) so it dedupes with the likec4 your project already installs, which is the common case for a repository that authors LikeC4 models, and an advisory CI leg runs the suite against `likec4@latest` so skew with new releases surfaces there rather than in your install.
 
 The pieces, whether scaffolded or written by hand:
 
@@ -98,6 +114,16 @@ That exit 1 is the product: the gate that fails exactly where code and contract 
 `--json` emits the full result instead of the report. `--config <path>` overrides discovery, which otherwise checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json`, first in the working directory and then under `.fitc4/`, repeating up each ancestor. Two configs in one directory is an error rather than a silent choice.
 
 The module forms default-export the same fields (wrap them in `defineConfig` for editor types) plus optional provider arrays. That is how the agent providers below are composed in. They load as ES modules, so in a CommonJS package (no `"type": "module"`), name the config `fitc4.config.mts`. If your tsconfig typechecks the config file, keep `skipLibCheck: true`. LikeC4's own declarations do not pass a strict lib check.
+
+The optional `severity` map promotes or softens individual rules, and works in the JSON form as well as the module forms, since it carries only strings:
+
+```json
+"severity": { "unmapped-source": "error" }
+```
+
+The [standard severities](#rules) assume adoption: new unowned code is a `warning` nudge rather than a broken build. That map is how a team done adopting closes the door, and unowned code fails the gate from then on. `{ "unused-drift": "error" }` means a drift edge the code no longer exercises fails until it is deleted from the model, so [declared drift](#tolerated-drift) can only shrink. An unknown rule id is an error, not an ignored key, because a typo'd promotion that silently does nothing is a team believing their gate is closed when it is open.
+
+It tunes the default rules provider, so a module config that also supplies its own `validate` array is an error rather than a silently ignored map. Pass the severities to the provider directly in that case: `validate: [architectureRules({ severity: { ... } })]`.
 
 The optional `viewerBaseUrl` links findings into a published LikeC4 viewer. Publish one with `likec4 build --use-hash-history -o <dir>` to any static host (GitHub Pages works) and set `viewerBaseUrl` to where it is served, ending in `#/` for a hash-history build. Each finding in `--json` then carries a `link` to the most specific view showing the elements involved, the index view otherwise, so a finding pasted into an issue lands on the diagram. The text report only adds a `viewer:` footer line. With no host, `likec4 build --output-single-file` makes a single HTML file that works as a CI artifact.
 
@@ -271,6 +297,10 @@ The one norm an agent cannot infer from the CLI: **the model is the contract. Ed
   any model change explicitly when handing off.
 - Never delete `sources` metadata or a declared relationship to make a finding
   go away. That removes code from architecture control entirely.
+- Never soften a rule in the config's `severity` map to make a finding go
+  away. Promoting a rule is a team decision about how strict the gate is;
+  demoting one to get a green run is the same evasion as deleting the
+  relationship, one layer up.
 - Rule reference: `node_modules/fitc4/README.md#rules`. Structured output:
   `npx fitc4 --json`.
 ```

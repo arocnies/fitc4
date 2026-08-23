@@ -143,25 +143,30 @@ describe('init --agent', () => {
     // The measured-perfect model, one shared exec, declared as the agent.
     expect(config).toContain(`const exec = cached(claudeCli({ model: 'sonnet' }))`)
     expect(config).toContain('agent: exec,')
-    // The gate providers ship commented out: composing them would make every
-    // plain `fitc4` run bill a live call and fail in CI without a login.
+    // No gate provider is composed: doing so would make every plain `fitc4`
+    // run bill a live call and fail in CI without a login. The caveat is
+    // stated, and the composition lives in the README.
     expect(config).not.toMatch(/^\s{2}resolve:/m)
     expect(config).not.toMatch(/^\s{2}validate:/m)
-    expect(config).toContain('// resolve: [...defaultResolve, agentResolve({ exec })]')
-    expect(config).toContain('// validate: [...defaultValidate, agentSemanticReview({ exec })]')
     expect(config).toContain('bills per run')
     expect(config).toContain('--config')
-    // agentScan ships commented out too: a fail-closed scanner with
-    // placeholder instructions would be worse than none.
+    expect(config).toContain('README.md#agent-providers')
     expect(config).not.toMatch(/^\s{2}scan:/m)
-    expect(config).toContain('// scan: [')
-    expect(config).toContain('write yours before enabling this')
 
-    // The agent path says what changed: a module config, draft --describe, and
-    // the caveat on the providers it deliberately did not compose.
-    expect(result.notes.join('\n')).toContain('module config')
+    // Nothing ships commented out. Thirty of fifty lines of switched-off
+    // configuration made the first file a user opens read as a tutorial, and
+    // commented code asks to be uncommented before it is understood.
+    const commentedConfig = config
+      .split('\n')
+      .filter((line) => /^\s*\/\/\s*(resolve|validate|scan|agent):/.test(line))
+    expect(commentedConfig).toEqual([])
+    expect(config.split('\n').length).toBeLessThan(32)
+
+    // The agent path says what changed: the exec, draft --describe, and the
+    // caveat on the providers it deliberately did not compose.
+    expect(result.notes.join('\n')).toContain("config's agent exec")
     expect(result.notes.join('\n')).toContain('fitc4 draft --describe')
-    expect(result.notes.join('\n')).toContain('commented out')
+    expect(result.notes.join('\n')).toContain('fail in CI without a login')
   })
 
   test('scaffolds the codex CLI around its measured model', () => {
@@ -170,8 +175,50 @@ describe('init --agent', () => {
 
     const config = fs.readFileSync(path.join(root, AGENT_CONFIG_FILENAME), 'utf8')
     expect(config).toContain(`const exec = cached(codexCli({ model: 'gpt-5.6-luna' }))`)
-    expect(config).toContain('// resolve: [...defaultResolve, agentResolve({ exec })]')
     expect(config).toContain('call your codex CLI')
+    expect(config).toContain('README.md#agent-providers')
+  })
+
+  test('addresses its agent notes and AGENTS.md to the CLI that was chosen', () => {
+    const codexRoot = scratch()
+    const codexNotes = init(codexRoot, { agent: 'codex' }).notes.join('\n')
+    const codexAgents = fs.readFileSync(path.join(codexRoot, 'AGENTS.md'), 'utf8')
+
+    // The shipped skill is Claude Code's format, so a codex user is never
+    // told to copy it, and the MCP command is codex's own.
+    expect(codexNotes).toContain('codex mcp add likec4 -- npx likec4 mcp --stdio')
+    expect(codexNotes).not.toContain('.claude/skills')
+    expect(codexNotes).not.toContain('claude mcp add')
+    expect(codexAgents).toContain('codex mcp add likec4')
+    expect(codexAgents).not.toContain('.claude/skills')
+
+    const claudeRoot = scratch()
+    const claudeNotes = init(claudeRoot, { agent: 'claude' }).notes.join('\n')
+    const claudeAgents = fs.readFileSync(path.join(claudeRoot, 'AGENTS.md'), 'utf8')
+    expect(claudeNotes).toContain('.claude/skills')
+    expect(claudeNotes).toContain('claude mcp add likec4')
+    expect(claudeNotes).not.toContain('codex mcp add')
+    expect(claudeAgents).toContain('.claude/skills')
+
+    // With no agent named the reader is unknown, so both are listed.
+    const plainRoot = scratch()
+    init(plainRoot)
+    const plainAgents = fs.readFileSync(path.join(plainRoot, 'AGENTS.md'), 'utf8')
+    expect(plainAgents).toContain('.claude/skills')
+    expect(plainAgents).toContain('codex mcp add likec4')
+  })
+
+  test('tells a JSON-config user the actual move, since an exec cannot go in JSON', () => {
+    const root = scratch()
+    init(root)
+
+    // "Edit it" is right for a second plain init and wrong here: there is
+    // nothing to edit an exec into.
+    expect(() => init(root, { agent: 'codex' })).toThrow(/cannot go in JSON/)
+    expect(() => init(root, { agent: 'codex' })).toThrow(/Delete fitc4\.config\.json and rerun/)
+    expect(() => init(root, { agent: 'codex' })).toThrow(/keeps your existing/)
+    // A second plain init keeps the original advice.
+    expect(() => init(root)).toThrow(/Edit it, or delete it first to start over/)
   })
 
   // The template is a working config, not pseudocode: rewrite its package

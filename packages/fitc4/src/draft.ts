@@ -125,6 +125,14 @@ export interface DraftResult {
   text: string
   /** Absolute path written, or undefined when writing was refused. */
   written?: string
+  /**
+   * True when the written path held `init`'s untouched placeholder, so the
+   * draft replaced a file rather than creating one. Reported because a user
+   * who ran `init` seconds ago and reads "created" has no way to tell whether
+   * their file was overwritten, and "created" for a replacement is a lie
+   * about the one case where this tool does overwrite anything.
+   */
+  replacedPlaceholder?: boolean
   /** Why the draft was not written, when a model file already exists. */
   refusal?: string
   /** Elements drafted, the vendor stub and boundary elements included. */
@@ -289,6 +297,9 @@ export async function draft(
   return {
     text,
     ...(written === undefined ? {} : { written }),
+    ...(written !== undefined && decision.replacedPlaceholder === true
+      ? { replacedPlaceholder: true }
+      : {}),
     ...(refusal === undefined ? {} : { refusal }),
     elements: countElements(elements) + externals.length + (vendorId === undefined ? 0 : 1),
     edges: edges.length,
@@ -671,7 +682,10 @@ function observedExternals(observations: Observation[]): DraftExternal[] {
     if (target === undefined) continue
     if (target.kind === 'file' || target.kind === 'directory' || target.kind === 'module') continue
     if (target.id.trim() === '') continue
-    seen.set(`${target.kind} ${target.id}`, {
+    // Keyed on kind and id joined by NUL, which neither field can contain.
+    // The `\0` escape, never a literal NUL byte: a raw one makes this whole
+    // file read as binary to grep and everything built on it.
+    seen.set(`${target.kind}\0${target.id}`, {
       kind: target.kind,
       targetId: target.id,
       elementId: '',
@@ -711,7 +725,7 @@ function draftEdges(
   const prefixes = claimedPrefixes(elements)
 
   const externalIds = new Map(
-    externals.map((external) => [`${external.kind} ${external.targetId}`, external.elementId]),
+    externals.map((external) => [`${external.kind}\0${external.targetId}`, external.elementId]),
   )
   const claimed = new Set(packages)
   const counts = new Map<string, DraftEdge>()
@@ -744,7 +758,7 @@ function draftEdges(
         bump(from.elementId, vendorId, false)
       }
     } else if (target.kind !== 'directory') {
-      const externalId = externalIds.get(`${target.kind} ${target.id}`)
+      const externalId = externalIds.get(`${target.kind}\0${target.id}`)
       if (externalId !== undefined) bump(from.elementId, externalId, true)
     }
   }
@@ -922,13 +936,17 @@ function render(
  * that never carried the marker. The draft replaces the placeholder in place
  * rather than writing `model.c4` beside a renamed one, so no orphan is left.
  */
-function placement(config: ResolvedConfig): { target?: string; refusal?: string } {
+function placement(config: ResolvedConfig): {
+  target?: string
+  refusal?: string
+  replacedPlaceholder?: boolean
+} {
   const existing = existingModelFiles(config.modelDir)
   const modelDir = path.relative(config.repositoryRoot, config.modelDir).split(path.sep).join('/')
 
   const only = existing.length === 1 ? existing[0] : undefined
   if (only !== undefined && isPlaceholderModel(path.join(config.modelDir, only))) {
-    return { target: path.join(config.modelDir, only) }
+    return { target: path.join(config.modelDir, only), replacedPlaceholder: true }
   }
 
   if (existing.length > 0) {

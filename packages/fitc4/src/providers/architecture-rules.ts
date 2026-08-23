@@ -50,23 +50,33 @@ export const PROVIDER_ID = 'architecture-rules'
  */
 export const EVIDENCE_LIMIT = 10
 
-/** Every rule these checks can emit, in the standard-severity order of the docs. */
-export type ArchitectureRuleId =
-  | 'missing-relationship'
-  | 'relationship-direction'
-  | 'ambiguous-source'
-  | 'invalid-sources'
-  | 'unmatched-sources'
-  | 'invalid-packages'
-  | 'ambiguous-package'
-  | 'unmatched-packages'
-  | 'unmapped-source'
-  | 'unresolved-import'
-  | 'drift-relationship'
-  | 'unused-drift'
-  | 'unobserved-elements'
-  | 'duplicate-relationship'
-  | 'unknown-observation-kind'
+/**
+ * Every rule these checks can emit, in the standard-severity order of the docs.
+ *
+ * A runtime array rather than a bare type union, because the JSON config's
+ * `severity` map is validated against it: a `severity` key naming a rule that
+ * does not exist must be an error, and a type union cannot say so at runtime.
+ * The type is derived from the array so the two cannot drift.
+ */
+export const ARCHITECTURE_RULE_IDS = [
+  'missing-relationship',
+  'relationship-direction',
+  'ambiguous-source',
+  'invalid-sources',
+  'unmatched-sources',
+  'invalid-packages',
+  'ambiguous-package',
+  'unmatched-packages',
+  'unmapped-source',
+  'unresolved-import',
+  'drift-relationship',
+  'unused-drift',
+  'unobserved-elements',
+  'duplicate-relationship',
+  'unknown-observation-kind',
+] as const
+
+export type ArchitectureRuleId = (typeof ARCHITECTURE_RULE_IDS)[number]
 
 /** The default tag marking a relationship as tolerated drift. */
 export const DEFAULT_DRIFT_TAG = 'drift'

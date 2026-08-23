@@ -14,7 +14,19 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { messageOf } from './errors.ts'
-import type { NamedProvider, ResolveProvider, ScanProvider, ValidateProvider } from './types.ts'
+import {
+  ARCHITECTURE_RULE_IDS,
+  type ArchitectureRuleId,
+} from './providers/architecture-rules.ts'
+import {
+  isSeverity,
+  SEVERITIES,
+  type NamedProvider,
+  type ResolveProvider,
+  type ScanProvider,
+  type Severity,
+  type ValidateProvider,
+} from './types.ts'
 
 // Type-only on purpose: the core package never runtime-imports `fitc4/agent`
 // (see the layering note in agent/index.ts), and an erased import keeps it
@@ -62,6 +74,11 @@ export interface FitC4Config {
    * Absent means the feature is off.
    */
   viewerBaseUrl?: string
+  /**
+   * Per-rule severity overrides for the default architecture rules. Absent
+   * means the standard severities apply.
+   */
+  severity?: Partial<Record<ArchitectureRuleId, Severity>>
 }
 
 /**
@@ -85,6 +102,25 @@ export interface FitC4FileConfig {
   tsconfig: string
   /** Base URL of a published LikeC4 viewer; findings link into it when set. */
   viewerBaseUrl?: string
+  /**
+   * How load-bearing each architecture rule is, overriding the standard
+   * severities. The standard set assumes adoption: new unowned code is a
+   * `warning` nudge rather than a broken build. A team done adopting writes
+   * `"severity": { "unmapped-source": "error" }` and unowned code fails the
+   * gate from then on.
+   *
+   * Deliberately legal in the JSON form, unlike the provider arrays. This is
+   * the one piece of rule tuning a team reaches for while adopting, and
+   * putting it behind a module config meant converting the file and
+   * re-spreading `defaultValidate` to change one word. It carries only
+   * strings, so JSON can hold it.
+   *
+   * Tunes the DEFAULT rules provider only. A config that also supplies
+   * `validate` has replaced that provider, so the two together are an error
+   * rather than a silently ignored field: pass the map to
+   * `architectureRules({ severity })` in the array instead.
+   */
+  severity?: Partial<Record<ArchitectureRuleId, Severity>>
   /**
    * Replaces the default scan phase entirely. The default scanner is built
    * from `tsconfig` and `scanRoots`. Rebuild it with
@@ -190,6 +226,18 @@ export async function resolveConfig(configPath: string): Promise<ResolvedConfig>
   if (scan !== undefined || resolve !== undefined || validate !== undefined) {
     config.providers = { scan, resolve, validate }
   }
+  // 'severity' tunes the default rules provider, and 'validate' replaces that
+  // provider. Together, the map would apply to nothing. Silently ignoring it
+  // is the fail-open the rest of this module refuses: a team would read their
+  // own config as a promoted gate that never promoted anything.
+  if (validate !== undefined && config.severity !== undefined) {
+    throw new Error(
+      `${configPath}: 'severity' and 'validate' cannot both be set. 'severity' tunes the ` +
+        `default architecture-rules provider, and 'validate' replaces it, so the map would ` +
+        `apply to nothing. Pass it to the provider instead: ` +
+        `validate: [architectureRules({ severity: { ... } })]`,
+    )
+  }
   const agent = requireAgent(configPath, record)
   if (agent !== undefined) config.agent = agent
   return config
@@ -203,6 +251,7 @@ const SHARED_KEYS = [
   'scanRoots',
   'tsconfig',
   'viewerBaseUrl',
+  'severity',
   '$schema',
 ]
 
@@ -244,6 +293,7 @@ function validateFields(
   }
 
   const viewerBaseUrl = optionalViewerBaseUrl(configPath, record)
+  const severity = optionalSeverity(configPath, record)
 
   return {
     repositoryRoot: resolve('repositoryRoot'),
@@ -251,7 +301,51 @@ function validateFields(
     scanRoots,
     tsconfigPath: resolve('tsconfig'),
     ...(viewerBaseUrl === undefined ? {} : { viewerBaseUrl }),
+    ...(severity === undefined ? {} : { severity }),
   }
+}
+
+/**
+ * Validate the optional per-rule severity map.
+ *
+ * Both halves are checked against the real vocabulary. An unknown rule id is
+ * an error rather than an ignored key, because a typo'd `unmaped-source` that
+ * silently does nothing is a team believing their gate was promoted when it
+ * was not, which is the fail-open this whole config module exists to prevent.
+ * Rule ids are suggested on a near miss, the same courtesy as a typo'd field.
+ */
+function optionalSeverity(
+  configPath: string,
+  record: Record<string, unknown>,
+): Partial<Record<ArchitectureRuleId, Severity>> | undefined {
+  const value = record['severity']
+  if (value === undefined) return undefined
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(
+      `${configPath}: 'severity' must be an object mapping rule ids to ` +
+        `${SEVERITIES.join(', ')}, such as { "unmapped-source": "error" }`,
+    )
+  }
+
+  const known: readonly string[] = ARCHITECTURE_RULE_IDS
+  const map: Partial<Record<ArchitectureRuleId, Severity>> = {}
+  for (const [rule, level] of Object.entries(value)) {
+    if (!known.includes(rule)) {
+      const suggestion = closestName(rule, [...ARCHITECTURE_RULE_IDS])
+      throw new Error(
+        `${configPath}: 'severity' names unknown rule '${rule}'` +
+          (suggestion === undefined ? '' : `, did you mean '${suggestion}'?`) +
+          ` (see node_modules/fitc4/README.md#rules)`,
+      )
+    }
+    if (!isSeverity(level)) {
+      throw new Error(
+        `${configPath}: 'severity.${rule}' must be one of ${SEVERITIES.join(', ')}`,
+      )
+    }
+    map[rule as ArchitectureRuleId] = level
+  }
+  return map
 }
 
 /**

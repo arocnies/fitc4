@@ -325,11 +325,11 @@ describe('init --agent', () => {
 
     expect(status).toBe(0)
     expect(stdout).toContain('created fitc4.config.mts')
-    expect(stdout).toContain('module config')
+    expect(stdout).toContain("config's agent exec")
     // The next step is the point of this path, and the caveat is stated here
     // too, not only inside the file.
     expect(stdout).toContain('Next: npx fitc4 draft --describe')
-    expect(stdout).toContain('commented out')
+    expect(stdout).toContain('fail in CI without a login')
     expect(fs.readFileSync(path.join(directory, 'fitc4.config.mts'), 'utf8')).toContain(
       `claudeCli({ model: 'sonnet' })`,
     )
@@ -361,7 +361,10 @@ describe('init', () => {
     const { status, stdout } = runCli(['draft'], directory)
 
     expect(status).toBe(0)
-    expect(stdout).toContain('created arch/model.c4')
+    // "created" here would hide the one case where a draft overwrites a file,
+    // from the reader most likely to wonder whether theirs was clobbered.
+    expect(stdout).toContain("replaced arch/model.c4 (it held init's untouched placeholder)")
+    expect(stdout).not.toContain('created arch/model.c4')
     const model = fs.readFileSync(path.join(directory, 'arch', 'model.c4'), 'utf8')
     expect(model).not.toContain('fitc4 init placeholder')
     expect(model).toContain(`sources 'src/**'`)
