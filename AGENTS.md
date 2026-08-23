@@ -30,5 +30,5 @@ This is the property the whole tool exists for, and most of its rules exist beca
 
 - Treat `example/arch/model.c4` as a design contract, not an implementation scratch file. Keep module boundaries and relationship ownership explicit in it.
 - Keep implementation changes separate from architecture changes unless the design contract itself is changing.
-- `fitc4.config.json` belongs at a project's root. `.fitc4/` is a supported fallback for the config only. The model stays visible, wherever `model` points.
+- `fitc4.config.mts` belongs at a project's root. `.fitc4/` is a supported fallback for the config only. The model stays visible, wherever `model` points.
 - `fitc4` depends on TypeScript 6 for the compiler API; `example` typechecks with TypeScript 7.

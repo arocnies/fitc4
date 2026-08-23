@@ -22,7 +22,12 @@
 
 import path from 'node:path'
 
-import type { ResolvedConfig } from 'fitc4'
+import {
+  architectureRules,
+  sourceRoot,
+  typescriptImports,
+  type ResolvedConfig,
+} from 'fitc4'
 import type { AgentExec } from 'fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
@@ -47,10 +52,11 @@ export default function ddhDraft(_exec: AgentExec, root: string): ResolvedConfig
     repositoryRoot: work,
     // Fresh and empty, so draft's never-overwrite rule has nothing to trip on.
     modelDir: path.join(work, 'draft'),
-    // The same scan root the gate variants' fitc4.config.json declares.
-    scanRoots: ['src'],
-    tsconfigPath: path.join(work, 'tsconfig.json'),
-    // No providers: `pipelineConfig` composes the default typescript-imports
-    // scanner, which is the point. The exec parameter is never used.
+    // The stock scanner over the same root the gate variants' config
+    // declares, which is the point: stub and live mode run the identical
+    // free scan. The exec parameter is never used.
+    scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
+    resolve: [sourceRoot()],
+    validate: [architectureRules()],
   }
 }

@@ -1,13 +1,14 @@
 /**
  * `fitc4 init`: set a project up for a first green run.
  *
- * Drops the files a project needs: a `fitc4.config.json`, a starter
- * `arch/model.c4` whose single element owns `src/**`, so the very first
- * `npx fitc4` is green rather than a wall of unowned files, and an
- * `AGENTS.md` carrying the one norm a coding agent cannot infer from the CLI:
- * the model is the contract, not a knob for silencing findings. The starter
- * model is a placeholder to split, not a suggestion of shape, and it says so
- * in its first line: see `MODEL_PLACEHOLDER_MARKER`.
+ * Drops the files a project needs: a `fitc4.config.mts` naming the standard
+ * phases explicitly, a starter `arch/model.c4` whose single element owns
+ * `src/**`, so the very first `npx fitc4` is green rather than a wall of
+ * unowned files, and an `AGENTS.md` carrying the one norm a coding agent
+ * cannot infer from the CLI: the model is the contract, not a knob for
+ * silencing findings. The starter model is a placeholder to split, not a
+ * suggestion of shape, and it says so in its first line: see
+ * `MODEL_PLACEHOLDER_MARKER`.
  *
  * Never overwrites: an existing config is an error (running init twice is a
  * mistake worth stopping), an existing model file or AGENTS.md is kept with a
@@ -36,10 +37,9 @@ export type InitAgent = (typeof INIT_AGENTS)[number]
 
 export interface InitOptions {
   /**
-   * Scaffold a `fitc4.config.mts` module config wired to this agent CLI
-   * instead of the JSON config. `.mts` on purpose: it loads as an ES module in
-   * ESM and CommonJS packages alike (see `CONFIG_FILENAMES` in config.ts).
-   * Everything else init does is identical.
+   * Also declare this agent CLI as the config's `agent` exec, so
+   * `fitc4 draft --describe` works immediately. Everything else init does is
+   * identical.
    */
   agent?: InitAgent
 }
@@ -47,18 +47,6 @@ export interface InitOptions {
 export const MODEL_DIR = 'arch'
 export const MODEL_FILENAME = 'model.c4'
 export const AGENTS_FILENAME = 'AGENTS.md'
-
-const CONFIG_TEMPLATE = `{
-  "$schema": "./node_modules/fitc4/schema/fitc4.config.schema.json",
-  "version": 1,
-  "repositoryRoot": ".",
-  "model": "${MODEL_DIR}",
-  "scanRoots": ["src"],
-  "tsconfig": "tsconfig.json"
-}
-`
-
-export const AGENT_CONFIG_FILENAME = 'fitc4.config.mts'
 
 /** The exec line per agent CLI. Both models measured perfect in the evals. */
 const AGENT_EXEC_LINES: Record<InitAgent, string> = {
@@ -72,53 +60,54 @@ const AGENT_EXEC_IMPORTS: Record<InitAgent, string> = {
 }
 
 /**
- * The module config `init --agent` scaffolds: an exec declared once, and
- * nothing that spends money until a command asks for it.
+ * The config `init` scaffolds. Every line is live configuration, and the
+ * phases are written out in full: what runs is what the file names, so
+ * reading the config is reading the gate. This becomes the user's file to
+ * own, so it carries their settings, never a tutorial.
  *
- * Every line here is live configuration. An earlier version shipped the agent
- * gate providers and an `agentScan` example commented out in place, thirty of
- * fifty lines, and the first file a new user opened had more configuration
- * switched off than on. Commented-out code reads as a decision the scaffold
- * already made for you and asks to be uncommented before it is understood.
- * The trade those blocks explained is real and still stated, once, as prose at
- * the bottom, with the README carrying the composition: enabling them makes
- * every plain `npx fitc4`, the command the scaffolded AGENTS.md tells every
- * coding agent to run before handoff, bill a live call on every machine, and
- * fail in CI where no CLI is logged in. A config that bills per gate run is a
- * config a team turns off, which is worse than one they graduate into.
- *
- * This becomes the user's file to own, so it carries their settings and the
- * reasons, never a tutorial.
+ * With `--agent`, one exec is declared and nothing spends money until a
+ * command asks for it. The agent gate providers are deliberately not wired
+ * in: they would make every plain `npx fitc4`, the command the scaffolded
+ * AGENTS.md tells every coding agent to run before handoff, bill a live call
+ * on every machine and fail in CI where no CLI is logged in. A config that
+ * bills per gate run is a config a team turns off, which is worse than one
+ * they graduate into.
  */
-function agentConfigTemplate(agent: InitAgent): string {
-  return `import { defineConfig } from 'fitc4'
-import { ${AGENT_EXEC_IMPORTS[agent]} } from 'fitc4/agent'
+function configTemplate(agent: InitAgent | undefined): string {
+  const execBlock =
+    agent === undefined
+      ? ''
+      : `import { ${AGENT_EXEC_IMPORTS[agent]} } from 'fitc4/agent'
 
 // Your own ${agent} CLI, on your own login and billing. cached() makes reruns
 // with unchanged inputs free. This model measured perfect in the fitc4 evals.
 ${AGENT_EXEC_LINES[agent]}
+`
+  const agentField =
+    agent === undefined
+      ? ''
+      : `
+  // The exec commands use directly, such as fitc4 draft --describe. Declaring
+  // it costs nothing: no call happens until a command asks for one. Gate
+  // providers from fitc4/agent could join validate, but each fitc4 run would
+  // then call your ${agent} CLI: node_modules/fitc4/README.md#agent-providers
+  agent: exec,`
 
+  return `import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+${execBlock}
 export default defineConfig({
   version: 1,
   repositoryRoot: '.',
   model: '${MODEL_DIR}',
-  scanRoots: ['src'],
-  tsconfig: 'tsconfig.json',
 
-  // The exec commands use directly, such as fitc4 draft --describe. Declaring
-  // it costs nothing: no call happens until a command asks for one.
-  agent: exec,
+  // The phases are explicit: what runs is what this file names. Tune a rule
+  // on its provider, such as
+  // architectureRules({ severity: { 'unmapped-source': 'error' } })
+  // once you are done adopting: node_modules/fitc4/README.md#rules
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
+  resolve: [sourceRoot()],
+  validate: [architectureRules()],${agentField}
 })
-
-// Rule severities are tunable from here too, without touching providers:
-// severity: { 'unmapped-source': 'error' } once you are done adopting.
-//
-// Agent providers can also join the gate itself, judging each description
-// against the code or claiming files no pattern owns. They are not wired in
-// above because doing so makes every 'fitc4' run call your ${agent} CLI, which
-// bills per run and fails in CI where nothing is logged in. The usual move is
-// a second config, say fitc4.agent.config.mts, run with --config beside this
-// one. Composition and caveats: node_modules/fitc4/README.md#agent-providers
 `
 }
 
@@ -226,9 +215,9 @@ const AGENTS_NORMS = `# Agent instructions
   any model change explicitly when handing off.
 - Never delete \`sources\` metadata or a declared relationship to make a finding
   go away. That removes code from architecture control entirely.
-- Never soften a rule in the config's \`severity\` map to make a finding go
-  away. Promoting a rule is a team decision about how strict the gate is;
-  demoting one to get a green run is the same evasion as deleting the
+- Never soften a rule's severity in the config, and never remove a provider
+  from a phase, to make a finding go away. How strict the gate is belongs to
+  the team; loosening it for a green run is the same evasion as deleting the
   relationship, one layer up.
 - Rule reference: \`node_modules/fitc4/README.md#rules\`. Structured output:
   \`npx fitc4 --json\`.
@@ -245,19 +234,6 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
       const existing = path.join(location, name)
       if (fs.existsSync(existing)) {
         const found = path.relative(target, existing) || name
-        // "Edit it" is good advice for a second plain init and wrong advice
-        // for --agent on a JSON config: an exec is a function, so there is
-        // nothing to edit into JSON. Name the actual move instead. The other
-        // files init writes already exist by then, so a re-init keeps them.
-        if (options.agent !== undefined && found.endsWith('.json')) {
-          throw new Error(
-            `already configured: ${found} exists, and an agent exec cannot go in JSON. ` +
-              `Delete ${found} and rerun this command: init keeps your existing ` +
-              `${MODEL_DIR}/${MODEL_FILENAME} and ${AGENTS_FILENAME}, so only the config is ` +
-              `replaced. Or write the ${AGENT_CONFIG_FILENAME} by hand ` +
-              `(see node_modules/fitc4/README.md#agent-providers).`,
-          )
-        }
         throw new Error(
           `already configured: ${found} exists. Edit it, or delete it first to start over.`,
         )
@@ -267,17 +243,14 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
 
   const result: InitResult = { created: [], skipped: [], notes: [] }
 
-  if (options.agent === undefined) {
-    fs.writeFileSync(path.join(target, CONFIG_FILENAME), CONFIG_TEMPLATE)
-    result.created.push(CONFIG_FILENAME)
-  } else {
-    fs.writeFileSync(path.join(target, AGENT_CONFIG_FILENAME), agentConfigTemplate(options.agent))
-    result.created.push(AGENT_CONFIG_FILENAME)
+  fs.writeFileSync(path.join(target, CONFIG_FILENAME), configTemplate(options.agent))
+  result.created.push(CONFIG_FILENAME)
+  if (options.agent !== undefined) {
     result.notes.push(
-      `${AGENT_CONFIG_FILENAME} declares the ${options.agent} CLI as the config's agent exec, ` +
+      `${CONFIG_FILENAME} declares the ${options.agent} CLI as the config's agent exec, ` +
         `so fitc4 draft --describe works immediately. No agent provider joins the gate itself: ` +
         `that would call your CLI on every fitc4 run and fail in CI without a login. The ` +
-        `bottom of the file says where to read about enabling them`,
+        `config says where to read about enabling them`,
     )
   }
 
@@ -309,7 +282,7 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
     )
   }
   if (!fs.existsSync(path.join(target, 'src'))) {
-    result.notes.push(`scanRoots is ["src"] but src/ does not exist. Create it or edit scanRoots`)
+    result.notes.push(`the scaffolded scan roots are ['src'] but src/ does not exist. Create it or edit 'roots'`)
   }
 
   // Commands, not copied files: .claude/ and the MCP registry are the user's

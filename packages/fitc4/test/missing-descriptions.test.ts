@@ -1,13 +1,13 @@
 /**
  * The opt-in missing-descriptions rule: one info finding per undescribed
  * element, so a team that wants the documentation burn-down can count it.
- * Opt-in because a description is documentation, not structure, and never
- * part of `defaultValidate`.
+ * Opt-in because a description is documentation, not structure, so the
+ * scaffolded config never lists it; a team that wants it adds it to
+ * `validate` alongside `architectureRules()`.
  */
 
 import { describe, expect, test } from 'vitest'
 
-import { defaultValidate } from '../src/defaults.ts'
 import { missingDescriptions, PROVIDER_ID } from '../src/providers/missing-descriptions.ts'
 import { runFixture } from './helpers.ts'
 
@@ -62,7 +62,4 @@ describe('missingDescriptions', () => {
     expect(result.findings.map((finding) => finding.subject?.id)).toEqual(['demo'])
   })
 
-  test('is opt-in: the default validate phase does not include it', () => {
-    expect(defaultValidate.map((provider) => provider.id)).not.toContain(PROVIDER_ID)
-  })
 })

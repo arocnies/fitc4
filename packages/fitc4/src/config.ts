@@ -1,10 +1,11 @@
 /**
- * `fitc4.config.{ts,js,json}`: the project-specific inputs.
+ * `fitc4.config.{ts,mts,js,mjs}`: the project-specific inputs.
  *
- * The JSON form holds only what differs between repositories: where the code
- * is, where the model is, and which tsconfig describes module resolution. The
- * module forms carry the same fields plus optional provider phase arrays,
- * which cannot live in JSON because a provider is a function.
+ * One config form: a module whose default export names everything the
+ * pipeline runs. The phases are explicit, never defaulted. A phase that is
+ * not in the file does not run, so reading the config is reading the gate:
+ * there is no hidden composition to know about, and no merge semantics.
+ * Providers are functions, which is also why there is no JSON form.
  *
  * Every path is resolved relative to the config file, so moving the workspace
  * does not silently repoint the scan.
@@ -13,19 +14,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { messageOf } from './errors.ts'
-import {
-  ARCHITECTURE_RULE_IDS,
-  type ArchitectureRuleId,
-} from './providers/architecture-rules.ts'
-import {
-  isSeverity,
-  SEVERITIES,
-  type NamedProvider,
-  type ResolveProvider,
-  type ScanProvider,
-  type Severity,
-  type ValidateProvider,
+import { closestName, messageOf } from './errors.ts'
+import type { PipelineConfig } from './pipeline.ts'
+import type {
+  NamedProvider,
+  ResolveProvider,
+  ScanProvider,
+  ValidateProvider,
 } from './types.ts'
 
 // Type-only on purpose: the core package never runtime-imports `fitc4/agent`
@@ -33,8 +28,13 @@ import {
 // that way while the config field still typechecks against the real contract.
 import type { AgentExec } from './agent/exec.ts'
 
-export const CONFIG_FILENAME = 'fitc4.config.json'
 export const CONFIG_VERSION = 1
+
+/**
+ * The filename `init` scaffolds. `.mts` on purpose: it loads as an ES module
+ * in ESM and CommonJS packages alike.
+ */
+export const CONFIG_FILENAME = 'fitc4.config.mts'
 
 /**
  * The recognized config filenames, in discovery order.
@@ -51,43 +51,20 @@ export const CONFIG_VERSION = 1
  */
 export const CONFIG_FILENAMES = [
   'fitc4.config.ts',
-  'fitc4.config.mts',
+  CONFIG_FILENAME,
   'fitc4.config.js',
   'fitc4.config.mjs',
-  CONFIG_FILENAME,
 ] as const
 
-const MODULE_EXTENSIONS = ['.ts', '.mts', '.js', '.mjs']
-
-export interface FitC4Config {
-  /** Absolute repository root. Every reported path is relative to this. */
-  repositoryRoot: string
-  /** Absolute directory holding the LikeC4 workspace. */
-  modelDir: string
-  /** Repository-relative directories under architecture control. */
-  scanRoots: string[]
-  /** Absolute path to the tsconfig supplying compiler options. */
-  tsconfigPath: string
-  /**
-   * Base URL of a published LikeC4 viewer (`likec4 build`). When set, findings
-   * carry links into it; end it with `#/` for a `--use-hash-history` build.
-   * Absent means the feature is off.
-   */
-  viewerBaseUrl?: string
-  /**
-   * Per-rule severity overrides for the default architecture rules. Absent
-   * means the standard severities apply.
-   */
-  severity?: Partial<Record<ArchitectureRuleId, Severity>>
-}
-
 /**
- * What a `fitc4.config.ts` / `.js` module's default export must be.
+ * What a fitc4 config module's default export must be.
  *
- * The same fields as the JSON config, plus optional provider phase arrays. A
- * phase array that is present replaces the defaults for that phase entirely.
- * See `pipelineConfig`. A config that extends a phase therefore names every
- * provider it wants, default entries included.
+ * The three phase arrays are required and explicit. What runs is what the
+ * file says runs: `typescriptImports(...)` under `scan`, `sourceRoot()` under
+ * `resolve`, `architectureRules()` under `validate` is the standard gate, and
+ * a config that wants more names more. There are no defaults to remember, no
+ * spread idiom to keep the standard rules, and nothing composed in behind the
+ * file's back.
  */
 export interface FitC4FileConfig {
   /** Config format version. Always `1`; an unknown version is an error, not a silent default. */
@@ -96,60 +73,30 @@ export interface FitC4FileConfig {
   repositoryRoot: string
   /** Directory holding the LikeC4 workspace, relative to the config file. */
   model: string
-  /** Repository-relative directories under architecture control. */
-  scanRoots: string[]
-  /** Path to the tsconfig supplying compiler options, relative to the config file. */
-  tsconfig: string
   /** Base URL of a published LikeC4 viewer; findings link into it when set. */
   viewerBaseUrl?: string
-  /**
-   * How load-bearing each architecture rule is, overriding the standard
-   * severities. The standard set assumes adoption: new unowned code is a
-   * `warning` nudge rather than a broken build. A team done adopting writes
-   * `"severity": { "unmapped-source": "error" }` and unowned code fails the
-   * gate from then on.
-   *
-   * Deliberately legal in the JSON form, unlike the provider arrays. This is
-   * the one piece of rule tuning a team reaches for while adopting, and
-   * putting it behind a module config meant converting the file and
-   * re-spreading `defaultValidate` to change one word. It carries only
-   * strings, so JSON can hold it.
-   *
-   * Tunes the DEFAULT rules provider only. A config that also supplies
-   * `validate` has replaced that provider, so the two together are an error
-   * rather than a silently ignored field: pass the map to
-   * `architectureRules({ severity })` in the array instead.
-   */
-  severity?: Partial<Record<ArchitectureRuleId, Severity>>
-  /**
-   * Replaces the default scan phase entirely. The default scanner is built
-   * from `tsconfig` and `scanRoots`. Rebuild it with
-   * `typescriptImports({ tsconfigPath, roots })` if you still want import
-   * scanning alongside your own provider.
-   */
-  scan?: NamedProvider<ScanProvider>[]
-  /** Replaces the default resolve phase; spread `defaultResolve` to keep it. */
-  resolve?: NamedProvider<ResolveProvider>[]
-  /** Replaces the default validate phase; spread `defaultValidate` to keep the standard rules. */
-  validate?: NamedProvider<ValidateProvider>[]
+  /** The scan phase: what observes the code. */
+  scan: NamedProvider<ScanProvider>[]
+  /** The resolve phase: what maps observations onto model elements. */
+  resolve: NamedProvider<ResolveProvider>[]
+  /** The validate phase: what judges the associations. This is the gate. */
+  validate: NamedProvider<ValidateProvider>[]
   /**
    * The agent exec commands like `draft --describe` run on: an `AgentExec`
-   * from `fitc4/agent` (`cached(claudeCli({ ... }))` and friends). Optional
-   * and module-only, since an exec is a function. Declaring it here rather
-   * than per command means one place carries the model choice and billing
-   * surface, and the CLI can say precisely what is missing when a command
-   * needs an exec and the config has none.
+   * from `fitc4/agent` (`cached(claudeCli({ ... }))` and friends). Optional:
+   * declaring it costs nothing, since no call happens until a command asks
+   * for one. One place carries the model choice and billing surface, and the
+   * CLI can say precisely what is missing when a command needs an exec and
+   * the config has none.
    */
   agent?: AgentExec
 }
 
-/** A loaded config plus whichever provider phases the config file supplied. */
-export interface ResolvedConfig extends FitC4Config {
-  providers?: {
-    scan?: NamedProvider<ScanProvider>[]
-    resolve?: NamedProvider<ResolveProvider>[]
-    validate?: NamedProvider<ValidateProvider>[]
-  }
+/**
+ * A loaded config, paths resolved absolute. Structurally a `PipelineConfig`,
+ * so `runPipeline(config)` runs it as loaded.
+ */
+export interface ResolvedConfig extends PipelineConfig {
   /** The config file's `agent` exec, when it declared one. */
   agent?: AgentExec
 }
@@ -166,42 +113,15 @@ export function defineConfig(config: FitC4FileConfig): FitC4FileConfig {
 }
 
 /**
- * Read and validate a JSON config.
+ * Import a config module and validate its default export.
  *
- * The synchronous, JSON-only loader: importing a module config is inherently
- * async, so this is the form library callers can use inside synchronous
- * setup. The CLI goes through `resolveConfig`, which handles every form.
- */
-export function loadConfig(configPath: string): FitC4Config {
-  let raw: unknown
-  try {
-    raw = JSON.parse(fs.readFileSync(configPath, 'utf8'))
-  } catch (error) {
-    throw new Error(`Cannot read ${configPath}: ${messageOf(error)}`)
-  }
-
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    throw new Error(`${configPath}: expected a JSON object`)
-  }
-
-  return validateFields(configPath, raw as Record<string, unknown>, 'json')
-}
-
-/**
- * Load any of the three config forms.
- *
- * A `.json` path behaves exactly like `loadConfig`. A `.ts` or `.js` path is
- * imported and its default export validated with the same strictness. The
- * module form does not get a laxer contract just because a compiler already
- * saw it, since nothing forces a config author to typecheck the file. Node
- * strips types natively at this package's engines floor, so importing a `.ts`
+ * Validated with full strictness even though a compiler may have seen the
+ * file, since nothing forces a config author to typecheck it. Node strips
+ * types natively at this package's engines floor, so importing a `.ts`
  * config needs no loader.
  */
 export async function resolveConfig(configPath: string): Promise<ResolvedConfig> {
   const resolved = path.resolve(configPath)
-  if (!MODULE_EXTENSIONS.some((extension) => resolved.endsWith(extension))) {
-    return loadConfig(resolved)
-  }
 
   let module: Record<string, unknown>
   try {
@@ -219,63 +139,45 @@ export async function resolveConfig(configPath: string): Promise<ResolvedConfig>
   }
   const record = raw as Record<string, unknown>
 
-  const config: ResolvedConfig = validateFields(configPath, record, 'module')
-  const scan = requireProviders<ScanProvider>(configPath, record, 'scan')
-  const resolve = requireProviders<ResolveProvider>(configPath, record, 'resolve')
-  const validate = requireProviders<ValidateProvider>(configPath, record, 'validate')
-  if (scan !== undefined || resolve !== undefined || validate !== undefined) {
-    config.providers = { scan, resolve, validate }
-  }
-  // 'severity' tunes the default rules provider, and 'validate' replaces that
-  // provider. Together, the map would apply to nothing. Silently ignoring it
-  // is the fail-open the rest of this module refuses: a team would read their
-  // own config as a promoted gate that never promoted anything.
-  if (validate !== undefined && config.severity !== undefined) {
-    throw new Error(
-      `${configPath}: 'severity' and 'validate' cannot both be set. 'severity' tunes the ` +
-        `default architecture-rules provider, and 'validate' replaces it, so the map would ` +
-        `apply to nothing. Pass it to the provider instead: ` +
-        `validate: [architectureRules({ severity: { ... } })]`,
-    )
-  }
+  const config = validateFields(configPath, record)
   const agent = requireAgent(configPath, record)
   if (agent !== undefined) config.agent = agent
   return config
 }
 
-/** The fields every config form carries. `$schema` is the JSON editor hook. */
-const SHARED_KEYS = [
+/** The fields a config module may carry. */
+const KNOWN_KEYS = [
   'version',
   'repositoryRoot',
   'model',
-  'scanRoots',
-  'tsconfig',
   'viewerBaseUrl',
-  'severity',
-  '$schema',
+  'scan',
+  'resolve',
+  'validate',
+  'agent',
 ]
 
-/** The fields carrying functions, legal only in the module config forms. */
-const MODULE_KEYS = ['scan', 'resolve', 'validate', 'agent']
+/** What each missing phase's error suggests, ready to paste. */
+const STANDARD_PHASES: Record<string, string> = {
+  scan: `scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })]`,
+  resolve: `resolve: [sourceRoot()]`,
+  validate: `validate: [architectureRules()]`,
+}
 
 /**
- * The validation shared by every config form.
+ * The config validation.
  *
- * Deliberately strict and hand-written. A malformed config that quietly falls
- * back to defaults would scan the wrong tree and report a clean pass, the
+ * Deliberately strict and hand-written. A malformed config that quietly fell
+ * back to anything would scan the wrong tree and report a clean pass, the
  * same fail-open the pipeline works hard to avoid everywhere else. Unknown
- * keys are rejected for the same reason: a typo'd `scanRoot` that is silently
- * ignored is a scan of the wrong tree with extra confidence.
+ * keys are rejected for the same reason: a typo'd `scann` that is silently
+ * ignored is a gate with no scanner and extra confidence.
  */
-function validateFields(
-  configPath: string,
-  record: Record<string, unknown>,
-  form: 'json' | 'module',
-): FitC4Config {
-  rejectUnknownKeys(configPath, record, form)
+function validateFields(configPath: string, record: Record<string, unknown>): ResolvedConfig {
+  rejectUnknownKeys(configPath, record)
 
   if (record['version'] === undefined) {
-    throw new Error(`${configPath}: missing required field 'version' (add "version": ${CONFIG_VERSION})`)
+    throw new Error(`${configPath}: missing required field 'version' (add version: ${CONFIG_VERSION})`)
   }
   if (record['version'] !== CONFIG_VERSION) {
     throw new Error(
@@ -287,65 +189,16 @@ function validateFields(
   const resolve = (key: string): string =>
     path.resolve(base, requireString(configPath, record, key))
 
-  const scanRoots = requireStringArray(configPath, record, 'scanRoots')
-  if (scanRoots.length === 0) {
-    throw new Error(`${configPath}: scanRoots must list at least one directory`)
-  }
-
   const viewerBaseUrl = optionalViewerBaseUrl(configPath, record)
-  const severity = optionalSeverity(configPath, record)
 
   return {
     repositoryRoot: resolve('repositoryRoot'),
     modelDir: resolve('model'),
-    scanRoots,
-    tsconfigPath: resolve('tsconfig'),
     ...(viewerBaseUrl === undefined ? {} : { viewerBaseUrl }),
-    ...(severity === undefined ? {} : { severity }),
+    scan: requirePhase<ScanProvider>(configPath, record, 'scan'),
+    resolve: requirePhase<ResolveProvider>(configPath, record, 'resolve'),
+    validate: requirePhase<ValidateProvider>(configPath, record, 'validate'),
   }
-}
-
-/**
- * Validate the optional per-rule severity map.
- *
- * Both halves are checked against the real vocabulary. An unknown rule id is
- * an error rather than an ignored key, because a typo'd `unmaped-source` that
- * silently does nothing is a team believing their gate was promoted when it
- * was not, which is the fail-open this whole config module exists to prevent.
- * Rule ids are suggested on a near miss, the same courtesy as a typo'd field.
- */
-function optionalSeverity(
-  configPath: string,
-  record: Record<string, unknown>,
-): Partial<Record<ArchitectureRuleId, Severity>> | undefined {
-  const value = record['severity']
-  if (value === undefined) return undefined
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error(
-      `${configPath}: 'severity' must be an object mapping rule ids to ` +
-        `${SEVERITIES.join(', ')}, such as { "unmapped-source": "error" }`,
-    )
-  }
-
-  const known: readonly string[] = ARCHITECTURE_RULE_IDS
-  const map: Partial<Record<ArchitectureRuleId, Severity>> = {}
-  for (const [rule, level] of Object.entries(value)) {
-    if (!known.includes(rule)) {
-      const suggestion = closestName(rule, [...ARCHITECTURE_RULE_IDS])
-      throw new Error(
-        `${configPath}: 'severity' names unknown rule '${rule}'` +
-          (suggestion === undefined ? '' : `, did you mean '${suggestion}'?`) +
-          ` (see node_modules/fitc4/README.md#rules)`,
-      )
-    }
-    if (!isSeverity(level)) {
-      throw new Error(
-        `${configPath}: 'severity.${rule}' must be one of ${SEVERITIES.join(', ')}`,
-      )
-    }
-    map[rule as ArchitectureRuleId] = level
-  }
-  return map
 }
 
 /**
@@ -382,59 +235,15 @@ function optionalViewerBaseUrl(
   return trimmed
 }
 
-function rejectUnknownKeys(
-  configPath: string,
-  record: Record<string, unknown>,
-  form: 'json' | 'module',
-): void {
-  const known = form === 'module' ? [...SHARED_KEYS, ...MODULE_KEYS] : SHARED_KEYS
-
+function rejectUnknownKeys(configPath: string, record: Record<string, unknown>): void {
   for (const key of Object.keys(record)) {
-    if (known.includes(key)) continue
-    if (form === 'json' && MODULE_KEYS.includes(key)) {
-      const carries = key === 'agent' ? 'An agent exec' : 'A provider'
-      throw new Error(
-        `${configPath}: '${key}' is only available in the module config forms ` +
-          `(.ts/.mts/.js/.mjs). ${carries} is a function, which JSON cannot carry`,
-      )
-    }
-    const candidates = known.filter((name) => name !== '$schema')
-    const suggestion = closestName(key, candidates)
+    if (KNOWN_KEYS.includes(key)) continue
+    const suggestion = closestName(key, KNOWN_KEYS)
     throw new Error(
       `${configPath}: unknown field '${key}'` +
         (suggestion === undefined ? '' : `, did you mean '${suggestion}'?`),
     )
   }
-}
-
-/** The known name within edit distance 2, if any. Enough for the typo case. */
-export function closestName(key: string, candidates: string[]): string | undefined {
-  let best: { name: string; distance: number } | undefined
-  for (const name of candidates) {
-    const distance = editDistance(key.toLowerCase(), name.toLowerCase())
-    if (distance <= 2 && (best === undefined || distance < best.distance)) {
-      best = { name, distance }
-    }
-  }
-  return best?.name
-}
-
-function editDistance(a: string, b: string): number {
-  const row = Array.from({ length: b.length + 1 }, (_, index) => index)
-  for (let i = 1; i <= a.length; i += 1) {
-    let previous = row[0] ?? 0
-    row[0] = i
-    for (let j = 1; j <= b.length; j += 1) {
-      const current = row[j] ?? 0
-      row[j] = Math.min(
-        current + 1,
-        (row[j - 1] ?? 0) + 1,
-        previous + (a[i - 1] === b[j - 1] ? 0 : 1),
-      )
-      previous = current
-    }
-  }
-  return row[b.length] ?? 0
 }
 
 /**
@@ -499,7 +308,13 @@ function requireString(configPath: string, record: Record<string, unknown>, key:
 }
 
 /**
- * Validate one provider phase array structurally.
+ * Validate one required provider phase, structurally.
+ *
+ * Required, because the phases are the gate and an absent one runs nothing.
+ * The missing-phase error carries the standard composition ready to paste,
+ * so "explicit" never means "go find out what the default would have been".
+ * An empty array is rejected for the same reason it would be suspicious in a
+ * report: a validate phase with no providers passes everything, silently.
  *
  * Structural, not behavioral: `run` is checked to be a function, nothing
  * more. What it must return is the pipeline's contract, and the pipeline
@@ -507,15 +322,26 @@ function requireString(configPath: string, record: Record<string, unknown>, key:
  * deferred is the shape. An entry with no `run` would only show up once the
  * pipeline tried to call it, blamed on the wrong layer.
  */
-function requireProviders<T>(
+function requirePhase<T>(
   configPath: string,
   record: Record<string, unknown>,
-  key: string,
-): NamedProvider<T>[] | undefined {
+  key: 'scan' | 'resolve' | 'validate',
+): NamedProvider<T>[] {
   const value = record[key]
-  if (value === undefined) return undefined
+  if (value === undefined) {
+    throw new Error(
+      `${configPath}: missing '${key}'. Phases are explicit; the standard one is ` +
+        `${STANDARD_PHASES[key]} (imported from 'fitc4')`,
+    )
+  }
   if (!Array.isArray(value)) {
     throw new Error(`${configPath}: '${key}' must be an array of providers`)
+  }
+  if (value.length === 0) {
+    throw new Error(
+      `${configPath}: '${key}' lists no providers, so nothing would run in that phase. ` +
+        `The standard one is ${STANDARD_PHASES[key]} (imported from 'fitc4')`,
+    )
   }
 
   value.forEach((entry, index) => {
@@ -555,25 +381,4 @@ function requireAgent(configPath: string, record: Record<string, unknown>): Agen
     )
   }
   return value as AgentExec
-}
-
-function requireStringArray(
-  configPath: string,
-  record: Record<string, unknown>,
-  key: string,
-): string[] {
-  const value = record[key]
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) {
-    throw new Error(`${configPath}: '${key}' must be an array of strings`)
-  }
-  // A blank entry is not a harmless no-op: as a path prefix it matches
-  // everything, silently putting the whole repository under scan.
-  const blank = value.findIndex((entry) => (entry as string).trim() === '')
-  if (blank !== -1) {
-    throw new Error(
-      `${configPath}: '${key}[${blank}]' must be a non-empty string. ` +
-        `An empty entry would put the entire repository under scan`,
-    )
-  }
-  return value as string[]
 }

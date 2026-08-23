@@ -43,20 +43,20 @@ model {
 }
 ```
 
-**`example/fitc4.config.json`** says where things are. Paths resolve relative to this file.
+**`example/fitc4.config.mts`** says where things are and which providers run. Paths resolve relative to this file, and the phases are explicit: what runs is what this file names.
 
-```json
-{
-  "$schema": "../packages/fitc4/schema/fitc4.config.schema.json",
-  "version": 1,
-  "repositoryRoot": ".",
-  "model": "arch",
-  "scanRoots": ["src"],
-  "tsconfig": "tsconfig.json"
-}
+```ts
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+
+export default defineConfig({
+  version: 1,
+  repositoryRoot: '.',
+  model: 'arch',
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
+  resolve: [sourceRoot()],
+  validate: [architectureRules()],
+})
 ```
-
-The `$schema` points into this workspace because the example lives beside the package. Installed from npm it is `./node_modules/fitc4/schema/fitc4.config.schema.json`. The schema ships with the package rather than being copied into your repository.
 
 **Run it.**
 
@@ -93,7 +93,7 @@ Agents get the same treatment as humans: the CLI is the interface, failing repor
 
 ## Where things live
 
-`fitc4.config.json` goes at your project root, beside `tsconfig.json`. `npx fitc4 init` scaffolds it along with a starter model. On a repository with real history, `npx fitc4 draft` generates the first model from the observed code instead, every relationship drift-tagged so the first run is green. It never overwrites an authored model: if a model file already exists it prints the draft to stdout and explains itself on stderr. The one exception is init's own starter model while nobody has edited it, which carries a marker comment saying so on its first line, so `init` followed by `draft` works instead of refusing. Discovery starts at the working directory and checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json`, first directly and then under `.fitc4/`, repeating up each ancestor. That way the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.
+`fitc4.config.mts` goes at your project root, beside `tsconfig.json`. `npx fitc4 init` scaffolds it along with a starter model. On a repository with real history, `npx fitc4 draft` generates the first model from the observed code instead, every relationship drift-tagged so the first run is green. It never overwrites an authored model: if a model file already exists it prints the draft to stdout and explains itself on stderr. The one exception is init's own starter model while nobody has edited it, which carries a marker comment saying so on its first line, so `init` followed by `draft` works instead of refusing. Discovery starts at the working directory and checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, first directly and then under `.fitc4/`, repeating up each ancestor. That way the command works from the project root or anywhere inside it. The root-level file wins over `.fitc4/`, and two config files in one directory is an error rather than a silent choice.
 
 A module-form config is what lets you add custom providers. It default-exports the same fields plus optional `scan`, `resolve`, and `validate` provider arrays. A phase that is present replaces the defaults for that phase; absent means the default. Merge semantics are yours, in your config file, where you can see them. Module configs load as ES modules, so a CommonJS package names its config `fitc4.config.mts`. See [`docs/providers.md`](docs/providers.md) for the provider contract and a worked example.
 
@@ -123,7 +123,7 @@ The model itself lives wherever `model` points. It is authored architecture docu
 
 Everything from `invalid-sources` down exists so the gate cannot fail open. A typo in `sources` used to make every prefix stop matching, which turned architecture errors into a clean exit 0.
 
-The severities are defaults, not policy. In a `.ts` config, `validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]` makes new unowned code fail the gate. That is worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. Every rule id in the table accepts an override.
+The severities are defaults, not policy. `validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]` makes new unowned code fail the gate. That is worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. Every rule id in the table accepts an override.
 
 Above five `unmapped-source` findings the report renders one grouped block: the total, a by-directory breakdown, and the first ten paths. A brownfield repository's 450 unowned files are one adoption fact, not 450 separate ones. `--json` is unchanged and keeps every finding.
 
@@ -189,26 +189,24 @@ One trap sits outside the gate's reach. `sources` is a metadata key, and LikeC4 
 
 An element with no `sources` is legal: a grouping element, or a component implemented elsewhere. **An unowned file is a finding; an unowned element is not.** Legal, but not invisible. One `unobserved-elements` info finding per run lists the leaf elements with neither `sources` nor `packages`, so a deliberately abstract element like an external system or a person stays visibly unenforced rather than accidentally so. A relationship declared between two parents covers traffic between their descendants. An element never "crosses a boundary" into its own parent or child, because LikeC4 refuses to declare parent-child relationships, so reporting those would leave no fix available.
 
-The scanner walks `scanRoots` on disk rather than a TypeScript `Program`'s file list, so a file nothing imports is still checked for ownership. A root that is missing, misspelled, or holds no TypeScript is an error rather than an empty pass. The scanner excludes test files, by filename and by directory.
+The scanner walks its configured roots on disk rather than a TypeScript `Program`'s file list, so a file nothing imports is still checked for ownership. A root that is missing, misspelled, or holds no TypeScript is an error rather than an empty pass. The scanner excludes test files, by filename and by directory.
 
 ## Using it as a library
 
 Everything the CLI does is reachable from the package entry point, so a host project can assert on architecture inside its own test suite instead of shelling out.
 
 ```ts
-import { findConfig, resolveConfig, pipelineConfig, runPipeline, exitCodeFor } from 'fitc4'
+import { findConfig, resolveConfig, runPipeline, exitCodeFor } from 'fitc4'
 
-const result = await runPipeline(pipelineConfig(await resolveConfig(findConfig(process.cwd()))))
+const result = await runPipeline(await resolveConfig(findConfig(process.cwd())))
 expect(exitCodeFor(result)).toBe(0)
 ```
 
-`resolveConfig` loads all three config forms. A `.ts` or `.js` config would make the JSON-only `loadConfig` throw.
-
-Providers are plain functions composed into phase arrays: `ScanProvider`, `ResolveProvider`, `ValidateProvider`. `pipelineConfig` is the batteries-included default; a caller wanting a different scanner builds its own `PipelineConfig` and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system.
+Providers are plain functions composed into phase arrays: `ScanProvider`, `ResolveProvider`, `ValidateProvider`. A resolved config is a runnable `PipelineConfig`; a caller wanting a different scanner builds its own and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system.
 
 The `fitc4/agent` entry point adds agent providers over locally installed agent CLIs (`claude`, `codex`). They cache on their inputs, and the core never imports them. They come in two tiers. The validate providers (ownership advice, semantic review) are advisory: additive findings, `severity` per provider, part of the gate only when you choose `'error'`. The scan and resolve providers (`agentScan`, `agentResolve`) are load-bearing and therefore fail closed. `agentScan` observes model domains no parser covers from prose instructions. `agentResolve` maps external and unresolvable dependencies onto elements the code cannot reach, including description-only ones. Any failure or off-schema reply is a `provider-failure` error rather than a quietly thinner run. They are the prototyping path: prose explores a new domain, and a domain that proves out graduates to a small deterministic provider, same envelope and same rules. See [`docs/agent-providers.md`](docs/agent-providers.md). The agent providers are measured, not just tested. [`evals/`](evals) runs four fixture projects with planted ground truth, scored against expected findings: greenfield, brownfield with tolerated drift, a docker-compose model domain no TypeScript parser sees (the worked non-TS `agentScan` example), and an exploratory markdown-runbook domain where the agent walks the repository itself. The default is a free stub mode; `npm run eval -- --exec claude` runs them against a real agent CLI.
 
-Extending a phase spreads the defaults back in, as in `validate: [...defaultValidate, myProvider]`. Every report names the providers that composed each phase. See [`docs/providers.md`](docs/providers.md) for the provider contract.
+Extending a phase means adding a provider to the config's array, as in `validate: [architectureRules(), myProvider]`. Every report names the providers that composed each phase. See [`docs/providers.md`](docs/providers.md) for the provider contract.
 
 ## The provider vocabulary
 

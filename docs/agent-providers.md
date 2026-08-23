@@ -65,10 +65,10 @@ A failed provider contributes nothing, not even a half-scan. The other providers
 
 ### A worked config
 
-`npx fitc4 init --agent claude` (or `codex`) scaffolds a `fitc4.config.mts` around one shared cached exec, declared as the config's `agent` so `draft --describe` works immediately and nothing else costs anything. What it deliberately does not do is compose the agent providers for you. `agentResolve`, `agentSemanticReview`, and `agentScan` all ship commented out, with the trade stated where you would uncomment them: composing them means every plain `npx fitc4`, the command the scaffolded `AGENTS.md` tells every coding agent to run before handing off, makes live billed calls on every machine, and CI without a logged-in CLI hits `provider-failure` errors from the fail-closed resolver. The pattern that survives contact with a team is a second config, say `fitc4.agent.config.mts`, carrying those lines and run with `--config` beside the deterministic one CI runs; `example/fitc4.agent.config.ts` in the repository is exactly that. `agentScan` stays commented out for a second reason on top: a fail-closed scanner driven by placeholder instructions is worse than no scanner.
+`npx fitc4 init --agent claude` (or `codex`) scaffolds a `fitc4.config.mts` around one shared cached exec, declared as the config's `agent` so `draft --describe` works immediately and nothing else costs anything. What it deliberately does not do is compose the agent providers into the phases: doing so would mean every plain `npx fitc4`, the command the scaffolded `AGENTS.md` tells every coding agent to run before handing off, makes live billed calls on every machine, and CI without a logged-in CLI hits `provider-failure` errors from the fail-closed resolver. The pattern that survives contact with a team is a second config, say `fitc4.agent.config.mts`, run with `--config` beside the deterministic one CI runs; `example/fitc4.agent.config.ts` in the repository is exactly that. `agentScan` in particular is never scaffolded: a fail-closed scanner driven by placeholder instructions is worse than no scanner.
 
 ```ts
-import { defineConfig, defaultValidate, typescriptImports, TYPESCRIPT_IMPORTS_PROVIDER_ID } from 'fitc4'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
 import { agentScan, cached, claudeCli, codexCli } from 'fitc4/agent'
 
 const exec = cached(claudeCli({ model: 'sonnet' }))
@@ -79,14 +79,8 @@ export default defineConfig({
   version: 1,
   repositoryRoot: '.',
   model: 'arch',
-  scanRoots: ['src'],
-  tsconfig: 'tsconfig.json',
-  // Present replaces: spread the deterministic scanner back in explicitly.
   scan: [
-    {
-      id: TYPESCRIPT_IMPORTS_PROVIDER_ID,
-      run: typescriptImports({ tsconfigPath: 'tsconfig.json', roots: ['src'] }),
-    },
+    typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] }),
     agentScan({
       exec,
       id: 'compose',
@@ -106,7 +100,8 @@ export default defineConfig({
         'observation from the doc (kind "file") to that source file (kind "file").',
     }),
   ],
-  validate: [...defaultValidate],
+  resolve: [sourceRoot()],
+  validate: [architectureRules()],
 })
 ```
 
@@ -119,17 +114,16 @@ Two instances coexist because `id` suffixes the provider id (`agent-scan:compose
 It is used **alongside** the default resolver, never instead of it:
 
 ```ts
-import { defineConfig, defaultResolve, defaultValidate } from 'fitc4'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
 import { agentResolve, cached, claudeCli } from 'fitc4/agent'
 
 export default defineConfig({
   version: 1,
   repositoryRoot: '.',
   model: 'arch',
-  scanRoots: ['src'],
-  tsconfig: 'tsconfig.json',
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
   resolve: [
-    ...defaultResolve,
+    sourceRoot(),
     agentResolve({
       exec: cached(claudeCli({ model: 'sonnet' })),
       instructions:
@@ -137,7 +131,7 @@ export default defineConfig({
         'payments-gateway element. Message-broker clients belong to the queue element.',
     }),
   ],
-  validate: [...defaultValidate],
+  validate: [architectureRules()],
 })
 ```
 

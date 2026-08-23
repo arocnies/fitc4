@@ -20,22 +20,13 @@ echo "== install into a fresh consumer"
 consumer="$work/consumer"
 mkdir -p "$consumer"
 cp -R "$root/example/src" "$root/example/arch" "$consumer/"
-cp "$root/example/tsconfig.json" "$consumer/"
-sed 's|"../packages/fitc4/schema/|"./node_modules/fitc4/schema/|' \
-  "$root/example/fitc4.config.json" > "$consumer/fitc4.config.json"
+cp "$root/example/tsconfig.json" "$root/example/fitc4.config.mts" "$consumer/"
 (cd "$consumer" && npm init -y >/dev/null && npm install --no-audit --no-fund "$tarball" >/dev/null)
-
-echo "== schema resolves through the exports map"
-(cd "$consumer" && node -e "
-  const assert = require('node:assert')
-  const schema = require('fitc4/schema/fitc4.config.schema.json')
-  assert.equal(schema.properties.version.const, 1)
-")
 
 echo "== library entry point loads"
 (cd "$consumer" && node --input-type=module -e "
-  import { runPipeline, pipelineConfig, loadConfig, findConfig, exitCodeFor } from 'fitc4'
-  const result = await runPipeline(pipelineConfig(loadConfig(findConfig(process.cwd()))))
+  import { runPipeline, resolveConfig, findConfig, exitCodeFor } from 'fitc4'
+  const result = await runPipeline(await resolveConfig(findConfig(process.cwd())))
   if (exitCodeFor(result) !== 0) { console.error(result.findings); process.exit(1) }
 ")
 
@@ -73,19 +64,20 @@ case "$violation_out" in
 esac
 rm "$consumer/src/core/bad.ts"
 
-# The severity map is the one rule knob a JSON config can reach, which is the
-# whole point of it, so it is asserted through an installed consumer's JSON
-# config rather than only in the unit tests.
-echo "== severity promotes a rule from a JSON config"
+# Severity tuning lives on the rules provider, in the consumer's own validate
+# array, so it is asserted through an installed consumer's config rather than
+# only in the unit tests.
+echo "== severity promotes a rule from the consumer's config"
 printf "export const orphan = true\n" > "$consumer/src/orphan.ts"
 (cd "$consumer" && npx fitc4 >/dev/null)  # warning only, still exit 0
 node -e "
   const fs = require('node:fs')
   const file = process.argv[1]
-  const config = JSON.parse(fs.readFileSync(file, 'utf8'))
-  config.severity = { 'unmapped-source': 'error' }
-  fs.writeFileSync(file, JSON.stringify(config, null, 2))
-" "$consumer/fitc4.config.json"
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(
+    'architectureRules()',
+    \"architectureRules({ severity: { 'unmapped-source': 'error' } })\",
+  ))
+" "$consumer/fitc4.config.mts"
 if promoted_out="$(cd "$consumer" && npx fitc4 2>&1)"; then
   echo "FAIL: severity did not promote unmapped-source to an error: $promoted_out" >&2
   exit 1
@@ -99,10 +91,8 @@ esac
 node -e "
   const fs = require('node:fs')
   const file = process.argv[1]
-  const config = JSON.parse(fs.readFileSync(file, 'utf8'))
-  config.severity = { 'unmaped-source': 'error' }
-  fs.writeFileSync(file, JSON.stringify(config, null, 2))
-" "$consumer/fitc4.config.json"
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('unmapped-source', 'unmaped-source'))
+" "$consumer/fitc4.config.mts"
 if typo_out="$(cd "$consumer" && npx fitc4 2>&1)"; then
   echo "FAIL: a typo'd rule id was accepted: $typo_out" >&2
   exit 1
@@ -111,13 +101,7 @@ case "$typo_out" in
   *"did you mean 'unmapped-source'"*) ;;
   *) echo "FAIL: typo'd rule id gave no suggestion: $typo_out" >&2; exit 1 ;;
 esac
-node -e "
-  const fs = require('node:fs')
-  const file = process.argv[1]
-  const config = JSON.parse(fs.readFileSync(file, 'utf8'))
-  delete config.severity
-  fs.writeFileSync(file, JSON.stringify(config, null, 2))
-" "$consumer/fitc4.config.json"
+cp "$root/example/fitc4.config.mts" "$consumer/fitc4.config.mts"
 rm "$consumer/src/orphan.ts"
 
 echo "== init scaffolds a green first run"

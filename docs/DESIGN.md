@@ -106,9 +106,9 @@ Providers that carry runtime dependencies ship as separate npm packages so `fitc
 
 ## Configuration
 
-Three forms, one shape ([`config.ts`](../packages/fitc4/src/config.ts)). `fitc4.config.json` holds what differs between repositories (`repositoryRoot`, `model`, `scanRoots`, `tsconfig`), and a shipped JSON schema validates it. The module forms (`.ts`, `.mts`, `.js`, `.mjs`, wrapped in `defineConfig`) carry the same fields plus optional `scan`/`resolve`/`validate` provider arrays, because functions cannot live in JSON. A phase array that is present replaces the defaults for that phase entirely; extending means spreading `defaultResolve`/`defaultValidate` back in. Merge semantics belong to the user, in the file they can see.
+One form, one shape ([`config.ts`](../packages/fitc4/src/config.ts)). The config is an ES module (`.ts`, `.mts`, `.js`, `.mjs`, wrapped in `defineConfig`) naming the repository facts (`repositoryRoot`, `model`) and three required provider arrays: `scan`, `resolve`, `validate`. There are no default phases and no merge semantics. What runs is exactly what the file names, so reading the config answers "which providers judge this repository" without consulting anything else. A missing or empty phase is an error that carries the standard composition ready to paste, which keeps the required arrays from being a setup burden: `init` scaffolds them, and the error message reconstructs them.
 
-Discovery starts at the working directory and checks the module names, then the JSON name. It looks in the directory itself, then under `.fitc4/`, and repeats up each ancestor. Root-adjacent wins over `.fitc4/`. Two configs in one directory is an error, because whichever lost a silent tiebreak would be a silently ignored config. `--config` overrides discovery entirely. Every path resolves relative to the config file, so moving the workspace cannot silently repoint the scan. Validation is strict: unknown version, empty `scanRoots`, blank paths, and malformed JSON are errors, never silent defaults.
+Discovery starts at the working directory and checks the module names. It looks in the directory itself, then under `.fitc4/`, and repeats up each ancestor. Root-adjacent wins over `.fitc4/`. Two configs in one directory is an error, because whichever lost a silent tiebreak would be a silently ignored config. `--config` overrides discovery entirely. Every path resolves relative to the config file, so moving the workspace cannot silently repoint the scan. Validation is strict: unknown version, unknown fields, blank paths, and malformed phases are errors, never silent defaults.
 
 ## Progress narration
 
@@ -121,7 +121,7 @@ A plain string because anything richer is a schema. Percentages, progress object
 ## Deliberately not built
 
 - **Baseline files.** Tolerated drift lives in the model as reviewable, taggable relationships; a generated suppression file is invisible debt that gets regenerated and rubber-stamped.
-- **YAML config.** JSON has the schema and the module forms have the functions; a third syntax adds another parser without adding expressiveness.
+- **JSON or YAML config.** Providers are functions, and functions cannot live in data files; a data syntax would need default phases and merge semantics, which is exactly the hidden behavior the explicit config removed.
 - **MCP server.** LikeC4 already ships one for querying and authoring the model; FitC4 is the enforcement half, and its agent interface is the CLI report and `--json`.
 - **A provider registry or plugin discovery.** Composition is explicit arrays in a config file the user owns; anything cleverer hides which providers judge the run.
 - **General glob matching for `sources`.** Directory prefixes have survived real use; a glob engine multiplies the silent mismatches the `invalid-sources`/`unmatched-sources` pair exists to close.

@@ -4,7 +4,7 @@
  *
  * The upstream repository is fetched into evals/.cache/ on demand (see
  * ../external.json and harness/external.ts) and assembled with our overlay
- * (arch/ and fitc4.config.json) into a fresh working directory per run. The
+ * (arch/ and fitc4.config.mts) into a fresh working directory per run. The
  * deterministic gate must be green: the model transcribes what the pinned
  * code does and what its .dependency-cruiser.js permits, nothing more.
  *
@@ -17,7 +17,7 @@
 
 import path from 'node:path'
 
-import { loadConfig, pipelineConfig, type PipelineConfig } from 'fitc4'
+import { resolveConfig, type PipelineConfig } from 'fitc4'
 import { agentResolve, type AgentExec } from 'fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
@@ -28,7 +28,7 @@ export const RESOLVE_INSTRUCTIONS =
   'name the backing system a client package connects to. Map only what the catalog clearly ' +
   'covers; when no element speaks for a package, leave it unmapped.'
 
-export default function ddhGreenfield(exec: AgentExec, root: string): PipelineConfig {
+export default async function ddhGreenfield(exec: AgentExec, root: string): Promise<PipelineConfig> {
   const fixtureDir = path.dirname(root)
   const evalsDir = path.resolve(fixtureDir, '..', '..')
   const manifest = externalManifest(root)
@@ -40,10 +40,10 @@ export default function ddhGreenfield(exec: AgentExec, root: string): PipelineCo
     name: 'ddh-greenfield',
     checkout,
     overlayDir: fixtureDir,
-    overlay: ['arch', 'fitc4.config.json'],
+    overlay: ['arch', 'fitc4.config.mts'],
   })
 
-  const base = pipelineConfig(loadConfig(path.join(work, 'fitc4.config.json')))
+  const base = await resolveConfig(path.join(work, 'fitc4.config.mts'))
   return {
     ...base,
     resolve: [...base.resolve, agentResolve({ exec, instructions: RESOLVE_INSTRUCTIONS })],

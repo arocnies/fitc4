@@ -3,30 +3,29 @@
  * The `fitc4` command line entry point.
  *
  * This module runs the pipeline on import, so nothing else in the package may
- * import it. The provider composition lives in `defaults.ts` for that reason.
+ * import it. What runs is whatever the config's phase arrays name; the CLI
+ * composes nothing of its own.
  */
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { closestName, findConfig, resolveConfig } from './config.ts'
+import { findConfig, resolveConfig } from './config.ts'
 import { draft, type DraftDescribe } from './draft.ts'
-import { messageOf } from './errors.ts'
+import { closestName, messageOf } from './errors.ts'
 import { init, INIT_AGENTS, type InitAgent } from './init.ts'
 import { runPipeline } from './pipeline.ts'
-import { pipelineConfig } from './defaults.ts'
 import { count, exitCodeFor, renderReport } from './report.ts'
 
 const USAGE = `Usage: fitc4 [command] [options]
 
 Commands:
   (none)           Check the code against the LikeC4 architecture model.
-  init             Scaffold fitc4.config.json, a starter arch/model.c4, and
+  init             Scaffold fitc4.config.mts, a starter arch/model.c4, and
                    an AGENTS.md with the fitc4 norms in the current
                    directory. Never overwrites existing files. The starter
                    model is marked as a placeholder, so a later draft may
                    replace it; editing it makes it yours. With --agent,
-                   scaffolds a fitc4.config.mts module config instead,
-                   declaring that agent CLI as the config's exec so
+                   the config also declares that agent CLI as its exec so
                    draft --describe works immediately. No agent provider
                    joins the gate itself, since that would call your CLI on
                    every run.
@@ -47,7 +46,7 @@ Commands:
                    agent exec proposes each element's description.
 
 Options:
-  --config <path>  Path to a fitc4 config (.ts, .mts, .js, .mjs, or .json).
+  --config <path>  Path to a fitc4 config (.ts, .mts, .js, or .mjs).
                    Defaults to discovery from the working directory: each of
                    those names in ./, then in ./.fitc4/, then the same in
                    each ancestor. Two configs in one directory is an error.
@@ -69,7 +68,7 @@ Options:
   --version        Print the version.
   --help           Show this message.
 
-A .ts/.js config loads as an ES module; in a CommonJS package name it
+A config loads as an ES module; in a CommonJS package name it
 fitc4.config.mts or set "type": "module". Exits non-zero when any finding
 has severity 'error'.`
 
@@ -256,8 +255,7 @@ async function runDraft(options: Arguments): Promise<void> {
     if (config.agent === undefined) {
       throw new Error(
         `--describe needs an agent exec, and ${configPath} declares none. ` +
-          `An exec is a function, so it lives in a module config: add an 'agent' field to a ` +
-          `fitc4.config.ts/.mts, such as agent: cached(claudeCli({ model: 'sonnet' })) from ` +
+          `Add an 'agent' field, such as agent: cached(claudeCli({ model: 'sonnet' })) from ` +
           `'fitc4/agent' (see node_modules/fitc4/README.md#agent-providers). In a project with ` +
           `no config yet, 'fitc4 init --agent claude' (or codex) scaffolds one`,
       )
@@ -347,7 +345,7 @@ async function main(): Promise<void> {
   // `node_modules` and find the wrong config, or none.
   const configPath = options.configPath ?? findConfig(process.cwd())
   const result = await runPipeline({
-    ...pipelineConfig(await resolveConfig(configPath)),
+    ...(await resolveConfig(configPath)),
     onProgress: narrationFor(options),
   })
 

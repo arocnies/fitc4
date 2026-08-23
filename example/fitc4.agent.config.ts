@@ -1,18 +1,15 @@
 /**
- * The same gate as `fitc4.config.json`, plus agent assistance — run it with:
+ * The same gate as `fitc4.config.mts`, plus two agent providers in validate.
+ * Run it with `fitc4 --config fitc4.agent.config.ts` (wired up here as
+ * `npm run fitc4:agent`).
  *
- *   fitc4 --config fitc4.agent.config.ts
- *
- * (which this repository wires up as `npm run fitc4:agent`).
- *
- * Kept out of the default `check` on purpose: the deterministic gate is what
- * CI runs, and the agent providers are advisory enrichment you invoke when you
- * want a second opinion. They shell out to your locally installed `claude`
- * CLI (your login, your billing); if it is missing or logged out, the run
- * still passes with a visible `agent-unavailable` note.
+ * A separate config on purpose: CI runs the deterministic gate, and these
+ * providers shell out to your locally installed `claude` CLI (your login,
+ * your billing). If it is missing or logged out, the run still passes with a
+ * visible `agent-unavailable` note.
  */
 
-import { defineConfig, defaultValidate } from 'fitc4'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
 import { agentOwnershipAdvisor, agentSemanticReview, cached, claudeCli } from 'fitc4/agent'
 
 // Cheap model; `cached` makes reruns with unchanged inputs free and identical.
@@ -22,20 +19,16 @@ export default defineConfig({
   version: 1,
   repositoryRoot: '.',
   model: 'arch',
-  scanRoots: ['src'],
-  tsconfig: 'tsconfig.json',
-  // Present replaces the defaults for the phase, so the standard rules come
-  // back in through the spread. scan and resolve stay default.
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
+  resolve: [sourceRoot()],
   validate: [
-    ...defaultValidate,
-    // Suggests an owner for any file no element claims. Zero agent calls when
-    // the repository is clean. `severity: 'error'` would make either provider
-    // part of the gate instead of advisory.
+    architectureRules(),
+    // Suggests an owner for any file no element claims. Zero agent calls
+    // when the repository is clean.
     agentOwnershipAdvisor({ exec: agent }),
-    // Judges each described element's implementation against its description.
-    // Unlike the advisor, this calls the CLI once per described element even
-    // when the repository is clean (two calls here); `cached` makes every
-    // rerun with unchanged files free.
+    // Judges each described element's implementation against its description,
+    // one call per element even when clean. `severity: 'error'` would make
+    // either provider part of the gate instead of advisory.
     agentSemanticReview({ exec: agent }),
   ],
 })

@@ -14,11 +14,11 @@
 
 import path from 'node:path'
 
-import { loadConfig, pipelineConfig, type PipelineConfig } from 'fitc4'
+import { resolveConfig, type PipelineConfig } from 'fitc4'
 import { agentOwnershipAdvisor, agentSemanticReview, type AgentExec } from 'fitc4/agent'
 
-export default function brownfield(exec: AgentExec, root: string): PipelineConfig {
-  const base = pipelineConfig(loadConfig(path.join(root, 'fitc4.config.json')))
+export default async function brownfield(exec: AgentExec, root: string): Promise<PipelineConfig> {
+  const base = await resolveConfig(path.join(root, 'fitc4.config.mts'))
   return {
     ...base,
     validate: [

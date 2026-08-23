@@ -51,10 +51,17 @@ The property the whole tool exists for: a check that silently reports nothing is
 
 ## A complete `fitc4.config.ts`
 
-A phase array present in the config replaces the defaults for that phase entirely. Present replaces, absent defaults. There are no merge semantics; a config that extends a phase spreads the default entries back in explicitly, using the exported providers and their exported ids, so the composition is visible in the file that owns it.
+The three phase arrays are required and explicit. What runs is what the file names: there are no default phases, no merge semantics, and nothing composed in behind the file. Extending the gate means writing the standard providers and yours in one visible array.
 
 ```ts
-import { defineConfig, defaultValidate, type Finding, type ValidateContext } from 'fitc4'
+import {
+  architectureRules,
+  defineConfig,
+  sourceRoot,
+  typescriptImports,
+  type Finding,
+  type ValidateContext,
+} from 'fitc4'
 
 const PROVIDER_ID = 'import-budget'
 const BUDGET = 20
@@ -84,19 +91,18 @@ export default defineConfig({
   version: 1,
   repositoryRoot: '.',
   model: 'arch',
-  scanRoots: ['src'],
-  tsconfig: 'tsconfig.json',
-  // Present replaces: this array is the whole validate phase, so the default
-  // rules come back in through the spread. Dropping the spread is how the
-  // standard rules are deliberately replaced. The report's provider line
-  // shows either way. scan and resolve are absent and keep their defaults.
-  validate: [...defaultValidate, { id: PROVIDER_ID, run: importBudget }],
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
+  resolve: [sourceRoot()],
+  // This array is the whole validate phase. Dropping architectureRules() is
+  // how the standard rules are deliberately replaced; the report's provider
+  // line shows either way.
+  validate: [architectureRules(), { id: PROVIDER_ID, run: importBudget }],
 })
 ```
 
-Discovery checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json`, in the working directory and its `.fitc4/`, then each ancestor. Two configs in one directory is an error, because whichever lost a tiebreak would be a silently ignored config. The module forms load as ES modules; a CommonJS package names its config `fitc4.config.mts`. `defaultResolve` is exported the same way. Scan has no array export because its provider is built from config values; rebuild it with `typescriptImports({ tsconfigPath, roots })` under `TYPESCRIPT_IMPORTS_PROVIDER_ID`. Every report names the providers that composed each phase, so a replaced phase is visible in the output, not only in the config.
+Discovery checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, in the working directory and its `.fitc4/`, then each ancestor. Two configs in one directory is an error, because whichever lost a tiebreak would be a silently ignored config. Configs load as ES modules; a CommonJS package names its config `fitc4.config.mts`. Every report names the providers that composed each phase, so a changed phase is visible in the output, not only in the config.
 
-The standard rules take per-rule severity overrides. `architectureRules()` with no options is what `defaultValidate` carries; it returns a ready `NamedProvider`, so tuning it is one line:
+The standard rules take per-rule severity overrides. `architectureRules()` returns a ready `NamedProvider`, so tuning it is one line:
 
 ```ts
 import { architectureRules } from 'fitc4'
@@ -115,7 +121,7 @@ A separate entry point on purpose: nothing in `fitc4` imports it, the core gate 
 `fitc4/agent` ships two tiers. This section is the standing contract for the **advisory validate providers** (`agentOwnershipAdvisor`, `agentSemanticReview`) and the exec layer they all share. The **fail-closed scan and resolve providers** (`agentScan`, `agentResolve`) are load-bearing. An absent scanner or resolver must not look like a clean run, so they throw into `provider-failure` instead of degrading. They are documented per provider in [`agent-providers.md`](agent-providers.md).
 
 ```ts
-import { defineConfig, defaultValidate } from 'fitc4'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
 import { cached, claudeCli, agentOwnershipAdvisor, agentSemanticReview } from 'fitc4/agent'
 
 const cheap = cached(claudeCli({ model: 'haiku' }))
@@ -125,10 +131,10 @@ export default defineConfig({
   version: 1,
   repositoryRoot: '.',
   model: 'arch',
-  scanRoots: ['src'],
-  tsconfig: 'tsconfig.json',
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
+  resolve: [sourceRoot()],
   validate: [
-    ...defaultValidate,
+    architectureRules(),
     agentOwnershipAdvisor({ exec: cheap }),
     agentSemanticReview({ exec: strong }),
   ],

@@ -23,7 +23,7 @@
 
 import path from 'node:path'
 
-import type { ResolvedConfig } from 'fitc4'
+import { architectureRules, sourceRoot, type ResolvedConfig } from 'fitc4'
 import type { AgentExec } from 'fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
@@ -65,14 +65,11 @@ export default function supabaseDraft(exec: AgentExec, root: string): ResolvedCo
     repositoryRoot: work,
     // Fresh and empty, so draft's never-overwrite rule has nothing to trip on.
     modelDir: path.join(work, 'draft'),
-    // The observations are fragment locators inside docker/, so the scan root
-    // only anchors what a directory mirror would cover; here it covers nothing
-    // and every element comes from a fragment.
-    scanRoots: ['docker'],
-    // Never read: the configured scan below replaces the TypeScript scanner.
-    tsconfigPath: path.join(work, 'tsconfig.json'),
-    providers: {
-      scan: [supabaseScan(exec, DRAFT_INSTRUCTIONS)],
-    },
+    // The observations are fragment locators inside docker/, so the scan's
+    // attested root only anchors what a directory mirror would cover; here it
+    // covers nothing and every element comes from a fragment.
+    scan: [supabaseScan(exec, DRAFT_INSTRUCTIONS)],
+    resolve: [sourceRoot()],
+    validate: [architectureRules()],
   }
 }

@@ -3,7 +3,7 @@
  *
  * One info finding per model element whose description is absent, empty, or
  * still the TODO placeholder that `init` and `draft` scaffold. Opt-in, never
- * part of `defaultValidate`: a description is documentation, not structure,
+ * part of the standard composition: a description is documentation, not structure,
  * and the standard gate judges structure only. What this rule buys a team
  * that wants it is countability. Every undescribed element is one visible
  * finding, so the report's info line becomes the documentation burn-down the
@@ -25,7 +25,7 @@ const RULE_ID = 'missing-description'
 
 /**
  * Returns a `NamedProvider`, ready to append to a config's `validate` array:
- * `validate: [...defaultValidate, missingDescriptions()]`.
+ * `validate: [architectureRules(), missingDescriptions()]`.
  */
 export function missingDescriptions(): NamedProvider<ValidateProvider> {
   const run: ValidateProvider = async (context: ValidateContext): Promise<Finding[]> => {

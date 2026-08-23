@@ -11,7 +11,7 @@
  * relationship rules then judge like any other edge.
  *
  * Composition: used ALONGSIDE the default resolver, never instead of it, as in
- * `resolve: [...defaultResolve, agentResolve({ exec })]`. Only observations
+ * `resolve: [sourceRoot(), agentResolve({ exec })]`. Only observations
  * `source-root` cannot map are sent: `unresolved-dependency` observations and
  * `dependency` observations with a module/external target whose package no
  * element claims via `packages` metadata (a claimed package is deterministically

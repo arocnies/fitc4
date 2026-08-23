@@ -81,11 +81,12 @@ describe('a model whose implementation contradicts the contract', () => {
       kind: 'relationship',
       id: 'fixture.app.interface::_::fixture.app.core',
     })
-    // The remedy offers the code fix first and the model edit as the
-    // deliberate alternative, matching the norms this package ships. The old
-    // text named only the model edit, in the message a reader acts on.
+    // The remedy names the code fix only. The model is the contract; whether
+    // it should change is a design decision that belongs to the shipped
+    // norms, not to a message an agent acts on directly. An earlier wording
+    // named the model edit here and read as an invitation.
     expect(finding?.description).toContain('Reroute or remove the import')
-    expect(finding?.description).toContain('if the architecture genuinely changed')
+    expect(finding?.description).not.toContain('declare the dependency')
   })
 
   test('treats an unowned file as a warning and a contested file as an error', () => {
@@ -316,10 +317,7 @@ describe('provider failure', () => {
   test('a scan failure produces one error rather than a cascade', async () => {
     const result = await runFixture('ok', {
       scan: [
-        {
-          id: TYPESCRIPT_IMPORTS_ID,
-          run: typescriptImports({ tsconfigPath: fixturePath('ok/missing.json'), roots: ['src'] }),
-        },
+        typescriptImports({ tsconfig: fixturePath('ok/missing.json'), roots: ['src'] }),
       ],
     })
 
@@ -481,13 +479,10 @@ describe('identifier namespacing', () => {
 
     const result = await runFixture('ok', {
       scan: [
-        {
-          id: TYPESCRIPT_IMPORTS_ID,
-          run: typescriptImports({
-            tsconfigPath: path.join(fixturePath('ok'), 'tsconfig.json'),
-            roots: ['src'],
-          }),
-        },
+        typescriptImports({
+          tsconfig: path.join(fixturePath('ok'), 'tsconfig.json'),
+          roots: ['src'],
+        }),
         { id: 'mock-semantic-scan', run: duplicate },
       ],
     })

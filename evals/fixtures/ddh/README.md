@@ -5,7 +5,7 @@ The first external fixture. The project is [Sairyss/domain-driven-hexagon](https
 This directory holds only what we author:
 
 - `external.json`, the repository URL and pin
-- `arch/model.c4` and `fitc4.config.json`, the overlay copied onto the pinned sources per run
+- `arch/model.c4` and `fitc4.config.mts`, the overlay copied onto the pinned sources per run
 - `patches/*.patch`, one planted violation per patch, each named after the upstream rule it breaks
 - `greenfield/`, `brownfield/`, and `draft/`, the three fixture variants, each with its own eval spec, `replies.json`, and `expectations.json`
 

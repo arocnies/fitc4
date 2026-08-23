@@ -19,17 +19,13 @@ npm i -D fitc4 fitc4-dependency-cruiser
 A complete `fitc4.config.ts`:
 
 ```ts
-import { defineConfig } from 'fitc4'
+import { architectureRules, defineConfig, sourceRoot } from 'fitc4'
 import { dependencyCruiser } from 'fitc4-dependency-cruiser'
 
 export default defineConfig({
   version: 1,
   repositoryRoot: '.',
   model: 'arch',
-  // These two feed the default TypeScript scanner; the `scan` array below
-  // replaces that phase entirely, so its own options are what count.
-  scanRoots: ['src'],
-  tsconfig: 'tsconfig.json',
   scan: [
     dependencyCruiser({
       roots: ['src'],
@@ -38,6 +34,8 @@ export default defineConfig({
       // webpackConfigPath: 'webpack.config.js', // resolve.alias etc.
     }),
   ],
+  resolve: [sourceRoot()],
+  validate: [architectureRules()],
 })
 ```
 

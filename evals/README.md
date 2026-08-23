@@ -14,7 +14,7 @@ npm run eval -- --exec codex              # live mode via the Codex CLI instead
 
 ## What a fixture is
 
-Each directory under [`fixtures/`](fixtures/) is a self-contained project: a LikeC4 model in `arch/`, sources, and where the deterministic scanner applies, a real `fitc4.config.json` the eval loads (so the eval also proves the config valid). Three files carry the eval itself:
+Each directory under [`fixtures/`](fixtures/) is a self-contained project: a LikeC4 model in `arch/`, sources, and where the deterministic scanner applies, a real `fitc4.config.mts` the eval loads (so the eval also proves the config valid). Three files carry the eval itself:
 
 - **`fitc4.eval.ts`** composes the pipeline as a function of the exec, so stub and live mode run through identical wiring.
 - **`replies.json`** is the *recorded ideal agent*: the reply a perfect agent would give to each request, matched by content rather than call order.

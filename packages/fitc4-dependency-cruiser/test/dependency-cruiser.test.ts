@@ -4,11 +4,11 @@ import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, test } from 'vitest'
 
 import {
-  defaultResolve,
-  defaultValidate,
+  architectureRules,
   isStandardObservationKind,
   renderReport,
   runPipeline,
+  sourceRoot,
   type Observation,
   type PipelineResult,
 } from 'fitc4'
@@ -192,8 +192,8 @@ describe('fail closed', () => {
       repositoryRoot: VIOLATION,
       modelDir: VIOLATION,
       scan: [dependencyCruiser({ roots: ['does-not-exist'] })],
-      resolve: [...defaultResolve],
-      validate: [...defaultValidate],
+      resolve: [sourceRoot()],
+      validate: [architectureRules()],
     })
 
     const failure = result.findings.find((finding) => finding.ruleId === 'provider-failure')
@@ -211,8 +211,8 @@ describe('the full pipeline over a JS project', () => {
       repositoryRoot: VIOLATION,
       modelDir: VIOLATION,
       scan: [dependencyCruiser({ roots: ['src'] })],
-      resolve: [...defaultResolve],
-      validate: [...defaultValidate],
+      resolve: [sourceRoot()],
+      validate: [architectureRules()],
     })
   })
 

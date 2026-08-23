@@ -12,6 +12,9 @@ import { afterAll, describe, expect, test } from 'vitest'
 
 import type { ResolvedConfig } from '../src/config.ts'
 import { draft } from '../src/draft.ts'
+import { architectureRules } from '../src/providers/architecture-rules.ts'
+import { sourceRoot } from '../src/providers/source-root.ts'
+import { typescriptImports } from '../src/providers/typescript-imports.ts'
 import type { Observation, ScanContext, ValidateProvider } from '../src/types.ts'
 import { fixturePath, runFixture } from './helpers.ts'
 
@@ -126,8 +129,9 @@ describe('draft narration', () => {
     const config: ResolvedConfig = {
       repositoryRoot: root,
       modelDir: scratch(),
-      scanRoots: ['src'],
-      tsconfigPath: path.join(root, 'tsconfig.json'),
+      scan: [typescriptImports({ tsconfig: path.join(root, 'tsconfig.json'), roots: ['src'] })],
+      resolve: [sourceRoot()],
+      validate: [architectureRules()],
     }
 
     const messages: string[] = []

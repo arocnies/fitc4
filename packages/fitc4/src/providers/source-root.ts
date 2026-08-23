@@ -21,35 +21,48 @@ import {
   type DeclaredRelationships,
   type OwnershipPrefix,
 } from '../model.ts'
-import type { Association, Observation, ResolveContext, Ref } from '../types.ts'
+import type {
+  Association,
+  NamedProvider,
+  Observation,
+  ResolveContext,
+  ResolveProvider,
+  Ref,
+} from '../types.ts'
 
 export const PROVIDER_ID = 'source-root'
 
 /** Claiming element ids per package name, unique and sorted for determinism. */
 type PackageClaimants = Map<string, string[]>
 
-export async function sourceRoot(context: ResolveContext): Promise<Association[]> {
-  const { prefixes } = ownershipPrefixes(context.model)
-  const declared = declaredRelationships(context.model)
-  const claimants = claimantsByPackage(context)
-  const associations: Association[] = []
+/** Returns a `NamedProvider`, ready to drop into a config's `resolve` array. */
+export function sourceRoot(): NamedProvider<ResolveProvider> {
+  const run: ResolveProvider = async (context: ResolveContext): Promise<Association[]> => {
+    const { prefixes } = ownershipPrefixes(context.model)
+    const declared = declaredRelationships(context.model)
+    const claimants = claimantsByPackage(context)
+    const associations: Association[] = []
 
-  for (const observation of context.observations) {
-    if (observation.kind === 'file') {
-      const association = fileAssociation(observation, prefixes)
-      if (association !== undefined) associations.push(association)
-      continue
+    for (const observation of context.observations) {
+      if (observation.kind === 'file') {
+        const association = fileAssociation(observation, prefixes)
+        if (association !== undefined) associations.push(association)
+        continue
+      }
+      // Both dependency kinds resolve the same way. An unresolvable target has
+      // no owning element by construction, so it lands on the `unresolved`
+      // branch below and the rules provider is the one that says anything
+      // about it.
+      if (observation.kind === 'dependency' || observation.kind === 'unresolved-dependency') {
+        const association = dependencyAssociation(observation, prefixes, declared, claimants)
+        if (association !== undefined) associations.push(association)
+      }
     }
-    // Both dependency kinds resolve the same way. An unresolvable target has no
-    // owning element by construction, so it lands on the `unresolved` branch
-    // below and the rules provider is the one that says anything about it.
-    if (observation.kind === 'dependency' || observation.kind === 'unresolved-dependency') {
-      const association = dependencyAssociation(observation, prefixes, declared, claimants)
-      if (association !== undefined) associations.push(association)
-    }
+
+    return associations
   }
 
-  return associations
+  return { id: PROVIDER_ID, run }
 }
 
 function claimantsByPackage(context: ResolveContext): PackageClaimants {

@@ -48,7 +48,6 @@ import fs from 'node:fs'
 import { isBuiltin } from 'node:module'
 import path from 'node:path'
 import type { ResolvedConfig } from './config.ts'
-import { pipelineConfig } from './defaults.ts'
 import { messageOf } from './errors.ts'
 import { MODEL_FILENAME, MODEL_PLACEHOLDER_MARKER } from './init.ts'
 import { packageNameOf, toPackageName } from './model.ts'
@@ -235,7 +234,7 @@ export async function draft(
 
   // The same narration seams as the pipeline's scan phase, because this IS a
   // scan run: provider start, then done with a count and elapsed time.
-  const scanProviders = pipelineConfig(config).scan
+  const scanProviders = config.scan
   narrate?.(`scan: ${count(scanProviders.length, 'provider')}`)
 
   const observations: Observation[] = []
@@ -253,7 +252,35 @@ export async function draft(
     }
   }
 
-  const elements = draftElements(observations, config.scanRoots)
+  // Structure derives from the scan roots the providers attested to, not
+  // from configuration: the config carries no roots of its own, and the
+  // `scan-root` observations are already the coverage contract the validate
+  // rules trust. A file observed outside every attested root still needs a
+  // place in the tree (an agent scan over deploy manifests reports stand-in
+  // files under src/), so it is rooted at its first directory. A scan that
+  // attested to nothing and observed nothing has no structure to draft from,
+  // and guessing one would be drafting fiction.
+  const rootSet = new Set(
+    observations
+      .filter((observation) => observation.kind === 'scan-root')
+      .map((observation) => normalizeRoot(observation.subject?.id ?? '')),
+  )
+  for (const observation of observations) {
+    if (observation.kind !== 'file' || observation.subject?.kind !== 'file') continue
+    const subjectId = observation.subject.id
+    const hash = subjectId.indexOf('#')
+    const filePath = hash === -1 ? subjectId : subjectId.slice(0, hash)
+    if ([...rootSet].some((root) => root === '' || filePath.startsWith(`${root}/`))) continue
+    const first = filePath.split('/')[0]
+    if (first !== undefined && first !== filePath) rootSet.add(first)
+  }
+  if (rootSet.size === 0) {
+    throw new Error(
+      'no scan provider reported a scan-root observation, so there is nothing to draft from',
+    )
+  }
+
+  const elements = draftElements(observations, [...rootSet])
   const packages = observedPackages(observations)
   const externals = observedExternals(observations)
 

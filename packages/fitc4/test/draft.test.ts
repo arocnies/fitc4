@@ -11,9 +11,11 @@ import { afterAll, describe, expect, test } from 'vitest'
 
 import type { ResolvedConfig } from '../src/config.ts'
 import { draft } from '../src/draft.ts'
-import { pipelineConfig } from '../src/defaults.ts'
 import { MODEL_PLACEHOLDER_MARKER } from '../src/init.ts'
 import { runPipeline } from '../src/pipeline.ts'
+import { architectureRules } from '../src/providers/architecture-rules.ts'
+import { sourceRoot } from '../src/providers/source-root.ts'
+import { typescriptImports } from '../src/providers/typescript-imports.ts'
 import type { Observation, ScanContext } from '../src/types.ts'
 import { fixturePath, ruleIds } from './helpers.ts'
 
@@ -36,9 +38,21 @@ function configFor(fixture: string): ResolvedConfig {
   return {
     repositoryRoot: root,
     modelDir: scratch(),
-    scanRoots: ['src'],
-    tsconfigPath: path.join(root, 'tsconfig.json'),
+    scan: [typescriptImports({ tsconfig: path.join(root, 'tsconfig.json'), roots: ['src'] })],
+    resolve: [sourceRoot()],
+    validate: [architectureRules()],
   }
+}
+
+/**
+ * The attestation a real scanner always emits. Draft derives its structure
+ * from `scan-root` observations, so a stub scan must attest like one.
+ */
+const SCAN_ROOT: Observation = {
+  id: 'scan-root:src',
+  kind: 'scan-root',
+  subject: { kind: 'directory', id: 'src' },
+  provider: 'stub',
 }
 
 function errors(findings: { severity: string }[]): unknown[] {
@@ -72,7 +86,7 @@ describe('draft', () => {
 
     // The proof: the real pipeline on the drafted model is green, and every
     // observed crossing is a counted drift edge rather than an error.
-    const gate = await runPipeline(pipelineConfig(config))
+    const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
     expect(errors(gate.findings)).toEqual([])
     expect(gate.findings.filter((finding) => finding.ruleId === 'drift-relationship')).toHaveLength(2)
@@ -91,7 +105,7 @@ describe('draft', () => {
     )
     expect(result.text).toContain('vendor = component')
 
-    const gate = await runPipeline(pipelineConfig(config))
+    const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
     expect(errors(gate.findings)).toEqual([])
     // Every element-to-package crossing is a drift edge; the resolve tier is
@@ -111,7 +125,7 @@ describe('draft', () => {
     expect(result.text).toContain(`sources 'src/**'`)
     expect(result.text).toContain(`packages ['amqplib', 'stripe']`)
 
-    const gate = await runPipeline(pipelineConfig(config))
+    const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
     expect(errors(gate.findings)).toEqual([])
     // The fixture's broken import stays a warning; it is not the draft's to fix.
@@ -126,7 +140,7 @@ describe('draft', () => {
     expect(result.text).not.toContain('tag drift')
     expect(result.text).toContain('app.legacy -> app.core // 2 dependencies')
 
-    const gate = await runPipeline(pipelineConfig(config))
+    const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
     expect(errors(gate.findings)).toEqual([])
     // Plain relationships mean no burn-down: the debt is blessed, not counted.
@@ -179,9 +193,7 @@ describe('draft', () => {
     ]
     const config: ResolvedConfig = {
       ...configFor('drift'),
-      providers: {
-        scan: [{ id: 'stub', run: async (_context: ScanContext) => observations }],
-      },
+      scan: [{ id: 'stub', run: async (_context: ScanContext) => [SCAN_ROOT, ...observations] }],
     }
 
     const result = await draft(config)
@@ -197,18 +209,16 @@ describe('draft', () => {
     expect(result.edges).toBe(2)
 
     // The mangled identifier still parses and the stub-scanned gate is green.
-    const gate = await runPipeline(pipelineConfig(config))
+    const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
     expect(errors(gate.findings)).toEqual([])
   })
 
-  /** A config whose scan is the given observations, verbatim. */
+  /** A config whose scan is the given observations, plus the root attestation. */
   function stubConfig(observations: Observation[]): ResolvedConfig {
     return {
       ...configFor('drift'),
-      providers: {
-        scan: [{ id: 'stub', run: async (_context: ScanContext) => observations }],
-      },
+      scan: [{ id: 'stub', run: async (_context: ScanContext) => [SCAN_ROOT, ...observations] }],
     }
   }
 
@@ -259,7 +269,7 @@ describe('draft', () => {
     expect(result.text).toContain('app.billing.invoices -> app.reporting { #drift } // 1 dependency')
     expect(result.edges).toBe(2)
 
-    const gate = await runPipeline(pipelineConfig(config))
+    const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
     expect(errors(gate.findings)).toEqual([])
     expect(gate.findings.filter((finding) => finding.ruleId === 'drift-relationship')).toHaveLength(2)
@@ -282,7 +292,7 @@ describe('draft', () => {
     expect(result.text).toContain(`sources 'src/billing/invoices/**'`)
 
     // A container with claiming children is structural, not unobserved.
-    const gate = await runPipeline(pipelineConfig(config))
+    const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
     expect(errors(gate.findings)).toEqual([])
     expect(ruleIds(gate.findings)).toEqual(['drift-relationship'])
@@ -318,7 +328,7 @@ describe('draft', () => {
     expect(result.text).toContain('app.tools -> app.stack { #drift } // 1 dependency')
     expect(result.edges).toBe(2)
 
-    const gate = await runPipeline(pipelineConfig(config))
+    const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
     expect(errors(gate.findings)).toEqual([])
     expect(gate.findings.filter((finding) => finding.ruleId === 'drift-relationship')).toHaveLength(2)
@@ -350,7 +360,7 @@ describe('draft', () => {
     expect(result.edges).toBe(2)
 
     // Green with only the unobserved-elements info listing the stubs.
-    const gate = await runPipeline(pipelineConfig(config))
+    const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
     expect(ruleIds(gate.findings)).toEqual(['unobserved-elements'])
     expect(gate.findings.every((finding) => finding.severity === 'info')).toBe(true)
@@ -419,7 +429,7 @@ describe('draft', () => {
       )
 
       // A described draft still gates green: describe edits description text only.
-      const gate = await runPipeline(pipelineConfig(config))
+      const gate = await runPipeline(config)
       expect(gate.modelErrors).toEqual([])
       expect(errors(gate.findings)).toEqual([])
     })

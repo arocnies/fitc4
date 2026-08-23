@@ -23,7 +23,7 @@ import path from 'node:path'
 // classic compiler API (program/checker), which 7.x no longer exposes.
 import ts from 'typescript'
 import { packageNameOf } from '../model.ts'
-import type { Observation, ScanContext } from '../types.ts'
+import type { NamedProvider, Observation, ScanContext, ScanProvider } from '../types.ts'
 
 export const PROVIDER_ID = 'typescript-imports'
 
@@ -47,8 +47,11 @@ const SKIPPED_AT_ROOT = new Set(['dist', 'build', 'out', 'coverage'])
 const PROGRESS_BATCH = 500
 
 export interface TypeScriptImportsOptions {
-  /** Path to the tsconfig supplying compiler options (paths, baseUrl). */
-  tsconfigPath: string
+  /**
+   * Path to the tsconfig supplying compiler options (paths, baseUrl),
+   * resolved against the repository root when relative.
+   */
+  tsconfig: string
   /**
    * Repository-relative directories to enumerate.
    *
@@ -59,9 +62,11 @@ export interface TypeScriptImportsOptions {
   roots: string[]
 }
 
-export function typescriptImports(options: TypeScriptImportsOptions) {
-  return async (context: ScanContext): Promise<Observation[]> => {
-    const compilerOptions = readCompilerOptions(options.tsconfigPath)
+export function typescriptImports(options: TypeScriptImportsOptions): NamedProvider<ScanProvider> {
+  const run: ScanProvider = async (context: ScanContext): Promise<Observation[]> => {
+    const compilerOptions = readCompilerOptions(
+      path.resolve(context.repositoryRoot, options.tsconfig),
+    )
     const declaredPackages = declaredPackageLookup(context.repositoryRoot)
     // One resolution cache per scan run. Without it every import re-walks
     // node_modules from its own directory; with it TypeScript reuses per-
@@ -161,6 +166,8 @@ export function typescriptImports(options: TypeScriptImportsOptions) {
 
     return observations
   }
+
+  return { id: PROVIDER_ID, run }
 }
 
 /** Every source file under the configured roots, as repository-relative POSIX paths. */

@@ -1,8 +1,0 @@
-{
-  "$schema": "../packages/fitc4/schema/fitc4.config.schema.json",
-  "version": 1,
-  "repositoryRoot": ".",
-  "model": "arch",
-  "scanRoots": ["src"],
-  "tsconfig": "tsconfig.json"
-}

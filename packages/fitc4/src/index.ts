@@ -11,7 +11,6 @@
  */
 
 export {
-  loadConfig,
   resolveConfig,
   defineConfig,
   findConfig,
@@ -20,11 +19,10 @@ export {
   CONFIG_DIRECTORY,
   CONFIG_VERSION,
 } from './config.ts'
-export type { FitC4Config, FitC4FileConfig, ResolvedConfig } from './config.ts'
+export type { FitC4FileConfig, ResolvedConfig } from './config.ts'
 
 export {
   init,
-  AGENT_CONFIG_FILENAME,
   INIT_AGENTS,
   MODEL_DIR,
   MODEL_FILENAME,
@@ -44,8 +42,6 @@ export {
 export { runPipeline } from './pipeline.ts'
 export type { PhaseProviders, PipelineConfig, PipelineResult } from './pipeline.ts'
 
-export { pipelineConfig, defaultResolve, defaultValidate } from './defaults.ts'
-
 export { exitCodeFor, renderReport, UNMAPPED_SOURCE_GROUP_THRESHOLD } from './report.ts'
 
 export { relationshipId, findingId, namespaced } from './ids.ts'
@@ -60,8 +56,8 @@ export {
   type RefKind,
 } from './kinds.ts'
 
-// The ids the default composition runs each provider under, exported so a
-// config file that replaces a phase can rebuild the default entries verbatim.
+// The providers a config composes into its phase arrays, plus the ids each
+// one runs under, so a report line can be traced back to what emitted it.
 export {
   architectureRules,
   ARCHITECTURE_RULE_IDS,

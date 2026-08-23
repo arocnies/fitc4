@@ -73,9 +73,9 @@ accepts. Call any model change out explicitly when handing off. Never:
 - delete `sources` metadata or a declared relationship to silence a finding,
   which removes code from architecture control entirely;
 - add a `#drift` tag to get a new dependency past the gate (see below);
-- soften a rule in the config's `severity` map to turn an error into a
-  warning. How strict the gate is, is the team's call, not a step in fixing
-  a finding.
+- soften a rule's severity in the config, or remove a provider from a
+  phase, to make a finding go away. How strict the gate is, is the team's
+  call, not a step in fixing a finding.
 
 ## Drift etiquette
 

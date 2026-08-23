@@ -21,7 +21,7 @@
 
 import path from 'node:path'
 
-import { defaultResolve, defaultValidate, type PipelineConfig } from 'fitc4'
+import { architectureRules, sourceRoot, type PipelineConfig } from 'fitc4'
 import { agentScan, type AgentExec } from 'fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
@@ -94,7 +94,7 @@ export default function ecomGreenfield(exec: AgentExec, root: string): PipelineC
     repositoryRoot: work,
     modelDir: path.join(work, 'arch'),
     scan: [ecomScan(exec)],
-    resolve: [...defaultResolve],
-    validate: [...defaultValidate],
+    resolve: [sourceRoot()],
+    validate: [architectureRules()],
   }
 }

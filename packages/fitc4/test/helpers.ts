@@ -27,13 +27,8 @@ export function fixtureConfig(
   return {
     repositoryRoot: root,
     modelDir: root,
-    scan: [
-      {
-        id: TYPESCRIPT_IMPORTS_ID,
-        run: typescriptImports({ tsconfigPath: path.join(root, 'tsconfig.json'), roots }),
-      },
-    ],
-    resolve: [{ id: SOURCE_ROOT_ID, run: sourceRoot }],
+    scan: [typescriptImports({ tsconfig: path.join(root, 'tsconfig.json'), roots })],
+    resolve: [sourceRoot()],
     validate: [architectureRules()],
     ...overrides,
   }

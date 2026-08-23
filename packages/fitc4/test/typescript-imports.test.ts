@@ -129,10 +129,10 @@ describe('the scan provider over the skip rules', () => {
     fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}\n')
 
     const scan = typescriptImports({
-      tsconfigPath: path.join(root, 'tsconfig.json'),
+      tsconfig: path.join(root, 'tsconfig.json'),
       roots: ['src'],
     })
-    const observations = await scan({ repositoryRoot: root })
+    const observations = await scan.run({ repositoryRoot: root })
 
     const files = observations
       .filter((observation) => observation.kind === 'file')
@@ -149,12 +149,12 @@ describe('scan progress', () => {
     fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}\n')
 
     const scan = typescriptImports({
-      tsconfigPath: path.join(root, 'tsconfig.json'),
+      tsconfig: path.join(root, 'tsconfig.json'),
       roots: ['src'],
     })
 
     const messages: string[] = []
-    await scan({ repositoryRoot: root, progress: (message) => void messages.push(message) })
+    await scan.run({ repositoryRoot: root, progress: (message) => void messages.push(message) })
     expect(messages).toEqual(['scanned 500 of 501 files'])
 
     // Below the batch size the provider says nothing at all.
@@ -162,9 +162,9 @@ describe('scan progress', () => {
     const small = scratchRepo(['src/one.ts', 'src/two.ts'])
     fs.writeFileSync(path.join(small, 'tsconfig.json'), '{}\n')
     await typescriptImports({
-      tsconfigPath: path.join(small, 'tsconfig.json'),
+      tsconfig: path.join(small, 'tsconfig.json'),
       roots: ['src'],
-    })({ repositoryRoot: small, progress: (message) => void quiet.push(message) })
+    }).run({ repositoryRoot: small, progress: (message) => void quiet.push(message) })
     expect(quiet).toEqual([])
   })
 })

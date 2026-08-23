@@ -25,7 +25,7 @@
 
 import path from 'node:path'
 
-import type { ResolvedConfig } from 'fitc4'
+import { architectureRules, sourceRoot, type ResolvedConfig } from 'fitc4'
 import type { AgentExec } from 'fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
@@ -59,13 +59,12 @@ export default function boutiqueDraft(exec: AgentExec, root: string): ResolvedCo
     repositoryRoot: work,
     // Fresh and empty, so draft's never-overwrite rule has nothing to trip on.
     modelDir: path.join(work, 'draft'),
-    // Draft derives element prefixes from the scan roots; the services'
-    // stand-in files live under src/<name>/.
-    scanRoots: ['src'],
-    // Never read: the configured scan below replaces the TypeScript scanner.
-    tsconfigPath: path.join(work, 'tsconfig.json'),
-    providers: {
-      scan: [boutiqueScan(exec, DRAFT_INSTRUCTIONS)],
-    },
+    // The scan attests to kubernetes-manifests/, but the stand-in files it
+    // reports live under src/<name>/ — outside every attested root — so
+    // draft roots them at their first directory and the element prefixes
+    // come out as src/<name>/** exactly as before.
+    scan: [boutiqueScan(exec, DRAFT_INSTRUCTIONS)],
+    resolve: [sourceRoot()],
+    validate: [architectureRules()],
   }
 }

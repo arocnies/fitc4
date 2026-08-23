@@ -113,18 +113,16 @@ warning (1)
 drift: 1 declared, 0 exercised, 1 unused
 ```
 
-A drift edge the code stopped exercising has to go, or the model keeps permitting a dependency nothing needs. Delete the tagged relationship (and the `tag drift` line, since nothing else uses it) and the run is clean again. `severity: { 'unused-drift': 'error' }` in a `.ts` config makes that deletion mandatory. `{ 'drift-relationship': 'error' }` forbids tolerated drift entirely.
+A drift edge the code stopped exercising has to go, or the model keeps permitting a dependency nothing needs. Delete the tagged relationship (and the `tag drift` line, since nothing else uses it) and the run is clean again. `architectureRules({ severity: { 'unused-drift': 'error' } })` in the config makes that deletion mandatory. `{ 'drift-relationship': 'error' }` forbids tolerated drift entirely.
 
 ## Layout
 
 ```text
 arch/model.c4        the contract: elements, sources ownership, allowed dependencies
-fitc4.config.json    where things are: the config CI discovers and runs
+fitc4.config.mts     the gate CI discovers and runs: where things are, which providers judge
 fitc4.agent.config.ts   the same gate plus advisory agent providers, run on demand
 AGENTS.md            norms for AI agents here: the model is the contract
 src/                 the implementation being checked
 ```
-
-One workspace-ism to not copy: this example's `fitc4.config.json` points `$schema` into the workspace (`../packages/fitc4/schema/...`). In your own project point it at `./node_modules/fitc4/schema/fitc4.config.schema.json`.
 
 `npm run check -w example` chains model validation, typecheck, tests, and the gate. `npm run view -w example` opens the live LikeC4 diagram.

@@ -38,12 +38,10 @@
       "types": "./dist/agent/index.d.ts",
       "default": "./dist/agent/index.js"
     },
-    "./schema/fitc4.config.schema.json": "./schema/fitc4.config.schema.json",
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "schema",
     "skills"
   ],
   "scripts": {

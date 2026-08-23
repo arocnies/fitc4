@@ -57,7 +57,7 @@ const MISSING_DECISION = 'demo.app.core=>./missing.js'
 
 /** Alongside the default resolver, exactly as the docs compose it. */
 function resolvePhase(exec: AgentExec, options: { maxObservations?: number } = {}) {
-  return [{ id: SOURCE_ROOT_ID, run: sourceRoot }, agentResolve({ exec, ...options })]
+  return [sourceRoot(), agentResolve({ exec, ...options })]
 }
 
 function providerFailure(findings: Finding[]): Finding | undefined {
@@ -331,7 +331,7 @@ describe('agentResolve composition', () => {
 
     const result = await runFixture('external', {
       resolve: [
-        { id: SOURCE_ROOT_ID, run: sourceRoot },
+        sourceRoot(),
         agentResolve({ exec, id: 'infra' }),
         agentResolve({ exec, id: 'apis' }),
       ],

@@ -1,9 +1,17 @@
+/**
+ * Field validation and discovery for the one config form.
+ *
+ * A config that quietly fell back to anything would scan the wrong tree and
+ * report a clean pass — the same fail-open the pipeline avoids everywhere
+ * else — so every malformed shape here must be a named error.
+ */
+
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import { CONFIG_DIRECTORY, CONFIG_FILENAME, findConfig, loadConfig } from '../src/config.ts'
+import { CONFIG_DIRECTORY, CONFIG_FILENAME, findConfig, resolveConfig } from '../src/config.ts'
 
 const created: string[] = []
 
@@ -13,187 +21,134 @@ afterEach(() => {
   }
 })
 
-function writeConfig(contents: unknown): string {
+/** Inline stub providers: these tests validate shape, never run a pipeline. */
+const STUB_PHASES = `  scan: [{ id: 'stub-scan', run: async () => [] }],
+  resolve: [{ id: 'stub-resolve', run: async () => [] }],
+  validate: [{ id: 'stub-validate', run: async () => [] }],`
+
+const VALID_FIELDS = `  version: 1,
+  repositoryRoot: '..',
+  model: '.',
+${STUB_PHASES}`
+
+function writeConfig(fields: string): string {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-config-'))
   created.push(directory)
   const configPath = path.join(directory, CONFIG_FILENAME)
-  fs.writeFileSync(
-    configPath,
-    typeof contents === 'string' ? contents : JSON.stringify(contents, null, 2),
-  )
+  fs.writeFileSync(configPath, `export default {\n${fields}\n}\n`)
   return configPath
 }
 
-const VALID = {
-  version: 1,
-  repositoryRoot: '..',
-  model: '.',
-  scanRoots: ['src'],
-  tsconfig: '../tsconfig.json',
-}
-
 describe('loading the config', () => {
-  // The viewer base names a published site, so it must not be path-resolved,
-  // and its absence is the feature being off, not a default.
-  // Severity is the one piece of rule tuning a team reaches for while
-  // adopting, so it is legal in JSON: it carries only strings, and putting it
-  // behind a module config meant converting the file to change one word.
-  test('accepts a severity map in the JSON form and leaves it absent otherwise', () => {
-    expect(loadConfig(writeConfig(VALID)).severity).toBeUndefined()
-
-    const promoted = { ...VALID, severity: { 'unmapped-source': 'error' } }
-    expect(loadConfig(writeConfig(promoted)).severity).toEqual({ 'unmapped-source': 'error' })
-
-    const both = { ...VALID, severity: { 'unused-drift': 'error', 'unresolved-import': 'info' } }
-    expect(loadConfig(writeConfig(both)).severity).toEqual({
-      'unused-drift': 'error',
-      'unresolved-import': 'info',
-    })
-  })
-
-  // An ignored key here is a team believing their gate is closed when it is
-  // open, which is exactly the fail-open this module exists to prevent.
-  test('rejects an unknown rule id, suggesting the near miss', () => {
-    expect(() =>
-      loadConfig(writeConfig({ ...VALID, severity: { 'unmaped-source': 'error' } })),
-    ).toThrow(/unknown rule 'unmaped-source', did you mean 'unmapped-source'\?/)
-    expect(() =>
-      loadConfig(writeConfig({ ...VALID, severity: { 'totally-made-up': 'error' } })),
-    ).toThrow(/unknown rule 'totally-made-up'/)
-    // No suggestion when nothing is close, rather than a misleading one.
-    expect(() =>
-      loadConfig(writeConfig({ ...VALID, severity: { 'totally-made-up': 'error' } })),
-    ).not.toThrow(/did you mean/)
-  })
-
-  test.each([
-    ['an unknown level', { 'unmapped-source': 'fatal' }],
-    ['a non-string level', { 'unmapped-source': 2 }],
-    ['a null level', { 'unmapped-source': null }],
-  ])('rejects %s', (_label, severity) => {
-    expect(() => loadConfig(writeConfig({ ...VALID, severity }))).toThrow(
-      /must be one of error, warning, info/,
-    )
-  })
-
-  test.each([
-    ['a bare string', 'error'],
-    ['an array', ['error']],
-    ['null', null],
-  ])('rejects severity as %s', (_label, severity) => {
-    expect(() => loadConfig(writeConfig({ ...VALID, severity }))).toThrow(
-      /'severity' must be an object mapping rule ids/,
-    )
-  })
-
-  test('keeps viewerBaseUrl verbatim and optional', () => {
-    expect(loadConfig(writeConfig(VALID)).viewerBaseUrl).toBeUndefined()
-
-    const base = 'https://acme.github.io/arch/#/'
-    expect(loadConfig(writeConfig({ ...VALID, viewerBaseUrl: base })).viewerBaseUrl).toBe(base)
-  })
-
-  test.each([
-    ['a non-string', 7],
-    ['a blank string', '  '],
-    ['a relative path', './site'],
-    ['a schemeless host', 'acme.github.io/arch'],
-    ['a non-http scheme', 'ftp://acme.github.io/arch'],
-  ])('rejects %s viewerBaseUrl', (_label, value) => {
-    expect(() => loadConfig(writeConfig({ ...VALID, viewerBaseUrl: value }))).toThrow(
-      "'viewerBaseUrl' must be an absolute http(s) URL",
-    )
-  })
-
-  test('resolves every path relative to the config file', () => {
-    const configPath = writeConfig(VALID)
+  test('resolves every path relative to the config file', async () => {
+    const configPath = writeConfig(VALID_FIELDS)
     const base = path.dirname(configPath)
-    const config = loadConfig(configPath)
+    const config = await resolveConfig(configPath)
 
     expect(config.repositoryRoot).toBe(path.resolve(base, '..'))
     expect(config.modelDir).toBe(path.resolve(base, '.'))
-    expect(config.tsconfigPath).toBe(path.resolve(base, '../tsconfig.json'))
-    expect(config.scanRoots).toEqual(['src'])
+    expect(config.scan.map((provider) => provider.id)).toEqual(['stub-scan'])
+  })
+
+  // The viewer base names a published site, so it must not be path-resolved,
+  // and its absence is the feature being off, not a default.
+  test('keeps viewerBaseUrl verbatim and optional', async () => {
+    expect((await resolveConfig(writeConfig(VALID_FIELDS))).viewerBaseUrl).toBeUndefined()
+
+    const base = 'https://acme.github.io/arch/#/'
+    const config = await resolveConfig(
+      writeConfig(`${VALID_FIELDS}\n  viewerBaseUrl: ${JSON.stringify(base)},`),
+    )
+    expect(config.viewerBaseUrl).toBe(base)
+  })
+
+  test.each([
+    ['a non-string', '7'],
+    ['a blank string', "'  '"],
+    ['a relative path', "'./site'"],
+    ['a schemeless host', "'acme.github.io/arch'"],
+    ['a non-http scheme', "'ftp://acme.github.io/arch'"],
+  ])('rejects %s viewerBaseUrl', async (_label, value) => {
+    await expect(
+      resolveConfig(writeConfig(`${VALID_FIELDS}\n  viewerBaseUrl: ${value},`)),
+    ).rejects.toThrow("'viewerBaseUrl' must be an absolute http(s) URL")
   })
 
   // The shipped example is the only config authored the way a consumer would
   // author one. If its paths stop resolving, the documented layout is wrong.
-  test("the example project's config loads and points at the example", () => {
+  // Loading it imports 'fitc4' through the workspace symlink, so this needs a
+  // built dist/ — which the test and eval workflow already requires.
+  test("the example project's config loads and points at the example", async () => {
     const example = path.resolve(import.meta.dirname, '../../../example')
     const configPath = findConfig(example)
 
     expect(configPath).toBe(path.join(example, CONFIG_FILENAME))
 
-    const config = loadConfig(configPath)
+    const config = await resolveConfig(configPath)
     expect(config.repositoryRoot).toBe(example)
-    expect(config.scanRoots).toEqual(['src'])
-    expect(fs.existsSync(config.tsconfigPath)).toBe(true)
+    expect(config.scan.map((provider) => provider.id)).toEqual(['typescript-imports'])
+    expect(config.resolve.map((provider) => provider.id)).toEqual(['source-root'])
+    expect(config.validate.map((provider) => provider.id)).toEqual(['architecture-rules'])
     expect(fs.existsSync(path.join(config.modelDir, 'model.c4'))).toBe(true)
   })
 })
 
-// A config that quietly falls back to defaults would scan the wrong tree and
-// report a clean pass — the same fail-open the pipeline avoids everywhere else.
 describe('rejecting a malformed config', () => {
   test.each([
-    ['a missing version', { ...VALID, version: undefined }, "missing required field 'version'"],
-    ['a future version', { ...VALID, version: 2 }, 'unsupported version'],
-    ['an empty scanRoots', { ...VALID, scanRoots: [] }, 'at least one directory'],
-    ['a non-array scanRoots', { ...VALID, scanRoots: 'src' }, 'array of strings'],
-    ['a non-string entry', { ...VALID, scanRoots: ['src', 3] }, 'array of strings'],
-    // A blank scan root is not a harmless no-op: as a prefix it matches
-    // everything, silently putting the whole repository under scan.
-    ['a blank scanRoots entry', { ...VALID, scanRoots: ['src', ' '] }, "'scanRoots[1]'"],
-    ['a blank path', { ...VALID, model: '  ' }, "'model' must be a non-empty string"],
-    ['a missing tsconfig', { ...VALID, tsconfig: undefined }, "'tsconfig' must be"],
-  ])('%s is an error', (_label, contents, expected) => {
-    expect(() => loadConfig(writeConfig(contents))).toThrow(expected)
+    ['a missing version', VALID_FIELDS.replace(/^ {2}version: 1,\n/, ''), "missing required field 'version'"],
+    ['a future version', VALID_FIELDS.replace('version: 1', 'version: 2'), 'unsupported version'],
+    ['a blank path', VALID_FIELDS.replace("model: '.'", "model: '  '"), "'model' must be a non-empty string"],
+  ])('%s is an error', async (_label, fields, expected) => {
+    await expect(resolveConfig(writeConfig(fields))).rejects.toThrow(expected)
   })
 
-  // A typo'd key that is silently ignored is the wrong tree scanned with
-  // extra confidence — the schema says additionalProperties: false, and the
-  // runtime must not be laxer than the editor.
-  test('an unknown field is an error with a suggestion', () => {
-    expect(() => loadConfig(writeConfig({ ...VALID, scanRoot: ['src'] }))).toThrow(
-      "unknown field 'scanRoot', did you mean 'scanRoots'?",
+  // The phases are required, and the missing-phase error carries the standard
+  // composition ready to paste: "explicit" must never mean "go find out what
+  // the default would have been".
+  test.each([
+    ['scan', /missing 'scan'.*typescriptImports\(\{ tsconfig: 'tsconfig\.json', roots: \['src'\] \}\)/],
+    ['resolve', /missing 'resolve'.*sourceRoot\(\)/],
+    ['validate', /missing 'validate'.*architectureRules\(\)/],
+  ] as const)('a missing %s phase names the standard one', async (phase, expected) => {
+    const fields = VALID_FIELDS.split('\n')
+      .filter((line) => !line.trimStart().startsWith(`${phase}: [`))
+      .join('\n')
+    await expect(resolveConfig(writeConfig(fields))).rejects.toThrow(expected)
+  })
+
+  // An empty phase runs nothing: an empty validate is a gate that passes
+  // everything, silently.
+  test.each(['scan', 'resolve', 'validate'] as const)(
+    'an empty %s phase is an error',
+    async (phase) => {
+      const fields = VALID_FIELDS.replace(new RegExp(`${phase}: \\[.*\\],`), `${phase}: [],`)
+      await expect(resolveConfig(writeConfig(fields))).rejects.toThrow(
+        `'${phase}' lists no providers`,
+      )
+    },
+  )
+
+  // A typo'd key that is silently ignored is the wrong gate run with extra
+  // confidence.
+  test('an unknown field is an error with a suggestion', async () => {
+    await expect(resolveConfig(writeConfig(`${VALID_FIELDS}\n  scann: [],`))).rejects.toThrow(
+      "unknown field 'scann', did you mean 'scan'?",
     )
-    expect(() => loadConfig(writeConfig({ ...VALID, banana: true }))).toThrow(
+    await expect(resolveConfig(writeConfig(`${VALID_FIELDS}\n  banana: true,`))).rejects.toThrow(
       "unknown field 'banana'",
     )
   })
 
-  test('provider arrays in JSON are named as a module-form feature', () => {
-    expect(() => loadConfig(writeConfig({ ...VALID, validate: [] }))).toThrow(
-      'only available in the module config forms (.ts/.mts/.js/.mjs)',
-    )
-  })
-
-  // The same module-only boundary, worded for what 'agent' actually is: not a
-  // provider array, but still a function JSON cannot carry.
-  test('an agent field in JSON is named as a module-form feature', () => {
-    expect(() => loadConfig(writeConfig({ ...VALID, agent: { id: 'x' } }))).toThrow(
-      'only available in the module config forms (.ts/.mts/.js/.mjs). ' +
-        'An agent exec is a function, which JSON cannot carry',
-    )
-  })
-
-  test('malformed JSON names the file', () => {
-    const configPath = writeConfig('{ not json')
-    expect(() => loadConfig(configPath)).toThrow(configPath)
-  })
-
-  test('a JSON array is not a config', () => {
-    expect(() => loadConfig(writeConfig([]))).toThrow('expected a JSON object')
-  })
-
-  test('a missing file is an error, not an empty config', () => {
-    expect(() => loadConfig(path.join(os.tmpdir(), 'definitely-absent.json'))).toThrow('Cannot read')
+  test('a missing file is an error, not an empty config', async () => {
+    await expect(
+      resolveConfig(path.join(os.tmpdir(), 'definitely-absent', CONFIG_FILENAME)),
+    ).rejects.toThrow('Cannot import')
   })
 })
 
 describe('finding the config', () => {
   test('walks up from a nested directory', () => {
-    const configPath = writeConfig(VALID)
+    const configPath = writeConfig(VALID_FIELDS)
     const nested = path.join(path.dirname(configPath), 'a', 'b')
     fs.mkdirSync(nested, { recursive: true })
 
@@ -203,7 +158,7 @@ describe('finding the config', () => {
   // The tucked-away location. Supported so a project can keep its root clean,
   // but the CLI is typed at the project root, so discovery must reach down.
   test(`finds a config tucked into ${CONFIG_DIRECTORY}/`, () => {
-    const configPath = writeConfig(VALID)
+    const configPath = writeConfig(VALID_FIELDS)
     const root = path.dirname(configPath)
     const nested = path.join(root, CONFIG_DIRECTORY)
     fs.mkdirSync(nested)
@@ -213,13 +168,24 @@ describe('finding the config', () => {
   })
 
   test(`a config beside the caller wins over one in ${CONFIG_DIRECTORY}/`, () => {
-    const configPath = writeConfig(VALID)
+    const configPath = writeConfig(VALID_FIELDS)
     const root = path.dirname(configPath)
     const nested = path.join(root, CONFIG_DIRECTORY)
     fs.mkdirSync(nested)
     fs.copyFileSync(configPath, path.join(nested, CONFIG_FILENAME))
 
     expect(findConfig(root)).toBe(configPath)
+  })
+
+  // The JSON form is gone: a leftover fitc4.config.json is not silently
+  // honored OR silently skipped into an ancestor's config — it is simply not
+  // a config name anymore, and the not-found error names what is.
+  test('a fitc4.config.json is not a recognized config', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-json-'))
+    created.push(directory)
+    fs.writeFileSync(path.join(directory, 'fitc4.config.json'), '{}\n')
+
+    expect(() => findConfig(directory)).toThrow(/No fitc4\.config\.ts/)
   })
 
   test('reports where it looked when there is none', () => {

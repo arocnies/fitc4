@@ -19,13 +19,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { loadConfig, pipelineConfig, type PipelineConfig } from 'fitc4'
+import { resolveConfig, type PipelineConfig } from 'fitc4'
 import { agentResolve, type AgentExec } from 'fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
 import { RESOLVE_INSTRUCTIONS } from '../greenfield/fitc4.eval.ts'
 
-export default function ddhBrownfield(exec: AgentExec, root: string): PipelineConfig {
+export default async function ddhBrownfield(exec: AgentExec, root: string): Promise<PipelineConfig> {
   const fixtureDir = path.dirname(root)
   const evalsDir = path.resolve(fixtureDir, '..', '..')
   const manifest = externalManifest(root)
@@ -44,11 +44,11 @@ export default function ddhBrownfield(exec: AgentExec, root: string): PipelineCo
     name: 'ddh-brownfield',
     checkout,
     overlayDir: fixtureDir,
-    overlay: ['arch', 'fitc4.config.json'],
+    overlay: ['arch', 'fitc4.config.mts'],
     patches,
   })
 
-  const base = pipelineConfig(loadConfig(path.join(work, 'fitc4.config.json')))
+  const base = await resolveConfig(path.join(work, 'fitc4.config.mts'))
   return {
     ...base,
     resolve: [...base.resolve, agentResolve({ exec, instructions: RESOLVE_INSTRUCTIONS })],

@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterAll, describe, expect, test } from 'vitest'
 
 import { loadModel } from '../src/model.ts'
@@ -34,21 +35,35 @@ function tempDir(): string {
   return directory
 }
 
+/** The real entry module, importable from a temp dir outside node_modules. */
+const INDEX_URL = pathToFileURL(path.join(import.meta.dirname, '..', 'src', 'index.ts')).href
+
+/**
+ * Write a standard config module into a temp dir, pointing at a fixture by
+ * absolute path. `extra` fields (say an `agent:` exec) land after the phases.
+ */
+function writeConfig(root: string, modelDir: string, extra = ''): string {
+  const configPath = path.join(tempDir(), 'fitc4.config.mts')
+  fs.writeFileSync(
+    configPath,
+    `import { architectureRules, sourceRoot, typescriptImports } from ${JSON.stringify(INDEX_URL)}
+export default {
+  version: 1,
+  repositoryRoot: ${JSON.stringify(root)},
+  model: ${JSON.stringify(modelDir)},
+  scan: [typescriptImports({ tsconfig: ${JSON.stringify(path.join(root, 'tsconfig.json'))}, roots: ['src'] })],
+  resolve: [sourceRoot()],
+  validate: [architectureRules()],
+${extra}}
+`,
+  )
+  return configPath
+}
+
 /** A config file pointing at a fixture by absolute path. */
 function configFor(fixture: string): string {
   const root = fixturePath(fixture)
-  const configPath = path.join(tempDir(), 'fitc4.config.json')
-  fs.writeFileSync(
-    configPath,
-    JSON.stringify({
-      version: 1,
-      repositoryRoot: root,
-      model: root,
-      scanRoots: ['src'],
-      tsconfig: path.join(root, 'tsconfig.json'),
-    }),
-  )
-  return configPath
+  return writeConfig(root, root)
 }
 
 function runCli(
@@ -129,17 +144,7 @@ describe('draft', () => {
   test('writes the model, reports the drift default, and ends with the summary', HEAVY, () => {
     const root = fixturePath('drift')
     const modelDir = path.join(tempDir(), 'arch')
-    const configPath = path.join(tempDir(), 'fitc4.config.json')
-    fs.writeFileSync(
-      configPath,
-      JSON.stringify({
-        version: 1,
-        repositoryRoot: root,
-        model: modelDir,
-        scanRoots: ['src'],
-        tsconfig: path.join(root, 'tsconfig.json'),
-      }),
-    )
+    const configPath = writeConfig(root, modelDir)
 
     const { status, stdout } = runCli(['draft', '--config', configPath])
 
@@ -211,21 +216,10 @@ describe('draft --describe', () => {
   test('an exec that cannot run aborts the draft, exits nonzero, and writes nothing', HEAVY, () => {
     const root = fixturePath('drift')
     const modelDir = path.join(tempDir(), 'arch')
-    const configPath = path.join(tempDir(), 'fitc4.config.ts')
-    fs.writeFileSync(
-      configPath,
-      `export default {
-  version: 1,
-  repositoryRoot: ${JSON.stringify(root)},
-  model: ${JSON.stringify(modelDir)},
-  scanRoots: ['src'],
-  tsconfig: ${JSON.stringify(path.join(root, 'tsconfig.json'))},
-  agent: {
-    id: 'stub/model',
-    run: async () => ({ ok: false, error: 'not logged in' }),
-  },
-}
-`,
+    const configPath = writeConfig(
+      root,
+      modelDir,
+      `  agent: { id: 'stub/model', run: async () => ({ ok: false, error: 'not logged in' }) },\n`,
     )
 
     const { status, stdout, stderr } = runCli(['draft', '--describe', '--config', configPath])
@@ -240,21 +234,10 @@ describe('draft --describe', () => {
   test('an abstaining exec keeps the TODOs and still exits 0', HEAVY, () => {
     const root = fixturePath('drift')
     const modelDir = path.join(tempDir(), 'arch')
-    const configPath = path.join(tempDir(), 'fitc4.config.ts')
-    fs.writeFileSync(
-      configPath,
-      `export default {
-  version: 1,
-  repositoryRoot: ${JSON.stringify(root)},
-  model: ${JSON.stringify(modelDir)},
-  scanRoots: ['src'],
-  tsconfig: ${JSON.stringify(path.join(root, 'tsconfig.json'))},
-  agent: {
-    id: 'stub/model',
-    run: async () => ({ ok: true, value: { description: '' }, raw: '' }),
-  },
-}
-`,
+    const configPath = writeConfig(
+      root,
+      modelDir,
+      `  agent: { id: 'stub/model', run: async () => ({ ok: true, value: { description: '' }, raw: '' }) },\n`,
     )
 
     const { status, stdout } = runCli(['draft', '--describe', '--config', configPath])
@@ -269,21 +252,10 @@ describe('draft --describe', () => {
   test('with a module config declaring a stub exec, descriptions land in the draft', HEAVY, () => {
     const root = fixturePath('drift')
     const modelDir = path.join(tempDir(), 'arch')
-    const configPath = path.join(tempDir(), 'fitc4.config.ts')
-    fs.writeFileSync(
-      configPath,
-      `export default {
-  version: 1,
-  repositoryRoot: ${JSON.stringify(root)},
-  model: ${JSON.stringify(modelDir)},
-  scanRoots: ['src'],
-  tsconfig: ${JSON.stringify(path.join(root, 'tsconfig.json'))},
-  agent: {
-    id: 'stub/model',
-    run: async () => ({ ok: true, value: { description: 'Does fixture things.' }, raw: '' }),
-  },
-}
-`,
+    const configPath = writeConfig(
+      root,
+      modelDir,
+      `  agent: { id: 'stub/model', run: async () => ({ ok: true, value: { description: 'Does fixture things.' }, raw: '' }) },\n`,
     )
 
     const { status, stdout, stderr } = runCli(['draft', '--describe', '--config', configPath])
@@ -357,6 +329,13 @@ describe('init', () => {
       JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext' } }),
     )
     expect(runCli(['init'], directory).status).toBe(0)
+    // The scaffold imports the package by name, which cannot resolve from a
+    // temp dir outside any node_modules; point it at the real entry module.
+    const scaffolded = path.join(directory, 'fitc4.config.mts')
+    fs.writeFileSync(
+      scaffolded,
+      fs.readFileSync(scaffolded, 'utf8').replace(`from 'fitc4'`, `from '${INDEX_URL}'`),
+    )
 
     const { status, stdout } = runCli(['draft'], directory)
 

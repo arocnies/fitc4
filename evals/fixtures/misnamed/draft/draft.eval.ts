@@ -38,7 +38,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import type { ResolvedConfig } from 'fitc4'
+import {
+  architectureRules,
+  sourceRoot,
+  typescriptImports,
+  type ResolvedConfig,
+} from 'fitc4'
 import type { AgentExec } from 'fitc4/agent'
 
 /**
@@ -65,10 +70,11 @@ export default function misnamedDraft(_exec: AgentExec, root: string): ResolvedC
     // Fresh and empty, and outside the repository: draft's never-overwrite
     // rule has nothing to trip on and nothing is written into the fixture.
     modelDir: fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-misnamed-draft-')),
-    scanRoots: ['src'],
-    tsconfigPath: path.join(project, 'tsconfig.json'),
-    // No providers: `pipelineConfig` composes the default typescript-imports
-    // scanner, which is the whole structural half of this fixture. The exec
-    // parameter is unused here; the harness passes it to the describer.
+    // The stock typescript-imports scanner is the whole structural half of
+    // this fixture. The exec parameter is unused here; the harness passes it
+    // to the describer.
+    scan: [typescriptImports({ tsconfig: path.join(project, 'tsconfig.json'), roots: ['src'] })],
+    resolve: [sourceRoot()],
+    validate: [architectureRules()],
   }
 }

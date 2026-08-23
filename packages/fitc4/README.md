@@ -15,19 +15,19 @@ npm install --save-dev fitc4
 npx fitc4 init
 ```
 
-`init` writes three files and never overwrites an existing one: `fitc4.config.json`, a starter `arch/model.c4` whose single element owns `src/**` so the very first check is green, and an `AGENTS.md` carrying [the norms](#for-ai-agents). Split the placeholder into real components from there, or let [`draft`](#draft-a-model-from-existing-code) replace it wholesale.
+`init` writes three files and never overwrites an existing one: `fitc4.config.mts`, a starter `arch/model.c4` whose single element owns `src/**` so the very first check is green, and an `AGENTS.md` carrying [the norms](#for-ai-agents). Split the placeholder into real components from there, or let [`draft`](#draft-a-model-from-existing-code) replace it wholesale.
 
 On a brownfield repository the whole path to green is five commands and one edit:
 
 ```sh
 npm install --save-dev fitc4
-npx fitc4 init --agent codex     # or claude, or plain init for the JSON config
+npx fitc4 init --agent codex     # or claude; plain init skips the agent exec
 npx fitc4 draft --describe       # writes a model from your code
                                  # then edit arch/model.c4: untag the edges you bless
 npx fitc4
 ```
 
-**With `--agent claude` or `--agent codex`**, init scaffolds a `fitc4.config.mts` instead, declaring one shared cached exec around that CLI's measured model as the config's `agent`, so [`draft --describe`](#draft-a-model-from-existing-code) works immediately. The exec runs your own CLI on your own login and billing. No [agent provider](#agent-providers) joins the gate itself, because that would make every `fitc4` run call your CLI, which bills per run and fails in CI without a login. Everything else init does is identical.
+**With `--agent claude` or `--agent codex`**, the scaffolded config also declares one shared cached exec around that CLI's measured model as its `agent`, so [`draft --describe`](#draft-a-model-from-existing-code) works immediately. The exec runs your own CLI on your own login and billing. No [agent provider](#agent-providers) joins the gate itself, because that would make every `fitc4` run call your CLI, which bills per run and fails in CI without a login. Everything else init does is identical.
 
 **Requirements.** Node >= 22.22.3, since the CLI loads `.ts` configs with Node's native type stripping, and a `tsconfig.json`, whose module resolution the scanner uses.
 
@@ -65,17 +65,19 @@ model {
 }
 ```
 
-**`fitc4.config.json`** at your project root. Paths resolve relative to this file.
+**`fitc4.config.mts`** at your project root. Paths resolve relative to this file, and the three phases are explicit: what runs is what the file names, nothing more.
 
-```json
-{
-  "$schema": "./node_modules/fitc4/schema/fitc4.config.schema.json",
-  "version": 1,
-  "repositoryRoot": ".",
-  "model": "arch",
-  "scanRoots": ["src"],
-  "tsconfig": "tsconfig.json"
-}
+```ts
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+
+export default defineConfig({
+  version: 1,
+  repositoryRoot: '.',
+  model: 'arch',
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
+  resolve: [sourceRoot()],
+  validate: [architectureRules()],
+})
 ```
 
 **Run it.**
@@ -94,15 +96,15 @@ Two more shapes fall out of the same principle. A scan that reports fragment loc
 
 Every relationship the gate can observe is tagged as drift by default, so the very first gate run is green and the drift line becomes the adoption burn-down. Untagging an edge is the human act of blessing it as intended architecture; `--no-drift` emits plain relationships instead. The draft is a starting point to rewrite, never a sync: rename the elements, write the real descriptions, split what a directory lumps together.
 
-It writes into the configured model directory when no model file exists there, and in exactly one other case: when the only model file is `init`'s untouched placeholder, recognized by the marker comment on its first line. That is not a hole in the never-overwrite rule. The rule protects authored documentation, and a placeholder this tool wrote and nobody edited is not authored documentation; without the exception `init`'s own advice was false, since it created the file that made the next command refuse. Everything else refuses as before: two model files, a marker line edited or removed, a file that never had one. The drafted output carries no marker of its own, so a second draft over it refuses. When the draft refuses, stdout carries the model text and nothing else, so `fitc4 draft > arch/model.c4` writes a clean file; the reason and the counts go to stderr.
+It never overwrites an authored model, with one exception: `init`'s untouched placeholder, recognized by the marker comment on its first line, is replaced (edit the placeholder and it is yours; draft leaves it alone). A drafted model carries no marker, so a second draft over it refuses. When the draft refuses, stdout carries the model text and nothing else, so `fitc4 draft > arch/model.c4` writes a clean file; the reason and the counts go to stderr.
 
-`draft --describe` replaces each eligible element's TODO description with one or two sentences proposed by the config's `agent` exec from the files that element owns (eligible means a `sources` claim plus at least one observed file; claimless containers and the stub elements keep their placeholders). It needs a module config declaring an `agent`, which `init --agent` scaffolds. Two failure modes, kept apart: a model that abstains, or answers with nothing, leaves that element's TODO in place and the draft still succeeds, while an exec that cannot run at all (missing CLI, not logged in, timeout, off-schema reply) aborts the draft, exits nonzero, and writes nothing. A logged-out CLI reporting eleven kept TODOs and exit 0 was the fail-open worth closing. The pass is also skipped entirely when the draft would refuse to write, since nobody should be billed for descriptions that get printed and thrown away. The proposals are draft-time only: the gate critiques descriptions (`agentSemanticReview`), it never rewrites them.
+`draft --describe` replaces each eligible element's TODO description with one or two sentences proposed by the config's `agent` exec from the files that element owns (eligible means a `sources` claim plus at least one observed file; claimless containers and the stub elements keep their placeholders). `init --agent` scaffolds the exec. A model that abstains leaves that element's TODO in place and the draft still succeeds; an exec that cannot run at all (missing CLI, not logged in, timeout, off-schema reply) aborts the draft, exits nonzero, and writes nothing. The pass is skipped entirely when the draft would refuse to write, so nobody is billed for descriptions that get thrown away. The proposals are draft-time only: the gate critiques descriptions (`agentSemanticReview`), it never rewrites them.
 
 A clean run prints a summary and exits 0. A file in `src/core` importing from `src/interface` is a dependency the model does not declare, so the run exits 1:
 
 ```text
 error (1)
-  relationship-direction  acme.app.core depends on acme.app.interface, but the model declares only acme.app.interface -> acme.app.core. Reroute or remove the import so the dependency flows the way the model declares; if the architecture genuinely changed, declare the dependency the code has instead.
+  relationship-direction  acme.app.core depends on acme.app.interface, but the model declares only acme.app.interface -> acme.app.core. Reroute or remove the import so the dependency flows the way the model declares.
     architecture-rules  architecture-rules/relationship-direction/acme.app.core->acme.app.interface
     src/core/bad.ts:1  ../interface/index.ts
 ```
@@ -111,19 +113,17 @@ That exit 1 is the product: the gate that fails exactly where code and contract 
 
 ## Configuration
 
-`--json` emits the full result instead of the report. `--config <path>` overrides discovery, which otherwise checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, then `fitc4.config.json`, first in the working directory and then under `.fitc4/`, repeating up each ancestor. Two configs in one directory is an error rather than a silent choice.
+`--json` emits the full result instead of the report. `--config <path>` overrides discovery, which otherwise checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, first in the working directory and then under `.fitc4/`, repeating up each ancestor. Two configs in one directory is an error rather than a silent choice.
 
-The module forms default-export the same fields (wrap them in `defineConfig` for editor types) plus optional provider arrays. That is how the agent providers below are composed in. They load as ES modules, so in a CommonJS package (no `"type": "module"`), name the config `fitc4.config.mts`. If your tsconfig typechecks the config file, keep `skipLibCheck: true`. LikeC4's own declarations do not pass a strict lib check.
+The config default-exports its fields (wrap them in `defineConfig` for editor types), and the `scan`/`resolve`/`validate` arrays are required: there are no default phases, no merge semantics, and nothing composed in behind the file. A missing phase is an error carrying the standard composition ready to paste. The file loads as an ES module, so in a CommonJS package (no `"type": "module"`), name it `fitc4.config.mts`. If your tsconfig typechecks the config file, keep `skipLibCheck: true`. LikeC4's own declarations do not pass a strict lib check.
 
-The optional `severity` map promotes or softens individual rules, and works in the JSON form as well as the module forms, since it carries only strings:
+Rule tuning lives on the rules provider, in your own `validate` array:
 
-```json
-"severity": { "unmapped-source": "error" }
+```ts
+validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
 ```
 
-The [standard severities](#rules) assume adoption: new unowned code is a `warning` nudge rather than a broken build. That map is how a team done adopting closes the door, and unowned code fails the gate from then on. `{ "unused-drift": "error" }` means a drift edge the code no longer exercises fails until it is deleted from the model, so [declared drift](#tolerated-drift) can only shrink. An unknown rule id is an error, not an ignored key, because a typo'd promotion that silently does nothing is a team believing their gate is closed when it is open.
-
-It tunes the default rules provider, so a module config that also supplies its own `validate` array is an error rather than a silently ignored map. Pass the severities to the provider directly in that case: `validate: [architectureRules({ severity: { ... } })]`.
+The [standard severities](#rules) assume adoption: new unowned code is a `warning` nudge rather than a broken build. That map is how a team done adopting closes the door, and unowned code fails the gate from then on. `{ 'unused-drift': 'error' }` means a drift edge the code no longer exercises fails until it is deleted from the model, so [declared drift](#tolerated-drift) can only shrink. An unknown rule id is an error at load time, not an ignored key, because a typo'd promotion that silently does nothing is a team believing their gate is closed when it is open.
 
 The optional `viewerBaseUrl` links findings into a published LikeC4 viewer. Publish one with `likec4 build --use-hash-history -o <dir>` to any static host (GitHub Pages works) and set `viewerBaseUrl` to where it is served, ending in `#/` for a hash-history build. Each finding in `--json` then carries a `link` to the most specific view showing the elements involved, the index view otherwise, so a finding pasted into an issue lands on the diagram. The text report only adds a `viewer:` footer line. With no host, `likec4 build --output-single-file` makes a single HTML file that works as a CI artifact.
 
@@ -164,7 +164,7 @@ A `sources` entry containing `#` is a fragment claim, `<file path>#<fragment>`: 
 
 Above five `unmapped-source` findings the report renders one grouped block: the total, a by-directory breakdown, and the first ten paths. A brownfield repository's unowned files are one adoption fact, not hundreds. `--json` is unchanged and keeps every finding.
 
-The severities above are defaults, not policy. In a `.ts` config:
+The severities above are defaults, not policy. On the rules provider, in your config's `validate` array:
 
 ```ts
 validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
@@ -172,7 +172,7 @@ validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
 
 promotes new unowned code from a nudge to a gate failure. That is worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. It also turns a typo'd `sources` metadata key loud: LikeC4 metadata is freeform, so `source` is silently valid and just leaves the element owning nothing.
 
-One more rule is opt-in rather than composed by default. `missingDescriptions()` (append it: `validate: [...defaultValidate, missingDescriptions()]`) emits one `missing-description` info finding per model element whose description is absent, empty, or still a scaffolded `TODO`. Opt-in because a description is documentation, not structure; what it buys a team that wants it is countability, the documentation burn-down the same way the drift line counts declared debt. Pairs with `draft --describe`, which proposes first descriptions, and `agentSemanticReview`, which critiques stale ones.
+One more rule is opt-in rather than part of the standard gate. `missingDescriptions()` (add it: `validate: [architectureRules(), missingDescriptions()]`) emits one `missing-description` info finding per model element whose description is absent, empty, or still a scaffolded `TODO`. Opt-in because a description is documentation, not structure; what it buys a team that wants it is countability, the documentation burn-down the same way the drift line counts declared debt. Pairs with `draft --describe`, which proposes first descriptions, and `agentSemanticReview`, which critiques stale ones.
 
 Type-only imports get their own policy. The scanner knows when a crossing is erased at compile time (`import type { X }`, `import { type X }` with only type specifiers, `export type { X } from`), and an edge counts as type-only only when every dependency behind it is; a mixed import like `import { type X, y }` is a value import. `architectureRules({ typeOnlyImports })` decides what that means: the default `'enforce'` keeps the standard severities but appends `(type-only)` to the boundary finding, `'info'` downgrades `missing-relationship` and `relationship-direction` on purely type-only edges to info, and `'ignore'` drops them. Ignored means not counted anywhere: under `'ignore'` a type-only import also stops exercising a drift-tagged relationship, so a drift edge kept alive only by type imports reports as `unused-drift`.
 
@@ -233,15 +233,13 @@ A claim is an exact npm package name, like `pg` or `@aws-sdk/client-s3`. It take
 Everything the CLI does is reachable from the package entry point, so you can assert on architecture inside your own test suite instead of shelling out.
 
 ```ts
-import { findConfig, resolveConfig, pipelineConfig, runPipeline, exitCodeFor } from 'fitc4'
+import { findConfig, resolveConfig, runPipeline, exitCodeFor } from 'fitc4'
 
-const result = await runPipeline(pipelineConfig(await resolveConfig(findConfig(process.cwd()))))
+const result = await runPipeline(await resolveConfig(findConfig(process.cwd())))
 expect(exitCodeFor(result)).toBe(0)
 ```
 
-`resolveConfig` loads all three config forms; `loadConfig` is the synchronous, JSON-only variant.
-
-Providers are plain functions composed into phase arrays: `ScanProvider`, `ResolveProvider`, `ValidateProvider`. `pipelineConfig` is the batteries-included default; to swap a scanner, build your own `PipelineConfig` and pass it to `runPipeline`.
+Providers are plain functions composed into phase arrays: `ScanProvider`, `ResolveProvider`, `ValidateProvider`. A loaded config is already a `PipelineConfig`, so `runPipeline` takes it directly; to swap a scanner, name a different one in `scan`, or build the `PipelineConfig` in code and skip the config file entirely.
 
 Every CLI run narrates its progress to stderr, one plain line per phase and provider (`scan: typescript-imports...`), so a long scan or a slow agent call never looks hung; `--quiet` turns it off, and the report and `--json` on stdout are byte-identical either way. As a library, pass `onProgress: (message) => ...` in the `PipelineConfig` (or in `draft`'s options) to receive the same lines. Provider contexts carry an optional `progress` hook the pipeline injects, prefixed with the provider id.
 
@@ -249,10 +247,10 @@ Every CLI run narrates its progress to stderr, one plain line per phase and prov
 
 `fitc4/agent` adds providers that shell out to your locally installed agent CLIs (`claude`, `codex`). Your login, your billing, no API keys in fitc4. `agentOwnershipAdvisor` suggests an owner for every file the model leaves unowned; `agentSemanticReview` judges whether an element's implementation still matches its declared description. Agent findings are additive, and each provider takes a `severity`: advisory by default, part of the gate when you choose `'error'`. At `'error'` a missing or logged-out CLI fails the build instead of being a `warning` nudge. `cached()` makes reruns with unchanged inputs free and identical.
 
-A complete `fitc4.config.ts`:
+A complete config:
 
 ```ts
-import { defineConfig, defaultValidate } from 'fitc4'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
 import { agentOwnershipAdvisor, agentSemanticReview, cached, claudeCli } from 'fitc4/agent'
 
 const agent = cached(claudeCli({ model: 'haiku' }))
@@ -261,17 +259,19 @@ export default defineConfig({
   version: 1,
   repositoryRoot: '.',
   model: 'arch',
-  scanRoots: ['src'],
-  tsconfig: 'tsconfig.json',
-  // A phase that is present replaces the defaults; spreading them back in
-  // keeps the deterministic rules and adds the agent providers on top.
-  validate: [...defaultValidate, agentOwnershipAdvisor({ exec: agent }), agentSemanticReview({ exec: agent })],
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
+  resolve: [sourceRoot()],
+  validate: [
+    architectureRules(),
+    agentOwnershipAdvisor({ exec: agent }),
+    agentSemanticReview({ exec: agent }),
+  ],
 })
 ```
 
 The advisor makes zero calls on a clean repository; the review makes one call per described element (cached after the first run), and skips elements whose description is absent, empty, or still a `TODO`, since a placeholder is a known-absent description the deterministic `missing-descriptions` rule already counts.
 
-Note the filename above. Composing agent providers into a discovery-named config (`fitc4.config.ts`) makes every plain `npx fitc4` call your CLI, which bills per run and fails in CI without a login. Keeping them in a non-discovery filename run with `--config`, beside the deterministic config CI runs, is the pattern; it is also why `init --agent` scaffolds the exec but leaves the providers commented out.
+Keep a config like this in a non-discovery filename run with `--config`, beside the deterministic config CI runs. Composing agent providers into the discovery-named config makes every plain `npx fitc4` call your CLI, which bills per run and fails in CI without a login; it is also why `init --agent` declares the exec but composes no agent provider into the phases.
 
 Judgment quality is measured, not assumed. Against planted ground truth in [`evals/`](https://github.com/arocnies/fitc4/tree/main/evals), `sonnet` and `gpt-5.6-luna` both score a perfect 35/35 across the full suite, checked-in and external fixtures alike (measured 2026-08-21). The cheap-model failure mode is measured too, and it runs in both directions: `haiku` over-reports, and it also under-reports on subtle single-line signals in large files. In the same run its scan missed a planted one-line violation, which then passed the gate undetected. An extra is noise a human dismisses; a scan miss is fail-open, invisible to the gate by construction. That asymmetry is the measured argument for keeping the validate providers advisory by default and for graduating proven domains to deterministic providers.
 
@@ -297,9 +297,9 @@ The one norm an agent cannot infer from the CLI: **the model is the contract. Ed
   any model change explicitly when handing off.
 - Never delete `sources` metadata or a declared relationship to make a finding
   go away. That removes code from architecture control entirely.
-- Never soften a rule in the config's `severity` map to make a finding go
-  away. Promoting a rule is a team decision about how strict the gate is;
-  demoting one to get a green run is the same evasion as deleting the
+- Never soften a rule's severity in the config, and never remove a provider
+  from a phase, to make a finding go away. How strict the gate is belongs to
+  the team; loosening it for a green run is the same evasion as deleting the
   relationship, one layer up.
 - Rule reference: `node_modules/fitc4/README.md#rules`. Structured output:
   `npx fitc4 --json`.

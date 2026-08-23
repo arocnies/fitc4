@@ -39,7 +39,7 @@
  * stub mode so the fixture gets updated instead of rotting silently.
  */
 
-import { defaultValidate, pipelineConfig, runPipeline } from 'fitc4'
+import { architectureRules, runPipeline } from 'fitc4'
 import type { DraftResult, ResolvedConfig } from 'fitc4'
 import { agentSemanticReview, AGENT_SEMANTIC_REVIEW_PROVIDER_ID } from 'fitc4/agent'
 import type { AgentExec } from 'fitc4/agent'
@@ -216,12 +216,10 @@ export async function scoreDescribeReview(
     return row
   }
 
-  const result = await runPipeline(
-    pipelineConfig({
-      ...config,
-      providers: { ...config.providers, validate: [...defaultValidate, agentSemanticReview({ exec })] },
-    }),
-  )
+  const result = await runPipeline({
+    ...config,
+    validate: [architectureRules(), agentSemanticReview({ exec })],
+  })
   if (result.modelErrors.length > 0) {
     row.misses += 1
     row.notes.push(`the drafted model did not load: ${result.modelErrors.join('; ')}`)

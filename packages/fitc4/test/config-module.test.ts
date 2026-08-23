@@ -1,11 +1,17 @@
+/**
+ * Loading config modules: every extension, real providers, custom providers,
+ * and the agent exec. The pipeline runs exactly what the file names — there
+ * is no default composition to fall back to and none is composed in.
+ */
+
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import { findConfig, loadConfig, resolveConfig } from '../src/config.ts'
+import { findConfig, resolveConfig } from '../src/config.ts'
 import { runPipeline } from '../src/pipeline.ts'
-import { pipelineConfig } from '../src/defaults.ts'
 import { renderReport } from '../src/report.ts'
 import { fixturePath, ruleIds } from './helpers.ts'
 
@@ -29,18 +35,25 @@ function writeConfigFile(filename: string, source: string): string {
   return configPath
 }
 
+/** The real entry module, importable from a temp dir outside node_modules. */
+const INDEX_URL = pathToFileURL(path.join(import.meta.dirname, '..', 'src', 'index.ts')).href
+
 /**
- * A config module pointing at a fixture by absolute path, so the temp
- * directory needs no source tree of its own.
+ * A config module pointing at a fixture by absolute path, with the standard
+ * phases written out the way a real config writes them. `extra` fields land
+ * after the phases; a duplicate key in `extra` (say a second `validate:`)
+ * overrides the standard one, which is how tests swap a phase.
  */
 function moduleSource(fixture: string, extra = ''): string {
   const root = fixturePath(fixture)
-  return `export default {
+  return `import { architectureRules, sourceRoot, typescriptImports } from ${JSON.stringify(INDEX_URL)}
+export default {
   version: 1,
   repositoryRoot: ${JSON.stringify(root)},
   model: ${JSON.stringify(root)},
-  scanRoots: ['src'],
-  tsconfig: ${JSON.stringify(path.join(root, 'tsconfig.json'))},
+  scan: [typescriptImports({ tsconfig: ${JSON.stringify(path.join(root, 'tsconfig.json'))}, roots: ['src'] })],
+  resolve: [sourceRoot()],
+  validate: [architectureRules()],
 ${extra}}
 `
 }
@@ -72,26 +85,26 @@ describe('a .ts config module', () => {
 
     expect(findConfig(path.dirname(configPath))).toBe(configPath)
 
-    const result = await runPipeline(pipelineConfig(await resolveConfig(configPath)))
+    const result = await runPipeline(await resolveConfig(configPath))
 
     expect(result.findings.map((finding) => finding.ruleId)).toEqual(['custom/advice'])
     expect(result.findings[0]?.provider).toBe('custom-advice')
-    // The scan and resolve phases were absent from the config, so the defaults
-    // still supplied them.
+    // The scan and resolve phases the file names still ran.
     expect(result.observations.length).toBeGreaterThan(0)
     expect(result.associations.length).toBeGreaterThan(0)
     expect(renderReport(result).exitCode).toBe(0)
   })
 
   // The whole semantics in one assertion: the fixture contradicts its model,
-  // and none of that is reported, because a present phase replaces the defaults.
-  test('a present phase replaces the defaults for that phase entirely', async () => {
+  // and none of that is reported, because the file's validate phase is the
+  // gate — nothing standard is composed in behind it.
+  test('the gate runs exactly the validate providers the file names', async () => {
     const configPath = writeConfigFile(
       'fitc4.config.ts',
       moduleSource('violations', CUSTOM_VALIDATE),
     )
 
-    const result = await runPipeline(pipelineConfig(await resolveConfig(configPath)))
+    const result = await runPipeline(await resolveConfig(configPath))
 
     expect(ruleIds(result.findings)).toEqual(['custom/advice'])
   })
@@ -102,7 +115,7 @@ describe('a .js config module', () => {
     const source = moduleSource('ok', CUSTOM_VALIDATE).replace(': string', '')
     const configPath = writeConfigFile('fitc4.config.js', source)
 
-    const result = await runPipeline(pipelineConfig(await resolveConfig(configPath)))
+    const result = await runPipeline(await resolveConfig(configPath))
 
     expect(result.findings.map((finding) => finding.ruleId)).toEqual(['custom/advice'])
   })
@@ -113,11 +126,11 @@ describe('a .js config module', () => {
 describe('two configs in one directory', () => {
   test('is an error naming both files', () => {
     const tsPath = writeConfigFile('fitc4.config.ts', moduleSource('ok'))
-    const jsonPath = path.join(path.dirname(tsPath), 'fitc4.config.json')
-    fs.writeFileSync(jsonPath, '{}')
+    const jsPath = path.join(path.dirname(tsPath), 'fitc4.config.js')
+    fs.writeFileSync(jsPath, 'export default {}\n')
 
     expect(() => findConfig(path.dirname(tsPath))).toThrow(tsPath)
-    expect(() => findConfig(path.dirname(tsPath))).toThrow(jsonPath)
+    expect(() => findConfig(path.dirname(tsPath))).toThrow(jsPath)
   })
 })
 
@@ -158,14 +171,24 @@ describe('rejecting a malformed config module', () => {
   })
 
   test('a non-array phase is an error', async () => {
-    const configPath = writeConfigFile(
-      'fitc4.config.js',
-      moduleSource('ok', '  resolve: {},\n'),
-    )
+    const configPath = writeConfigFile('fitc4.config.js', moduleSource('ok', '  resolve: {},\n'))
 
     await expect(resolveConfig(configPath)).rejects.toThrow("'resolve' must be an array")
   })
 
+  // The module form is validated even though a compiler may have seen the
+  // file: nothing forces the author to run one.
+  test('the shared fields are validated at load time', async () => {
+    const configPath = writeConfigFile(
+      'fitc4.config.js',
+      moduleSource('ok').replace('version: 1', 'version: 2'),
+    )
+
+    await expect(resolveConfig(configPath)).rejects.toThrow('unsupported version')
+  })
+})
+
+describe('the other extensions', () => {
   // The .mts form exists for CommonJS packages: a plain .ts config loads as
   // an ES module, and Node's own error for that case recommends exactly this
   // extension — which must therefore be discoverable, not a dead end.
@@ -177,7 +200,7 @@ describe('rejecting a malformed config module', () => {
     expect(path.basename(found)).toBe('fitc4.config.mts')
 
     const config = await resolveConfig(found)
-    expect(config.scanRoots).toEqual(['src'])
+    expect(config.scan.map((provider) => provider.id)).toEqual(['typescript-imports'])
   })
 
   // The plain-JS counterpart of .mts, for CommonJS packages that also skip
@@ -192,10 +215,12 @@ describe('rejecting a malformed config module', () => {
     const found = findConfig(directory)
     expect(path.basename(found)).toBe('fitc4.config.mjs')
 
-    const result = await runPipeline(pipelineConfig(await resolveConfig(found)))
+    const result = await runPipeline(await resolveConfig(found))
     expect(result.findings.map((finding) => finding.ruleId)).toEqual(['custom/advice'])
   })
+})
 
+describe('the agent exec', () => {
   test('a config with an agent exec carries it on the resolved config', async () => {
     const configPath = writeConfigFile(
       'fitc4.config.js',
@@ -209,8 +234,6 @@ describe('rejecting a malformed config module', () => {
 
     expect(resolved.agent?.id).toBe('stub/model')
     expect(typeof resolved.agent?.run).toBe('function')
-    // The agent field alone composes no providers.
-    expect(resolved.providers).toBeUndefined()
   })
 
   // The same structural strictness as the provider arrays: a malformed exec is
@@ -226,96 +249,5 @@ describe('rejecting a malformed config module', () => {
     await expect(resolveConfig(configPath)).rejects.toThrow(
       "'agent' must be an agent exec with a string 'id' and a function 'run'",
     )
-  })
-
-  // The module form gets the same strictness as JSON: a compiler may have
-  // seen the file, but nothing forces the author to run one.
-  test('the shared fields are validated as strictly as JSON', async () => {
-    const configPath = writeConfigFile(
-      'fitc4.config.js',
-      moduleSource('ok').replace('version: 1', 'version: 2'),
-    )
-
-    await expect(resolveConfig(configPath)).rejects.toThrow('unsupported version')
-  })
-})
-
-describe('the JSON path through resolveConfig', () => {
-  test('matches loadConfig and carries no providers', async () => {
-    const root = fixturePath('ok')
-    const configPath = path.join(tempDir(), 'fitc4.config.json')
-    fs.writeFileSync(
-      configPath,
-      JSON.stringify({
-        version: 1,
-        repositoryRoot: root,
-        model: root,
-        scanRoots: ['src'],
-        tsconfig: path.join(root, 'tsconfig.json'),
-      }),
-    )
-
-    const resolved = await resolveConfig(configPath)
-
-    expect(resolved).toEqual(loadConfig(configPath))
-    expect(resolved.providers).toBeUndefined()
-  })
-})
-
-describe('the severity map', () => {
-  // The map tunes the DEFAULT rules provider. Wiring it through
-  // pipelineConfig is what makes the JSON form able to promote a rule at all,
-  // since a JSON config cannot name a provider.
-  test('promotes a rule through the default validate phase', async () => {
-    const config = await resolveConfig(
-      writeConfigFile(
-        'fitc4.config.mjs',
-        moduleSource('violations', `  severity: { 'unmapped-source': 'error' },\n`),
-      ),
-    )
-
-    const { severity: _promotion, ...untuned } = config
-    const relaxed = await runPipeline(pipelineConfig(untuned))
-    const promoted = await runPipeline(pipelineConfig(config))
-
-    const severityOf = (result: Awaited<ReturnType<typeof runPipeline>>): string[] =>
-      result.findings.filter((f) => f.ruleId === 'unmapped-source').map((f) => f.severity)
-
-    expect(severityOf(relaxed)).not.toHaveLength(0)
-    expect(new Set(severityOf(relaxed))).toEqual(new Set(['warning']))
-    expect(new Set(severityOf(promoted))).toEqual(new Set(['error']))
-  })
-
-  // Both set, the map would apply to nothing. Silently ignoring it is the
-  // fail-open the config module refuses everywhere else.
-  test('refuses to sit beside a validate array that replaces what it tunes', async () => {
-    const configPath = writeConfigFile(
-      'fitc4.config.mjs',
-      `import { defaultValidate } from ${JSON.stringify(
-        path.join(process.cwd(), 'src/index.ts'),
-      )}
-${moduleSource(
-  'violations',
-  `  severity: { 'unmapped-source': 'error' },\n  validate: [...defaultValidate],\n`,
-)}`,
-    )
-
-    await expect(resolveConfig(configPath)).rejects.toThrow(
-      /'severity' and 'validate' cannot both be set/,
-    )
-    await expect(resolveConfig(configPath)).rejects.toThrow(/architectureRules\({ severity/)
-  })
-
-  test('is accepted beside the other phases, which it does not tune', async () => {
-    const configPath = writeConfigFile(
-      'fitc4.config.mjs',
-      moduleSource(
-        'violations',
-        `  severity: { 'unmapped-source': 'error' },\n  resolve: [{ id: 'noop', run: () => [] }],\n`,
-      ),
-    )
-
-    const config = await resolveConfig(configPath)
-    expect(config.severity).toEqual({ 'unmapped-source': 'error' })
   })
 })
