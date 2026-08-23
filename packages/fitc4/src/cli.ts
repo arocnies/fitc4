@@ -27,9 +27,9 @@ Commands:
                    replace it; editing it makes it yours. With --agent,
                    scaffolds a fitc4.config.mts module config instead,
                    declaring that agent CLI as the config's exec so
-                   draft --describe works immediately. The agent gate
-                   providers ship commented out, since composing them would
-                   call your CLI on every run.
+                   draft --describe works immediately. No agent provider
+                   joins the gate itself, since that would call your CLI on
+                   every run.
   draft            Run the configured scan providers and write a first-draft
                    model.c4 into the configured model directory. Elements
                    mirror the structure the observations report: a directory
@@ -303,7 +303,15 @@ async function runDraft(options: Arguments): Promise<void> {
     return
   }
 
-  const lines = [`created ${path.relative(process.cwd(), result.written)}`]
+  // "created" for a replacement would hide the one case where this tool
+  // overwrites a file, from the exact user most likely to wonder: someone who
+  // ran init a minute ago and is looking at the model it wrote.
+  const target = path.relative(process.cwd(), result.written)
+  const lines = [
+    result.replacedPlaceholder === true
+      ? `replaced ${target} (it held init's untouched placeholder)`
+      : `created ${target}`,
+  ]
   if (!options.noDrift) {
     lines.push(
       `every relationship is tagged as drift; run npx fitc4 to see the burn-down, ` +

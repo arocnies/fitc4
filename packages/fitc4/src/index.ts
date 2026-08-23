@@ -64,6 +64,7 @@ export {
 // config file that replaces a phase can rebuild the default entries verbatim.
 export {
   architectureRules,
+  ARCHITECTURE_RULE_IDS,
   DEFAULT_DRIFT_TAG,
   EVIDENCE_LIMIT,
   PROVIDER_ID as ARCHITECTURE_RULES_PROVIDER_ID,

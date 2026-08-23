@@ -49,7 +49,7 @@
   "scripts": {
     "check": "npm run model:validate && npm run format:check && npm run typecheck && npm run build && npm run test && npm run fitc4",
     "build": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node -e \"fs.chmodSync('dist/cli.js', 0o755)\"",
-    "prepare": "npm run build",
+    "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "model:validate": "likec4 validate arch",

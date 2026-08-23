@@ -75,25 +75,27 @@ const AGENT_EXEC_IMPORTS: Record<InitAgent, string> = {
  * The module config `init --agent` scaffolds: an exec declared once, and
  * nothing that spends money until a command asks for it.
  *
- * The exec is the whole point of this path, since `draft --describe` reads it
- * and it costs nothing on its own. The agent gate providers ship commented
- * out beside `agentScan`, with the trade stated where the reader will
- * uncomment: composing them means every plain `npx fitc4`, the command the
- * scaffolded AGENTS.md tells every coding agent to run before handoff, makes
- * live billed calls on every machine, and CI without a logged-in CLI fails on
- * the fail-closed resolver. A config that bills per gate run is a config a
- * team turns off, which is worse than one they graduate into deliberately.
+ * Every line here is live configuration. An earlier version shipped the agent
+ * gate providers and an `agentScan` example commented out in place, thirty of
+ * fifty lines, and the first file a new user opened had more configuration
+ * switched off than on. Commented-out code reads as a decision the scaffold
+ * already made for you and asks to be uncommented before it is understood.
+ * The trade those blocks explained is real and still stated, once, as prose at
+ * the bottom, with the README carrying the composition: enabling them makes
+ * every plain `npx fitc4`, the command the scaffolded AGENTS.md tells every
+ * coding agent to run before handoff, bill a live call on every machine, and
+ * fail in CI where no CLI is logged in. A config that bills per gate run is a
+ * config a team turns off, which is worse than one they graduate into.
  *
- * Deliberately lean. This becomes the user's config to own, so it carries the
- * composition and the one-line reasons, not a tutorial.
+ * This becomes the user's file to own, so it carries their settings and the
+ * reasons, never a tutorial.
  */
 function agentConfigTemplate(agent: InitAgent): string {
   return `import { defineConfig } from 'fitc4'
 import { ${AGENT_EXEC_IMPORTS[agent]} } from 'fitc4/agent'
 
-// This model measured perfect in the fitc4 evals. The exec runs your own
-// ${agent} CLI, on your own login and billing; cached() makes reruns with
-// unchanged inputs free.
+// Your own ${agent} CLI, on your own login and billing. cached() makes reruns
+// with unchanged inputs free. This model measured perfect in the fitc4 evals.
 ${AGENT_EXEC_LINES[agent]}
 
 export default defineConfig({
@@ -103,41 +105,20 @@ export default defineConfig({
   scanRoots: ['src'],
   tsconfig: 'tsconfig.json',
 
-  // The exec commands use directly, e.g. fitc4 draft --describe. Declaring it
-  // costs nothing: no call happens until a command asks for one.
+  // The exec commands use directly, such as fitc4 draft --describe. Declaring
+  // it costs nothing: no call happens until a command asks for one.
   agent: exec,
-
-  // The agent gate providers, one uncomment away. Uncommenting makes every
-  // 'fitc4' run call your ${agent} CLI: that bills per run, and it fails in CI
-  // where no CLI is logged in, since agentResolve is fail-closed and an
-  // unavailable exec is a provider-failure error. So the common pattern is a
-  // second config carrying these two lines, say fitc4.agent.config.mts, run
-  // with --config beside the deterministic one CI runs. A present phase
-  // replaces the defaults, so each spreads them back in: add defaultResolve
-  // and defaultValidate to the fitc4 import, agentResolve and
-  // agentSemanticReview to the fitc4/agent import.
-  // resolve: [...defaultResolve, agentResolve({ exec })],
-  // validate: [...defaultValidate, agentSemanticReview({ exec })],
-
-  // An agent scan can observe domains no parser covers (compose files,
-  // runbooks), but a scan is only as good as its domain-specific
-  // instructions: write yours before enabling this. Add agentScan to the
-  // fitc4/agent import, and typescriptImports plus
-  // TYPESCRIPT_IMPORTS_PROVIDER_ID to the fitc4 import, since a present scan
-  // phase replaces the default scanner.
-  // scan: [
-  //   {
-  //     id: TYPESCRIPT_IMPORTS_PROVIDER_ID,
-  //     run: typescriptImports({ tsconfigPath: 'tsconfig.json', roots: ['src'] }),
-  //   },
-  //   agentScan({
-  //     exec,
-  //     id: 'compose',
-  //     roots: ['deploy'],
-  //     instructions: 'TODO: say, in prose, exactly what to observe and how to cite it.',
-  //   }),
-  // ],
 })
+
+// Rule severities are tunable from here too, without touching providers:
+// severity: { 'unmapped-source': 'error' } once you are done adopting.
+//
+// Agent providers can also join the gate itself, judging each description
+// against the code or claiming files no pattern owns. They are not wired in
+// above because doing so makes every 'fitc4' run call your ${agent} CLI, which
+// bills per run and fails in CI where nothing is logged in. The usual move is
+// a second config, say fitc4.agent.config.mts, run with --config beside this
+// one. Composition and caveats: node_modules/fitc4/README.md#agent-providers
 `
 }
 
@@ -184,7 +165,55 @@ views {
 }
 `
 
-const AGENTS_TEMPLATE = `# Agent instructions
+/**
+ * The MCP registration command per agent CLI, verified against each CLI's own
+ * `--help` rather than assumed to match the other's.
+ */
+const MCP_COMMANDS: Record<InitAgent, string> = {
+  claude: 'claude mcp add likec4 -- npx likec4 mcp --stdio',
+  codex: 'codex mcp add likec4 -- npx likec4 mcp --stdio',
+}
+
+const SKILL_INSTALL = `mkdir -p .claude/skills && cp -R node_modules/fitc4/skills/fitc4 .claude/skills/fitc4`
+
+/**
+ * The "Agent setup" half of AGENTS.md, addressed to whichever CLI was chosen.
+ *
+ * With `--agent`, the reader is known, so the file says the one thing that
+ * applies to them. Without it, both are listed and labeled. The shipped skill
+ * is Claude Code's format, so it is named only where it can be installed;
+ * telling a codex user to copy a directory into `.claude/` was advice for
+ * somebody else's tool, in a file their agent reads on every run.
+ */
+function agentSetupSection(agent: InitAgent | undefined): string {
+  const mcpLine = (command: string): string =>
+    `- To query the architecture model while you work, register the LikeC4 MCP\n  server: \`${command}\``
+
+  if (agent === 'codex') {
+    return `## Agent setup
+
+- This file is what Codex reads. Keep the norms above in it.
+${mcpLine(MCP_COMMANDS.codex)}
+`
+  }
+  if (agent === 'claude') {
+    return `## Agent setup
+
+- The package ships a fitc4 skill for Claude Code. Install it with
+  \`${SKILL_INSTALL}\`
+${mcpLine(MCP_COMMANDS.claude)}
+`
+  }
+  return `## Agent setup
+
+- Claude Code: the package ships a fitc4 skill. Install it with
+  \`${SKILL_INSTALL}\`
+- To query the architecture model while you work, register the LikeC4 MCP
+  server: \`${MCP_COMMANDS.claude}\` (Codex: \`${MCP_COMMANDS.codex}\`)
+`
+}
+
+const AGENTS_NORMS = `# Agent instructions
 
 ## Architecture gate (fitc4)
 
@@ -197,15 +226,13 @@ const AGENTS_TEMPLATE = `# Agent instructions
   any model change explicitly when handing off.
 - Never delete \`sources\` metadata or a declared relationship to make a finding
   go away. That removes code from architecture control entirely.
+- Never soften a rule in the config's \`severity\` map to make a finding go
+  away. Promoting a rule is a team decision about how strict the gate is;
+  demoting one to get a green run is the same evasion as deleting the
+  relationship, one layer up.
 - Rule reference: \`node_modules/fitc4/README.md#rules\`. Structured output:
   \`npx fitc4 --json\`.
 
-## Agent setup
-
-- Claude Code: the package ships a fitc4 skill. Install it with
-  \`mkdir -p .claude/skills && cp -R node_modules/fitc4/skills/fitc4 .claude/skills/fitc4\`
-- To query the architecture model while you work, register the LikeC4 MCP
-  server: \`claude mcp add likec4 -- npx likec4 mcp --stdio\`
 `
 
 export function init(directory: string, options: InitOptions = {}): InitResult {
@@ -217,9 +244,22 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
     for (const name of CONFIG_FILENAMES) {
       const existing = path.join(location, name)
       if (fs.existsSync(existing)) {
+        const found = path.relative(target, existing) || name
+        // "Edit it" is good advice for a second plain init and wrong advice
+        // for --agent on a JSON config: an exec is a function, so there is
+        // nothing to edit into JSON. Name the actual move instead. The other
+        // files init writes already exist by then, so a re-init keeps them.
+        if (options.agent !== undefined && found.endsWith('.json')) {
+          throw new Error(
+            `already configured: ${found} exists, and an agent exec cannot go in JSON. ` +
+              `Delete ${found} and rerun this command: init keeps your existing ` +
+              `${MODEL_DIR}/${MODEL_FILENAME} and ${AGENTS_FILENAME}, so only the config is ` +
+              `replaced. Or write the ${AGENT_CONFIG_FILENAME} by hand ` +
+              `(see node_modules/fitc4/README.md#agent-providers).`,
+          )
+        }
         throw new Error(
-          `already configured: ${path.relative(target, existing) || name} exists. ` +
-            `Edit it, or delete it first to start over.`,
+          `already configured: ${found} exists. Edit it, or delete it first to start over.`,
         )
       }
     }
@@ -234,10 +274,10 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
     fs.writeFileSync(path.join(target, AGENT_CONFIG_FILENAME), agentConfigTemplate(options.agent))
     result.created.push(AGENT_CONFIG_FILENAME)
     result.notes.push(
-      `${AGENT_CONFIG_FILENAME} is a module config: it declares the ${options.agent} CLI as the ` +
-        `config's agent exec, so fitc4 draft --describe works immediately. The agent gate ` +
-        `providers ship commented out, because composing them would call your CLI on every ` +
-        `fitc4 run and fail in CI without a login; the file says how to enable them`,
+      `${AGENT_CONFIG_FILENAME} declares the ${options.agent} CLI as the config's agent exec, ` +
+        `so fitc4 draft --describe works immediately. No agent provider joins the gate itself: ` +
+        `that would call your CLI on every fitc4 run and fail in CI without a login. The ` +
+        `bottom of the file says where to read about enabling them`,
     )
   }
 
@@ -259,7 +299,7 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
         `the copy-paste block is at node_modules/fitc4/README.md#for-ai-agents`,
     )
   } else {
-    fs.writeFileSync(agentsPath, AGENTS_TEMPLATE)
+    fs.writeFileSync(agentsPath, AGENTS_NORMS + agentSetupSection(options.agent))
     result.created.push(AGENTS_FILENAME)
   }
 
@@ -272,14 +312,20 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
     result.notes.push(`scanRoots is ["src"] but src/ does not exist. Create it or edit scanRoots`)
   }
 
-  // Commands, not copied files: .claude/ and the MCP registry are the user's to curate.
-  result.notes.push(
-    `Claude Code users: install the shipped fitc4 skill with ` +
-      `mkdir -p .claude/skills && cp -R node_modules/fitc4/skills/fitc4 .claude/skills/fitc4`,
-  )
+  // Commands, not copied files: .claude/ and the MCP registry are the user's
+  // to curate. Addressed to the agent that was named, if one was: telling a
+  // codex user to copy a Claude Code skill is a note about somebody else's
+  // tool, and two of the three notes being for the wrong CLI teaches a reader
+  // to skim the third.
+  if (options.agent !== 'codex') {
+    result.notes.push(
+      `${options.agent === 'claude' ? 'install' : 'Claude Code users: install'} ` +
+        `the shipped fitc4 skill with ${SKILL_INSTALL}`,
+    )
+  }
   result.notes.push(
     `to let an agent query the architecture model while it works, register the ` +
-      `LikeC4 MCP server: claude mcp add likec4 -- npx likec4 mcp --stdio`,
+      `LikeC4 MCP server: ${MCP_COMMANDS[options.agent ?? 'claude']}`,
   )
 
   return result

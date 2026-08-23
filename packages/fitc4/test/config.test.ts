@@ -35,6 +35,57 @@ const VALID = {
 describe('loading the config', () => {
   // The viewer base names a published site, so it must not be path-resolved,
   // and its absence is the feature being off, not a default.
+  // Severity is the one piece of rule tuning a team reaches for while
+  // adopting, so it is legal in JSON: it carries only strings, and putting it
+  // behind a module config meant converting the file to change one word.
+  test('accepts a severity map in the JSON form and leaves it absent otherwise', () => {
+    expect(loadConfig(writeConfig(VALID)).severity).toBeUndefined()
+
+    const promoted = { ...VALID, severity: { 'unmapped-source': 'error' } }
+    expect(loadConfig(writeConfig(promoted)).severity).toEqual({ 'unmapped-source': 'error' })
+
+    const both = { ...VALID, severity: { 'unused-drift': 'error', 'unresolved-import': 'info' } }
+    expect(loadConfig(writeConfig(both)).severity).toEqual({
+      'unused-drift': 'error',
+      'unresolved-import': 'info',
+    })
+  })
+
+  // An ignored key here is a team believing their gate is closed when it is
+  // open, which is exactly the fail-open this module exists to prevent.
+  test('rejects an unknown rule id, suggesting the near miss', () => {
+    expect(() =>
+      loadConfig(writeConfig({ ...VALID, severity: { 'unmaped-source': 'error' } })),
+    ).toThrow(/unknown rule 'unmaped-source', did you mean 'unmapped-source'\?/)
+    expect(() =>
+      loadConfig(writeConfig({ ...VALID, severity: { 'totally-made-up': 'error' } })),
+    ).toThrow(/unknown rule 'totally-made-up'/)
+    // No suggestion when nothing is close, rather than a misleading one.
+    expect(() =>
+      loadConfig(writeConfig({ ...VALID, severity: { 'totally-made-up': 'error' } })),
+    ).not.toThrow(/did you mean/)
+  })
+
+  test.each([
+    ['an unknown level', { 'unmapped-source': 'fatal' }],
+    ['a non-string level', { 'unmapped-source': 2 }],
+    ['a null level', { 'unmapped-source': null }],
+  ])('rejects %s', (_label, severity) => {
+    expect(() => loadConfig(writeConfig({ ...VALID, severity }))).toThrow(
+      /must be one of error, warning, info/,
+    )
+  })
+
+  test.each([
+    ['a bare string', 'error'],
+    ['an array', ['error']],
+    ['null', null],
+  ])('rejects severity as %s', (_label, severity) => {
+    expect(() => loadConfig(writeConfig({ ...VALID, severity }))).toThrow(
+      /'severity' must be an object mapping rule ids/,
+    )
+  })
+
   test('keeps viewerBaseUrl verbatim and optional', () => {
     expect(loadConfig(writeConfig(VALID)).viewerBaseUrl).toBeUndefined()
 

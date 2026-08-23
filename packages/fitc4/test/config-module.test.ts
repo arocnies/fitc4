@@ -261,3 +261,61 @@ describe('the JSON path through resolveConfig', () => {
     expect(resolved.providers).toBeUndefined()
   })
 })
+
+describe('the severity map', () => {
+  // The map tunes the DEFAULT rules provider. Wiring it through
+  // pipelineConfig is what makes the JSON form able to promote a rule at all,
+  // since a JSON config cannot name a provider.
+  test('promotes a rule through the default validate phase', async () => {
+    const config = await resolveConfig(
+      writeConfigFile(
+        'fitc4.config.mjs',
+        moduleSource('violations', `  severity: { 'unmapped-source': 'error' },\n`),
+      ),
+    )
+
+    const { severity: _promotion, ...untuned } = config
+    const relaxed = await runPipeline(pipelineConfig(untuned))
+    const promoted = await runPipeline(pipelineConfig(config))
+
+    const severityOf = (result: Awaited<ReturnType<typeof runPipeline>>): string[] =>
+      result.findings.filter((f) => f.ruleId === 'unmapped-source').map((f) => f.severity)
+
+    expect(severityOf(relaxed)).not.toHaveLength(0)
+    expect(new Set(severityOf(relaxed))).toEqual(new Set(['warning']))
+    expect(new Set(severityOf(promoted))).toEqual(new Set(['error']))
+  })
+
+  // Both set, the map would apply to nothing. Silently ignoring it is the
+  // fail-open the config module refuses everywhere else.
+  test('refuses to sit beside a validate array that replaces what it tunes', async () => {
+    const configPath = writeConfigFile(
+      'fitc4.config.mjs',
+      `import { defaultValidate } from ${JSON.stringify(
+        path.join(process.cwd(), 'src/index.ts'),
+      )}
+${moduleSource(
+  'violations',
+  `  severity: { 'unmapped-source': 'error' },\n  validate: [...defaultValidate],\n`,
+)}`,
+    )
+
+    await expect(resolveConfig(configPath)).rejects.toThrow(
+      /'severity' and 'validate' cannot both be set/,
+    )
+    await expect(resolveConfig(configPath)).rejects.toThrow(/architectureRules\({ severity/)
+  })
+
+  test('is accepted beside the other phases, which it does not tune', async () => {
+    const configPath = writeConfigFile(
+      'fitc4.config.mjs',
+      moduleSource(
+        'violations',
+        `  severity: { 'unmapped-source': 'error' },\n  resolve: [{ id: 'noop', run: () => [] }],\n`,
+      ),
+    )
+
+    const config = await resolveConfig(configPath)
+    expect(config.severity).toEqual({ 'unmapped-source': 'error' })
+  })
+})

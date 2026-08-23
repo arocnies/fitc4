@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, expect, test } from 'vitest'
 
 import { findingId, namespaced, relationshipId } from '../src/ids.ts'
@@ -352,5 +354,40 @@ describe('native model validation', () => {
     const { errors } = await loadModel(fixturePath('no-model'))
     expect(errors).toHaveLength(1)
     expect(errors[0]).toContain('no LikeC4 elements')
+  })
+})
+
+/**
+ * A raw NUL byte in a source file makes the whole file read as binary to
+ * `grep`, `git grep`, and every tool built on them, which silently drops it
+ * out of codebase-wide searches. Two files used NUL as a map-key separator,
+ * written as the literal byte rather than the `\0` escape, and both were
+ * invisible to search until this was noticed. The escape compiles to the same
+ * byte at runtime, so nothing about the behavior depends on writing it raw.
+ */
+describe('source files stay searchable', () => {
+  test('no tracked source file embeds a raw NUL byte', () => {
+    const root = path.resolve(import.meta.dirname, '..')
+    const offenders: string[] = []
+
+    const walk = (directory: string): void => {
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name.startsWith('.')) {
+          continue
+        }
+        const full = path.join(directory, entry.name)
+        if (entry.isDirectory()) {
+          walk(full)
+          continue
+        }
+        if (!/\.(ts|mts|js|mjs|c4|md|json)$/.test(entry.name)) continue
+        if (fs.readFileSync(full).includes(0)) {
+          offenders.push(path.relative(root, full))
+        }
+      }
+    }
+    walk(root)
+
+    expect(offenders).toEqual([])
   })
 })

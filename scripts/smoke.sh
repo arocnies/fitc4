@@ -73,6 +73,53 @@ case "$violation_out" in
 esac
 rm "$consumer/src/core/bad.ts"
 
+# The severity map is the one rule knob a JSON config can reach, which is the
+# whole point of it, so it is asserted through an installed consumer's JSON
+# config rather than only in the unit tests.
+echo "== severity promotes a rule from a JSON config"
+printf "export const orphan = true\n" > "$consumer/src/orphan.ts"
+(cd "$consumer" && npx fitc4 >/dev/null)  # warning only, still exit 0
+node -e "
+  const fs = require('node:fs')
+  const file = process.argv[1]
+  const config = JSON.parse(fs.readFileSync(file, 'utf8'))
+  config.severity = { 'unmapped-source': 'error' }
+  fs.writeFileSync(file, JSON.stringify(config, null, 2))
+" "$consumer/fitc4.config.json"
+if promoted_out="$(cd "$consumer" && npx fitc4 2>&1)"; then
+  echo "FAIL: severity did not promote unmapped-source to an error: $promoted_out" >&2
+  exit 1
+fi
+case "$promoted_out" in
+  *"unmapped-source"*) ;;
+  *) echo "FAIL: promoted run did not name unmapped-source: $promoted_out" >&2; exit 1 ;;
+esac
+# A typo'd rule id must be an error, not an ignored key: a promotion that
+# silently does nothing is a team believing their gate is closed when it is open.
+node -e "
+  const fs = require('node:fs')
+  const file = process.argv[1]
+  const config = JSON.parse(fs.readFileSync(file, 'utf8'))
+  config.severity = { 'unmaped-source': 'error' }
+  fs.writeFileSync(file, JSON.stringify(config, null, 2))
+" "$consumer/fitc4.config.json"
+if typo_out="$(cd "$consumer" && npx fitc4 2>&1)"; then
+  echo "FAIL: a typo'd rule id was accepted: $typo_out" >&2
+  exit 1
+fi
+case "$typo_out" in
+  *"did you mean 'unmapped-source'"*) ;;
+  *) echo "FAIL: typo'd rule id gave no suggestion: $typo_out" >&2; exit 1 ;;
+esac
+node -e "
+  const fs = require('node:fs')
+  const file = process.argv[1]
+  const config = JSON.parse(fs.readFileSync(file, 'utf8'))
+  delete config.severity
+  fs.writeFileSync(file, JSON.stringify(config, null, 2))
+" "$consumer/fitc4.config.json"
+rm "$consumer/src/orphan.ts"
+
 echo "== init scaffolds a green first run"
 fresh="$work/fresh"
 mkdir -p "$fresh/src"
@@ -100,7 +147,9 @@ echo "== draft replaces init's untouched placeholder"
 # recommends. It used to refuse, because init had written the model file.
 draft_out="$(cd "$fresh" && npx fitc4 draft 2>&1)"
 case "$draft_out" in
-  *"created arch/model.c4"*) ;;
+  # "replaced", not "created": the report must name the one case where a
+  # draft overwrites a file, or the user who just ran init cannot tell.
+  *"replaced arch/model.c4"*) ;;
   *) echo "FAIL: draft did not replace init's placeholder: $draft_out" >&2; exit 1 ;;
 esac
 case "$(cat "$fresh/arch/model.c4")" in

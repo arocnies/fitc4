@@ -194,14 +194,19 @@ export function buildGraph(
       association.target?.kind === 'element' &&
       association.source.id !== association.target.id
     ) {
-      const key = `${association.source.id} ${association.target.id}`
+      // NUL joins the pair because no element id can contain one, so the
+      // split below cannot be fooled by an id holding the separator. Written
+      // as the `\0` escape, never as a literal NUL byte: a raw one makes the
+      // whole file read as binary to grep and every tool built on it, which
+      // silently drops it out of codebase-wide searches.
+      const key = `${association.source.id}\0${association.target.id}`
       edgeCounts.set(key, (edgeCounts.get(key) ?? 0) + 1)
     }
   }
 
   const observedEdges = [...edgeCounts]
     .map(([key, count]) => {
-      const [sourceId = '', targetId = ''] = key.split(' ')
+      const [sourceId = '', targetId = ''] = key.split('\0')
       return { sourceId, targetId, count }
     })
     .sort((a, b) => `${a.sourceId}→${a.targetId}`.localeCompare(`${b.sourceId}→${b.targetId}`))

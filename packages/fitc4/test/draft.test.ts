@@ -531,6 +531,19 @@ describe('draft', () => {
       expect(result.text).not.toContain(MODEL_PLACEHOLDER_MARKER)
       expect(result.text).not.toContain('fitc4 init placeholder')
       expect(fs.readFileSync(placeholder, 'utf8')).toBe(result.text)
+      // Reported, because "created" for the one case where this tool
+      // overwrites a file is a lie to the reader most likely to wonder:
+      // someone who ran init a minute ago.
+      expect(result.replacedPlaceholder).toBe(true)
+    })
+
+    test('a draft into an empty model directory reports no replacement', HEAVY, async () => {
+      // configFor's modelDir is a fresh scratch directory, so this is the
+      // ordinary first draft: a creation, and the flag must stay absent.
+      const result = await draft(configFor('drift'))
+
+      expect(result.written).toBeDefined()
+      expect(result.replacedPlaceholder).toBeUndefined()
     })
 
     test('the placeholder is replaced in place, leaving no orphan beside a renamed one', HEAVY, async () => {

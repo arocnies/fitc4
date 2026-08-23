@@ -11,6 +11,7 @@
     "evals"
   ],
   "scripts": {
+    "prepare": "npm run build --workspaces --if-present",
     "verify": "npm run check --workspaces",
     "smoke": "bash scripts/smoke.sh",
     "eval": "node evals/run.ts"

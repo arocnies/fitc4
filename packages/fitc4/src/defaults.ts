@@ -45,6 +45,11 @@ export const defaultValidate: NamedProvider<ValidateProvider>[] = [architectureR
  * A phase array present in the config replaces the defaults for that phase
  * entirely: present replaces, absent defaults. Merge semantics are the
  * user's job, in their config file, where they can see them.
+ *
+ * The config's `severity` map tunes the default rules provider, so the
+ * validate default is rebuilt with it rather than taken from the
+ * `defaultValidate` constant. The two cannot both apply: `resolveConfig`
+ * rejects a config carrying `severity` and `validate` together.
  */
 export function pipelineConfig(config: ResolvedConfig): PipelineConfig {
   return {
@@ -61,6 +66,10 @@ export function pipelineConfig(config: ResolvedConfig): PipelineConfig {
       },
     ],
     resolve: config.providers?.resolve ?? [...defaultResolve],
-    validate: config.providers?.validate ?? [...defaultValidate],
+    validate:
+      config.providers?.validate ??
+      (config.severity === undefined
+        ? [...defaultValidate]
+        : [architectureRules({ severity: config.severity })]),
   }
 }

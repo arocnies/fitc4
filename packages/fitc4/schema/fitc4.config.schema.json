@@ -39,6 +39,34 @@
       "type": "string",
       "pattern": "^https?://\\S+$",
       "description": "Optional base URL of a published LikeC4 viewer (likec4 build). When set, every finding in --json carries a link into the viewer and the report footer names the base URL. End it with #/ if the viewer was built with --use-hash-history."
+    },
+    "severity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per-rule severity overrides for the default architecture rules. The standard severities assume adoption: new unowned code is a warning nudge, not a broken build. A team done adopting writes { \"unmapped-source\": \"error\" }. In a module config this cannot be combined with a 'validate' array, which replaces the provider it tunes.",
+      "properties": {
+        "missing-relationship": { "$ref": "#/definitions/severity" },
+        "relationship-direction": { "$ref": "#/definitions/severity" },
+        "ambiguous-source": { "$ref": "#/definitions/severity" },
+        "invalid-sources": { "$ref": "#/definitions/severity" },
+        "unmatched-sources": { "$ref": "#/definitions/severity" },
+        "invalid-packages": { "$ref": "#/definitions/severity" },
+        "ambiguous-package": { "$ref": "#/definitions/severity" },
+        "unmatched-packages": { "$ref": "#/definitions/severity" },
+        "unmapped-source": { "$ref": "#/definitions/severity" },
+        "unresolved-import": { "$ref": "#/definitions/severity" },
+        "drift-relationship": { "$ref": "#/definitions/severity" },
+        "unused-drift": { "$ref": "#/definitions/severity" },
+        "unobserved-elements": { "$ref": "#/definitions/severity" },
+        "duplicate-relationship": { "$ref": "#/definitions/severity" },
+        "unknown-observation-kind": { "$ref": "#/definitions/severity" }
+      }
+    }
+  },
+  "definitions": {
+    "severity": {
+      "enum": ["error", "warning", "info"],
+      "description": "error fails the gate, warning and info do not."
     }
   }
 }
