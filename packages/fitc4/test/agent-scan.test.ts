@@ -345,6 +345,128 @@ describe('agentScan narration', () => {
   })
 })
 
+describe('agentScan batching', () => {
+  const scratchDirs: string[] = []
+  afterAll(() => {
+    for (const dir of scratchDirs) fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  /** A scratch repository of empty files, for listings larger than one batch. */
+  function scratchRepo(files: string[]): string {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-agent-scan-batch-'))
+    scratchDirs.push(root)
+    for (const relative of files) {
+      const absolute = path.join(root, relative)
+      fs.mkdirSync(path.dirname(absolute), { recursive: true })
+      fs.writeFileSync(absolute, '')
+    }
+    return root
+  }
+
+  function fileReply(file: string): AgentReply {
+    return ok({
+      observations: [{ kind: 'file', subject: { kind: 'file', id: file } }],
+      examined: [file],
+    })
+  }
+
+  const FIVE = ['a.py', 'b.py', 'c.py', 'd.py', 'e.py']
+
+  test('a listing beyond batchFiles splits into consecutive calls and the replies merge', async () => {
+    const repo = scratchRepo(FIVE)
+    const exec = stubExec([fileReply('a.py'), fileReply('c.py'), fileReply('e.py')])
+    const messages: string[] = []
+
+    const observations = await agentScan({ exec, batchFiles: 2 }).run({
+      repositoryRoot: repo,
+      progress: (message) => void messages.push(message),
+    })
+
+    // Three deterministic slices of the sorted listing, one request each.
+    expect(exec.requests).toHaveLength(3)
+    expect(exec.requests[0]?.context).toContain('batch 1 of 3')
+    expect(exec.requests[0]?.context).toContain('- a.py')
+    expect(exec.requests[0]?.context).not.toContain('- c.py')
+    expect(exec.requests[2]?.context).toContain('batch 3 of 3')
+    expect(exec.requests[2]?.context).toContain('- e.py')
+    // Each batch is told to stay on its own slice.
+    expect(exec.requests[0]?.context).toContain('do not report observations about files outside this listing')
+
+    // The merged result carries every batch's attestations and observations.
+    const ids = observationIds(observations)
+    expect(ids).toContain('scan-root:a.py')
+    expect(ids).toContain('scan-root:c.py')
+    expect(ids).toContain('scan-root:e.py')
+    expect(ids).toContain('file:a.py')
+    expect(ids).toContain('file:e.py')
+
+    // Progress announces each batch by its position.
+    expect(messages).toContainEqual('batch 1 of 3: exploring the repository with stub/model, 2 files listed')
+    expect(messages).toContainEqual('batch 3 of 3: exploring the repository with stub/model, 1 file listed')
+  })
+
+  test('one batch keeps identical claims distinct by ordinal; across batches the repeat is overlap', async () => {
+    const repo = scratchRepo(FIVE)
+    const claim = {
+      kind: 'dependency',
+      subject: { kind: 'file', id: 'a.py' },
+      target: { kind: 'file', id: 'b.py' },
+    }
+    const exec = stubExec([
+      ok({ observations: [claim, claim], examined: ['a.py'] }),
+      ok({ observations: [claim], examined: ['c.py'] }),
+      fileReply('e.py'),
+    ])
+
+    const observations = await agentScan({ exec, batchFiles: 2 }).run({ repositoryRoot: repo })
+
+    const ids = observationIds(observations).filter((id) => id.includes('a.py->b.py'))
+    expect(ids).toEqual(['dependency:a.py->b.py', 'dependency:a.py->b.py#1'])
+  })
+
+  test('a failing batch names its position and how a rerun resumes', async () => {
+    const repo = scratchRepo(FIVE)
+    const exec = stubExec([fileReply('a.py'), { ok: false, error: 'timed out' }])
+
+    await expect(
+      agentScan({ exec, batchFiles: 2 }).run({ repositoryRoot: repo }),
+    ).rejects.toThrow(/on batch 2 of 3: timed out.*cached\(\)/)
+  })
+
+  test('a batch that attests to examining nothing fails the scan', async () => {
+    const repo = scratchRepo(FIVE)
+    const exec = stubExec([fileReply('a.py'), ok({ observations: [], examined: [] })])
+
+    await expect(
+      agentScan({ exec, batchFiles: 2 }).run({ repositoryRoot: repo }),
+    ).rejects.toThrow(/examining no files/)
+  })
+
+  test('the truncation note lands on the final batch only', async () => {
+    const repo = scratchRepo(FIVE)
+    const exec = stubExec([fileReply('a.py'), fileReply('c.py')])
+
+    await agentScan({ exec, batchFiles: 2, maxFiles: 4 }).run({ repositoryRoot: repo })
+
+    expect(exec.requests).toHaveLength(2)
+    expect(exec.requests[0]?.context).not.toContain('truncated')
+    expect(exec.requests[1]?.context).toContain('1 more files exist')
+  })
+
+  test('focused excerpts batch the same way, one-shot per slice', async () => {
+    const repo = scratchRepo(FIVE)
+    const exec = stubExec([fileReply('a.py'), fileReply('c.py'), fileReply('e.py')])
+
+    await agentScan({ exec, batchFiles: 2, focus: ['**'] }).run({ repositoryRoot: repo })
+
+    expect(exec.requests).toHaveLength(3)
+    expect(exec.requests.every((request) => request.agentic === undefined)).toBe(true)
+    expect(exec.requests[1]?.context).toContain('batch 2 of 3')
+    expect(exec.requests[1]?.context).toContain('### c.py')
+    expect(exec.requests[1]?.context).not.toContain('### a.py')
+  })
+})
+
 describe('agentScan fails closed', () => {
   test('an exec failure fails the provider — one provider-failure error, not a clean scan', async () => {
     const exec = stubExec([{ ok: false, error: 'not logged in' }])

@@ -11,6 +11,13 @@
  * the instructions plus a bounded file listing, so it is deterministic and
  * `cached()` replays a rerun with unchanged inputs byte for byte.
  *
+ * A listing larger than `batchFiles` splits into consecutive batches, one
+ * call each, because a reply that must carry a whole repository dies at any
+ * timeout. The batches are deterministic slices of the sorted listing, so
+ * with `cached()` every completed batch is recorded as it finishes: progress
+ * lands incrementally, and a failed or interrupted scan resumes at the first
+ * unanswered batch instead of starting over.
+ *
  * With `focus`, the provider prefills instead of exploring: the files the
  * globs match are embedded as code-first excerpts and the request drops
  * `agentic` entirely. What is left is a one-shot call answered from the
@@ -120,11 +127,22 @@ export interface AgentScanOptions {
    * governing the small extraction calls the other providers make.
    */
   timeoutMs?: number
+  /**
+   * Files covered per call. A listing larger than this splits into
+   * consecutive batches, one call each, because one reply cannot honestly
+   * carry a whole repository: the reply grows with every file covered, and a
+   * single call was measured dying on real repositories at any timeout. Each
+   * batch is a deterministic request, so with `cached()` every completed
+   * batch is recorded as it finishes and an interrupted scan resumes where it
+   * stopped instead of starting over. Progress narrates per batch.
+   */
+  batchFiles?: number
 }
 
 const DEFAULT_MAX_FILES = 300
 const DEFAULT_EXCERPT_CHARS = 4_000
 const DEFAULT_SCAN_TIMEOUT_MS = 600_000
+const DEFAULT_BATCH_FILES = 25
 
 /** Cadence of the "still waiting" narration during the one long call. */
 const PROGRESS_TICK_MS = 30_000
@@ -212,104 +230,149 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
   const excerptChars = options.excerptChars ?? DEFAULT_EXCERPT_CHARS
   const timeoutMs = options.timeoutMs ?? DEFAULT_SCAN_TIMEOUT_MS
   const instructions = options.instructions ?? DEFAULT_INSTRUCTIONS
+  const batchFiles = options.batchFiles ?? DEFAULT_BATCH_FILES
 
   const run: ScanProvider = async (context: ScanContext): Promise<Observation[]> => {
+    if (batchFiles < 1) {
+      throw new Error(`agentScan batchFiles must be at least 1, got ${batchFiles}`)
+    }
     const files = enumerateFiles(context.repositoryRoot, roots)
 
-    // Two shapes of request. Without `focus`: the listing plus read-only
-    // exploration, unchanged. With `focus`: the matched files' contents are
-    // embedded and the call is one-shot with no `agentic` flag at all, so the
-    // reply can only come from the prefilled context, and the contents are in
-    // the `cached()` key.
-    const request =
-      options.focus === undefined
-        ? {
-            prompt: PROMPT + EXPLORATION_NOTE,
-            context: composeContext(
-              instructions,
-              roots,
-              files.slice(0, maxFiles),
-              Math.max(0, files.length - maxFiles),
-            ),
-            schema: REPLY_SCHEMA,
-            agentic: true as const,
-            cwd: context.repositoryRoot,
-            timeoutMs,
-          }
-        : {
-            prompt: PROMPT,
-            context: composeFocusedContext(
-              context.repositoryRoot,
-              instructions,
-              roots,
-              files,
-              options.focus,
-              maxFiles,
-              excerptChars,
-            ),
-            schema: REPLY_SCHEMA,
-            cwd: context.repositoryRoot,
-            timeoutMs,
-          }
-
-    // Announce the call before it starts: agent calls are the slow part of a
-    // run, and which shape (and roughly how much) is being sent says why.
-    context.progress?.(
-      options.focus === undefined
-        ? `exploring the repository with ${options.exec.id}, ${count(Math.min(files.length, maxFiles), 'file')} listed`
-        : `asking ${options.exec.id} one-shot, about ${roughKilobytes(request.context)} of instructions and excerpts`,
-    )
-
-    // The scan is one call and it is minutes long on a real repository, with
-    // nothing on the wire until the CLI finishes. A quiet line on a fixed
-    // cadence keeps that wait distinguishable from a hang, and names the
-    // budget so a reader knows when the hard stop comes.
-    const started = Date.now()
-    const ticker = setInterval(() => {
-      context.progress?.(`still waiting on ${options.exec.id}, ${elapsed(started)} of the ${seconds(timeoutMs)} budget`)
-    }, PROGRESS_TICK_MS)
-    ticker.unref?.()
-
-    let reply
-    try {
-      reply = await options.exec.run(request)
-    } finally {
-      clearInterval(ticker)
+    // The files the scan covers: the whole listing, or what the focus globs
+    // match, capped by maxFiles either way (the cap is announced, never
+    // silent). These chunk into batches of `batchFiles`, one call each: the
+    // requests are deterministic slices of a sorted listing, so `cached()`
+    // records each completed batch and a rerun resumes at the first
+    // unanswered one.
+    let covered: string[]
+    let dropped: number
+    if (options.focus === undefined) {
+      covered = files.slice(0, maxFiles)
+      dropped = Math.max(0, files.length - maxFiles)
+    } else {
+      const matched = files.filter(focusMatcher(options.focus))
+      if (matched.length === 0) {
+        throw new Error(
+          `Agent scan focus [${options.focus.join(', ')}] matched no files under the scanned roots. ` +
+            'A scan of nothing must not look like a clean one',
+        )
+      }
+      covered = matched.slice(0, maxFiles)
+      dropped = matched.length - covered.length
     }
 
-    if (!reply.ok) {
-      throw new Error(`Agent scan was unavailable (${options.exec.id}): ${reply.error}`)
-    }
-
-    // The exec layer already enforced the schema on a live reply, but this
-    // provider must not trust the transport it was handed: a custom adapter or
-    // a stale cache entry recorded against an older schema would otherwise
-    // flow malformed entries into the pipeline as observations.
-    const mismatch = schemaMismatch(reply.value, REPLY_SCHEMA)
-    if (mismatch !== undefined) {
-      throw new Error(`Agent scan reply did not match the requested schema: ${mismatch}`)
-    }
-
-    const parsed = reply.value as unknown as {
-      observations: ReplyObservation[]
-      examined: string[]
+    const batches: string[][] = []
+    for (let start = 0; start < covered.length; start += batchFiles) {
+      batches.push(covered.slice(start, start + batchFiles))
     }
 
     const guard = pathGuard(context.repositoryRoot)
+    const examined = new Set<string>()
+    const replies: ReplyObservation[][] = []
 
-    // Attestation first: an empty `examined` fails before any observation is
-    // considered, because observations without coverage are unanchored claims.
-    const examined = [...new Set(parsed.examined.map((entry) => guard(entry, 'examined')))].sort()
-    if (examined.length === 0) {
-      throw new Error(
-        `Agent scan (${options.exec.id}) attested to examining no files. An absent scan must not look like a clean one`,
+    for (const [index, batch] of batches.entries()) {
+      // With a single batch the request is byte-identical to the unbatched
+      // form, so recorded caches and pinned contexts stay valid.
+      const batchInfo = batches.length === 1 ? undefined : { index: index + 1, total: batches.length }
+      const batchDropped = index === batches.length - 1 ? dropped : 0
+
+      // Two shapes of request. Without `focus`: the listing plus read-only
+      // exploration. With `focus`: the matched files' contents are embedded
+      // and the call is one-shot with no `agentic` flag at all, so the reply
+      // can only come from the prefilled context, and the contents are in the
+      // `cached()` key.
+      const request =
+        options.focus === undefined
+          ? {
+              prompt: PROMPT + EXPLORATION_NOTE,
+              context: composeContext(instructions, roots, batch, batchDropped, batchInfo),
+              schema: REPLY_SCHEMA,
+              agentic: true as const,
+              cwd: context.repositoryRoot,
+              timeoutMs,
+            }
+          : {
+              prompt: PROMPT,
+              context: composeFocusedContext(
+                context.repositoryRoot,
+                instructions,
+                roots,
+                batch,
+                batchDropped,
+                excerptChars,
+                batchInfo,
+              ),
+              schema: REPLY_SCHEMA,
+              cwd: context.repositoryRoot,
+              timeoutMs,
+            }
+
+      // Announce the call before it starts: agent calls are the slow part of
+      // a run, and which shape (and roughly how much) is being sent says why.
+      const prefix = batchInfo === undefined ? '' : `batch ${batchInfo.index} of ${batchInfo.total}: `
+      context.progress?.(
+        options.focus === undefined
+          ? `${prefix}exploring the repository with ${options.exec.id}, ${count(batch.length, 'file')} listed`
+          : `${prefix}asking ${options.exec.id} one-shot, about ${roughKilobytes(request.context)} of instructions and excerpts`,
       )
+
+      // Each call is minutes long on a real repository, with nothing on the
+      // wire until the CLI finishes. A quiet line on a fixed cadence keeps
+      // that wait distinguishable from a hang, and names the budget so a
+      // reader knows when the hard stop comes.
+      const started = Date.now()
+      const ticker = setInterval(() => {
+        context.progress?.(`still waiting on ${options.exec.id}, ${elapsed(started)} of the ${seconds(timeoutMs)} budget`)
+      }, PROGRESS_TICK_MS)
+      ticker.unref?.()
+
+      let reply
+      try {
+        reply = await options.exec.run(request)
+      } finally {
+        clearInterval(ticker)
+      }
+
+      if (!reply.ok) {
+        const where = batchInfo === undefined ? '' : ` on batch ${batchInfo.index} of ${batchInfo.total}`
+        const resume =
+          batchInfo === undefined
+            ? ''
+            : '. Completed batches replay from the cache on a rerun when the exec is wrapped in cached()'
+        throw new Error(`Agent scan was unavailable (${options.exec.id})${where}: ${reply.error}${resume}`)
+      }
+
+      // The exec layer already enforced the schema on a live reply, but this
+      // provider must not trust the transport it was handed: a custom adapter
+      // or a stale cache entry recorded against an older schema would
+      // otherwise flow malformed entries into the pipeline as observations.
+      const mismatch = schemaMismatch(reply.value, REPLY_SCHEMA)
+      if (mismatch !== undefined) {
+        throw new Error(`Agent scan reply did not match the requested schema: ${mismatch}`)
+      }
+
+      const parsed = reply.value as unknown as {
+        observations: ReplyObservation[]
+        examined: string[]
+      }
+
+      // Attestation per batch: an empty `examined` fails before any
+      // observation is considered, because observations without coverage are
+      // unanchored claims, and a batch that read nothing scanned nothing.
+      const attested = parsed.examined.map((entry) => guard(entry, 'examined'))
+      if (attested.length === 0) {
+        throw new Error(
+          `Agent scan (${options.exec.id}) attested to examining no files. An absent scan must not look like a clean one`,
+        )
+      }
+      for (const entry of attested) examined.add(entry)
+      replies.push(parsed.observations)
     }
 
     const observations: Observation[] = []
     const usedIds = new Set<string>()
 
-    for (const filePath of examined) {
+    for (const filePath of [...examined].sort()) {
       const id = `scan-root:${filePath}`
       usedIds.add(id)
       observations.push({
@@ -322,8 +385,20 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
       })
     }
 
-    for (const entry of parsed.observations) {
-      observations.push(toObservation(entry, guard, usedIds, options.exec.id, providerId))
+    // Within one reply, two identical claims are two facts and stay distinct
+    // by ordinal. Across batches, an identical claim is overlap: a model that
+    // read a neighboring file for context re-reported it, and the repeat
+    // must not double the observation.
+    const reportedEarlier = new Set<string>()
+    for (const batchEntries of replies) {
+      const reportedHere = new Set<string>()
+      for (const entry of batchEntries) {
+        const converted = toObservation(entry, guard, usedIds, reportedEarlier, options.exec.id, providerId)
+        if (converted === undefined) continue
+        reportedHere.add(naturalKeyOf(converted))
+        observations.push(converted)
+      }
+      for (const key of reportedHere) reportedEarlier.add(key)
     }
 
     return observations
@@ -341,7 +416,8 @@ interface ReplyObservation {
 }
 
 /**
- * Convert one reply entry into a standard `Observation`.
+ * Convert one reply entry into a standard `Observation`, or undefined when an
+ * earlier batch already reported the identical claim.
  *
  * Kinds outside the standard set are legal, and the `unknown-observation-kind`
  * rule reports them at info. But every path must survive the hallucination
@@ -352,9 +428,10 @@ function toObservation(
   entry: ReplyObservation,
   guard: PathGuard,
   usedIds: Set<string>,
+  reportedEarlier: Set<string>,
   execId: string,
   providerId: string,
-): Observation {
+): Observation | undefined {
   if (entry.kind.trim() === '') {
     throw new Error('Agent scan reply contained an observation with an empty kind')
   }
@@ -371,6 +448,7 @@ function toObservation(
   // Natural-key ids per the ids convention; an ordinal keeps two identical
   // claims distinct instead of tripping the pipeline's duplicate-id check.
   const naturalKey = `${entry.kind}:${subject.id}${target === undefined ? '' : `->${target.id}`}`
+  if (reportedEarlier.has(naturalKey)) return undefined
   let id = naturalKey
   for (let ordinal = 1; usedIds.has(id); ordinal += 1) {
     id = `${naturalKey}#${ordinal}`
@@ -387,6 +465,13 @@ function toObservation(
     data: { agent: execId },
     provider: providerId,
   }
+}
+
+/** The same natural key `toObservation` derives, recomputed from a converted observation. */
+function naturalKeyOf(observation: Observation): string {
+  const subject = observation.subject?.id ?? ''
+  const target = observation.target === undefined ? '' : `->${observation.target.id}`
+  return `${observation.kind}:${subject}${target}`
 }
 
 /**
@@ -442,64 +527,75 @@ function pathGuard(repositoryRoot: string): PathGuard {
   }
 }
 
+interface BatchInfo {
+  index: number
+  total: number
+}
+
+/** The batch framing lines, absent entirely for a single-batch scan. */
+function batchHeading(batchInfo: BatchInfo | undefined): string {
+  return batchInfo === undefined ? '' : `, batch ${batchInfo.index} of ${batchInfo.total}`
+}
+
+function batchNote(batchInfo: BatchInfo | undefined): string {
+  if (batchInfo === undefined) return ''
+  return (
+    '\n\nNOTE: this is one batch of a larger scan. Carry out the scan instructions against the ' +
+    'files listed above; the other batches cover the rest, so do not report observations about ' +
+    'files outside this listing unless the scan instructions specifically name them.'
+  )
+}
+
 function composeContext(
   instructions: string,
   roots: string[],
   listed: string[],
   dropped: number,
+  batchInfo?: BatchInfo,
 ): string {
   const parts = [
     `### Scan instructions\n\n${instructions}`,
-    `### Repository files under ${roots.join(', ')} (repository-relative)\n\n` +
+    `### Repository files under ${roots.join(', ')} (repository-relative${batchHeading(batchInfo)})\n\n` +
       listed.map((file) => `- ${file}`).join('\n') +
       (dropped > 0
         ? `\n\nNOTE: this listing is truncated — ${dropped} more files exist under the scanned roots and are not listed. You may still read and report them.`
-        : ''),
+        : '') +
+      batchNote(batchInfo),
   ]
   return parts.join('\n\n')
 }
 
 /**
- * The focused, one-shot context: instructions plus code-first excerpts of the
- * files the focus globs match, assembled as a context pack.
+ * The focused, one-shot context: instructions plus code-first excerpts of one
+ * batch of the files the focus globs matched, assembled as a context pack.
  *
- * A focus that matches nothing throws. Fail closed again: a scan over zero
- * files must not look like a clean domain. Matches beyond
- * `maxFiles` or the pack's byte budget are announced inline, never silently
- * thinned; since the one-shot request has no tools, an unexcerpted file is a
- * file the model genuinely cannot see, and it must know that.
+ * Matches beyond `maxFiles` or the pack's byte budget are announced inline,
+ * never silently thinned; since the one-shot request has no tools, an
+ * unexcerpted file is a file the model genuinely cannot see, and it must
+ * know that.
  */
 function composeFocusedContext(
   repositoryRoot: string,
   instructions: string,
   roots: string[],
-  files: string[],
-  focus: string[],
-  maxFiles: number,
+  shown: string[],
+  alreadyDropped: number,
   excerptChars: number,
+  batchInfo?: BatchInfo,
 ): string {
-  const matches = focusMatcher(focus)
-  const matched = files.filter(matches)
-  if (matched.length === 0) {
-    throw new Error(
-      `Agent scan focus [${focus.join(', ')}] matched no files under the scanned roots. ` +
-        'A scan of nothing must not look like a clean one',
-    )
-  }
-
-  const shown = matched.slice(0, maxFiles)
   const pack = assemblePack(
     [
       { header: `### Scan instructions\n\n${instructions}`, items: [], what: 'instructions' },
       {
         header:
-          `### Focused files under ${roots.join(', ')} (repository-relative)\n\n` +
-          'Answer from these excerpts alone; they are your entire view of the repository.',
+          `### Focused files under ${roots.join(', ')} (repository-relative${batchHeading(batchInfo)})\n\n` +
+          'Answer from these excerpts alone; they are your entire view of the repository.' +
+          batchNote(batchInfo),
         items: shown.map(
           (file) => `### ${file}\n${fencedExcerpt(repositoryRoot, file, excerptChars)}`,
         ),
         what: 'focused files',
-        alreadyDropped: matched.length - shown.length,
+        alreadyDropped,
       },
     ],
     DEFAULT_PACK_BUDGET_BYTES,

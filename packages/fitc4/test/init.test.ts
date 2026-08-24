@@ -54,10 +54,10 @@ describe('init', () => {
 
     expect(result.created).toEqual([CONFIG_FILENAME, 'arch/model.c4', 'AGENTS.md'])
     expect(result.skipped).toEqual([])
-    // A fresh directory has neither prerequisite; both are notes, not files —
-    // guessing a project's TypeScript setup wrong is worse than asking.
+    // A fresh directory has no tsconfig, so the scaffolded scan is the
+    // import crawler and the note says how to get TypeScript resolution.
     expect(result.notes.join('\n')).toContain('tsconfig.json')
-    expect(result.notes.join('\n')).toContain('src/')
+    expect(result.notes.join('\n')).toContain('importScan')
     // Agent setup ships as copy-paste commands, not prose.
     expect(result.notes.join('\n')).toContain(
       'mkdir -p .claude/skills && cp -R node_modules/@arocnies/fitc4/skills/fitc4 .claude/skills/fitc4',
@@ -68,7 +68,7 @@ describe('init', () => {
     expect(config.modelDir).toBe(path.join(root, 'arch'))
     // The phases are written out in full and the scaffold names exactly the
     // standard gate — nothing extra, nothing composed in behind the file.
-    expect(config.scan.map((provider) => provider.id)).toEqual(['typescript-imports'])
+    expect(config.scan.map((provider) => provider.id)).toEqual(['import-scan'])
     expect(config.resolve.map((provider) => provider.id)).toEqual(['source-root'])
     expect(config.validate.map((provider) => provider.id)).toEqual(['architecture-rules'])
     expect(config.agent).toBeUndefined()
@@ -281,7 +281,34 @@ describe('the scaffolded config', () => {
     expect(resolved.scan.map((provider) => provider.id)).toEqual(['typescript-imports'])
   })
 
-  test('without a tsconfig the agent scaffold scans with the agent, and says so', () => {
+  test('with a tsconfig the plain scaffold keeps the deterministic TypeScript scanner', async () => {
+    const root = scratch()
+    fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
+    init(root)
+
+    const resolved = await resolveScaffolded(root)
+    expect(resolved.scan.map((provider) => provider.id)).toEqual(['typescript-imports'])
+  })
+
+  test('without a tsconfig but with source the crawler reads, the agent scaffold scans with importScan', async () => {
+    const root = scratch()
+    fs.mkdirSync(path.join(root, 'app'))
+    fs.writeFileSync(path.join(root, 'app', 'main.py'), 'import os\n')
+    const result = init(root, { agent: 'codex' })
+
+    const config = fs.readFileSync(path.join(root, CONFIG_FILENAME), 'utf8')
+    expect(config).toContain('scan: [importScan()],')
+    expect(config).not.toContain('agentScan({ exec })')
+    // The agent providers still carry resolve and validate.
+    expect(config).toContain('resolve: [sourceRoot(), agentResolve({ exec })],')
+    expect(result.notes.join('\n')).toContain('importScan')
+
+    const resolved = await resolveScaffolded(root)
+    expect(resolved.scan.map((provider) => provider.id)).toEqual(['import-scan'])
+    expect(resolved.resolve.map((provider) => provider.id)).toEqual(['source-root', 'agent-resolve'])
+  })
+
+  test('without a tsconfig, in a directory of nothing the crawler reads, the agent scaffold scans with the agent', () => {
     const root = scratch()
     const result = init(root, { agent: 'claude' })
 

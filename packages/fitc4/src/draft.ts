@@ -574,17 +574,27 @@ function buildDirectory(
   return element
 }
 
-/** Whether an observed dependency crosses between two subdirectories. */
+/**
+ * Whether an observed dependency crosses between two subdirectories, at this
+ * level or anywhere below. The recursion matters for hub-and-spoke packages:
+ * a top package whose subpackages only ever import its direct files has no
+ * sibling crossing of its own, yet a subpackage below it may hold the whole
+ * observed architecture, and collapsing the top level would bury it.
+ */
 function splits(
   node: DirectoryNode,
   prefix: string,
   dependencyPairs: [string, string][],
 ): boolean {
-  if (node.directories.size < 2) return false
-  for (const [from, to] of dependencyPairs) {
-    const a = childDirectory(from, prefix, node)
-    const b = childDirectory(to, prefix, node)
-    if (a !== undefined && b !== undefined && a !== b) return true
+  if (node.directories.size >= 2) {
+    for (const [from, to] of dependencyPairs) {
+      const a = childDirectory(from, prefix, node)
+      const b = childDirectory(to, prefix, node)
+      if (a !== undefined && b !== undefined && a !== b) return true
+    }
+  }
+  for (const [name, child] of node.directories) {
+    if (splits(child, `${prefix}${name}/`, dependencyPairs)) return true
   }
   return false
 }

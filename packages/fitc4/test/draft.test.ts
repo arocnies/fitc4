@@ -276,6 +276,42 @@ describe('draft', () => {
     expect(gate.findings.filter((finding) => finding.ruleId === 'unused-drift')).toEqual([])
   })
 
+  test('a hub-and-spoke package splits for structure that only exists deeper down', HEAVY, async () => {
+    // The real-repository shape that motivated the recursion: one top package
+    // whose subpackages never import each other, only the package's direct
+    // hub files. The top level has no sibling crossing of its own, but a
+    // subpackage below it holds the whole observed architecture, and a
+    // one-level check would collapse everything into a single blob element.
+    const config = stubConfig([
+      file('src/catalog/domain.ts'),
+      file('src/catalog/web/render.ts'),
+      file('src/catalog/inventory/api/routes.ts'),
+      file('src/catalog/inventory/pricing/runs.ts'),
+      // Spokes to the hub: parent-child, never a sibling crossing.
+      dependency(1, 'src/catalog/web/render.ts', { kind: 'file', id: 'src/catalog/domain.ts' }),
+      dependency(2, 'src/catalog/inventory/api/routes.ts', { kind: 'file', id: 'src/catalog/domain.ts' }),
+      // The one sibling crossing, two levels down inside inventory.
+      dependency(3, 'src/catalog/inventory/api/routes.ts', { kind: 'file', id: 'src/catalog/inventory/pricing/runs.ts' }),
+    ])
+
+    const result = await draft(config)
+
+    // catalog splits (keeping the catch-all claim for its direct domain.ts),
+    // and so does inventory below it; web holds no deeper structure and collapses.
+    expect(result.text).toContain(`sources 'src/catalog/**'`)
+    expect(result.text).toContain(`sources 'src/catalog/web/**'`)
+    expect(result.text).toContain(`sources 'src/catalog/inventory/api/**'`)
+    expect(result.text).toContain(`sources 'src/catalog/inventory/pricing/**'`)
+    // The deep crossing is the drafted edge; the hub spokes are parent-child
+    // and declare nothing.
+    expect(result.text).toContain('app.catalog.inventory.api -> app.catalog.inventory.pricing { #drift } // 1 dependency')
+    expect(result.edges).toBe(1)
+
+    const gate = await runPipeline(config)
+    expect(gate.modelErrors).toEqual([])
+    expect(errors(gate.findings)).toEqual([])
+  })
+
   test('a split directory with no direct files is a pure container and gates clean', HEAVY, async () => {
     const config = stubConfig([
       file('src/billing/invoices/create.ts'),

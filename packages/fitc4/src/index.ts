@@ -71,6 +71,12 @@ export type {
   TypeOnlyImportsPolicy,
 } from './providers/architecture-rules.ts'
 export {
+  importScan,
+  IMPORT_SCAN_EXTENSIONS,
+  PROVIDER_ID as IMPORT_SCAN_PROVIDER_ID,
+} from './providers/import-scan.ts'
+export type { ImportScanOptions } from './providers/import-scan.ts'
+export {
   missingDescriptions,
   PROVIDER_ID as MISSING_DESCRIPTIONS_PROVIDER_ID,
 } from './providers/missing-descriptions.ts'
