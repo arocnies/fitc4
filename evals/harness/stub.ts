@@ -15,8 +15,8 @@
  * shows it, never a silently skipped call.
  */
 
-import type { JsonValue } from 'fitc4'
-import type { AgentExec, AgentReply, AgentRequest } from 'fitc4/agent'
+import type { JsonValue } from '@arocnies/fitc4'
+import type { AgentExec, AgentReply, AgentRequest } from '@arocnies/fitc4/agent'
 
 export interface ScriptedReply {
   /** Every listed condition must hold for the script to match. */

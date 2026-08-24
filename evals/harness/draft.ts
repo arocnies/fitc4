@@ -39,10 +39,10 @@
  * stub mode so the fixture gets updated instead of rotting silently.
  */
 
-import { architectureRules, runPipeline } from 'fitc4'
-import type { DraftResult, ResolvedConfig } from 'fitc4'
-import { agentSemanticReview, AGENT_SEMANTIC_REVIEW_PROVIDER_ID } from 'fitc4/agent'
-import type { AgentExec } from 'fitc4/agent'
+import { architectureRules, runPipeline } from '@arocnies/fitc4'
+import type { DraftResult, ResolvedConfig } from '@arocnies/fitc4'
+import { agentSemanticReview, AGENT_SEMANTIC_REVIEW_PROVIDER_ID } from '@arocnies/fitc4/agent'
+import type { AgentExec } from '@arocnies/fitc4/agent'
 
 import type { FixtureScore, ProviderScore } from './score.ts'
 

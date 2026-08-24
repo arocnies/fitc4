@@ -23,7 +23,7 @@ import type {
   ValidateProvider,
 } from './types.ts'
 
-// Type-only on purpose: the core package never runtime-imports `fitc4/agent`
+// Type-only on purpose: the core package never runtime-imports `@arocnies/fitc4/agent`
 // (see the layering note in agent/index.ts), and an erased import keeps it
 // that way while the config field still typechecks against the real contract.
 import type { AgentExec } from './agent/exec.ts'
@@ -83,7 +83,7 @@ export interface FitC4FileConfig {
   validate: NamedProvider<ValidateProvider>[]
   /**
    * The agent exec commands like `draft --describe` run on: an `AgentExec`
-   * from `fitc4/agent` (`cached(claudeCli({ ... }))` and friends). Optional:
+   * from `@arocnies/fitc4/agent` (`cached(claudeCli({ ... }))` and friends). Optional:
    * declaring it costs nothing, since no call happens until a command asks
    * for one. One place carries the model choice and billing surface, and the
    * CLI can say precisely what is missing when a command needs an exec and
@@ -331,7 +331,7 @@ function requirePhase<T>(
   if (value === undefined) {
     throw new Error(
       `${configPath}: missing '${key}'. Phases are explicit; the standard one is ` +
-        `${STANDARD_PHASES[key]} (imported from 'fitc4')`,
+        `${STANDARD_PHASES[key]} (imported from '@arocnies/fitc4')`,
     )
   }
   if (!Array.isArray(value)) {
@@ -340,7 +340,7 @@ function requirePhase<T>(
   if (value.length === 0) {
     throw new Error(
       `${configPath}: '${key}' lists no providers, so nothing would run in that phase. ` +
-        `The standard one is ${STANDARD_PHASES[key]} (imported from 'fitc4')`,
+        `The standard one is ${STANDARD_PHASES[key]} (imported from '@arocnies/fitc4')`,
     )
   }
 
@@ -377,7 +377,7 @@ function requireAgent(configPath: string, record: Record<string, unknown>): Agen
   if (candidate === undefined || typeof id !== 'string' || id.trim() === '' || typeof run !== 'function') {
     throw new Error(
       `${configPath}: 'agent' must be an agent exec with a string 'id' and a function 'run', ` +
-        `such as cached(claudeCli({ model: 'sonnet' })) from 'fitc4/agent'`,
+        `such as cached(claudeCli({ model: 'sonnet' })) from '@arocnies/fitc4/agent'`,
     )
   }
   return value as AgentExec

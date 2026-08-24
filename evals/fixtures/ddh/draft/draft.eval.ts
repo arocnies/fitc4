@@ -27,8 +27,8 @@ import {
   sourceRoot,
   typescriptImports,
   type ResolvedConfig,
-} from 'fitc4'
-import type { AgentExec } from 'fitc4/agent'
+} from '@arocnies/fitc4'
+import type { AgentExec } from '@arocnies/fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
 

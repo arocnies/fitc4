@@ -21,7 +21,7 @@
  * not churn the expectations.
  */
 
-import type { Association, Finding, Observation, PipelineResult } from 'fitc4'
+import type { Association, Finding, Observation, PipelineResult } from '@arocnies/fitc4'
 
 export interface ExpectedFinding {
   provider: string

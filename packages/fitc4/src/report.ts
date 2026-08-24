@@ -50,7 +50,7 @@ export function renderReport(result: PipelineResult): Report {
   // a rule means. The shipped README documents every rule and its fixes, and
   // the local path works offline.
   if (result.findings.length > 0) {
-    lines.push('rules: node_modules/fitc4/README.md#rules')
+    lines.push('rules: node_modules/@arocnies/fitc4/README.md#rules')
     lines.push('')
   }
 

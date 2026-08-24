@@ -19,8 +19,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { architectureRules, sourceRoot, type PipelineConfig } from 'fitc4'
-import type { AgentExec } from 'fitc4/agent'
+import { architectureRules, sourceRoot, type PipelineConfig } from '@arocnies/fitc4'
+import type { AgentExec } from '@arocnies/fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
 import { supabaseScan } from '../greenfield/fitc4.eval.ts'

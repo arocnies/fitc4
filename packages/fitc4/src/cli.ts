@@ -279,7 +279,7 @@ async function runDraft(options: Arguments): Promise<void> {
       throw new Error(
         `--describe needs an agent exec, and ${configPath} declares none. ` +
           `Add an 'agent' field, such as agent: cached(claudeCli({ model: 'sonnet' })) from ` +
-          `'fitc4/agent' (see node_modules/fitc4/README.md#agent-providers). In a project with ` +
+          `'@arocnies/fitc4/agent' (see node_modules/@arocnies/fitc4/README.md#agent-providers). In a project with ` +
           `no config yet, 'fitc4 init --agent claude' (or codex) scaffolds one`,
       )
     }

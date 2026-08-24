@@ -10,14 +10,14 @@
  * is fail-closed, though it makes zero calls in this example (see below).
  */
 
-import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
 import {
   agentOwnershipAdvisor,
   agentResolve,
   agentSemanticReview,
   cached,
   claudeCli,
-} from 'fitc4/agent'
+} from '@arocnies/fitc4/agent'
 
 // Cheap model; `cached` makes reruns with unchanged inputs free and identical.
 const agent = cached(claudeCli({ model: 'haiku' }))

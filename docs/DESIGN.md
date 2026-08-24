@@ -89,7 +89,7 @@ Elements derive from `file` observations and never from listing the filesystem, 
 
 ## Agent provider tiers
 
-`fitc4/agent` is a separate entry point the core never imports; composing an agent provider into a phase is an explicit act in a config file. The exec layer shells out to locally installed agent CLIs (`claude`, `codex`), on the user's own login and billing, with no API keys. Replies are schema-enforced JSON, and `cached()` replays them keyed on everything the model saw.
+`@arocnies/fitc4/agent` is a separate entry point the core never imports; composing an agent provider into a phase is an explicit act in a config file. The exec layer shells out to locally installed agent CLIs (`claude`, `codex`), on the user's own login and billing, with no API keys. Replies are schema-enforced JSON, and `cached()` replays them keyed on everything the model saw.
 
 Two tiers, distinguished by what absence looks like:
 
@@ -102,7 +102,7 @@ The intended lifecycle: **agents prototype, determinism graduates.** A new model
 
 ## Companion packages
 
-Providers that carry runtime dependencies ship as separate npm packages so `fitc4` core keeps zero of them beyond TypeScript and LikeC4. [`fitc4-dependency-cruiser`](../packages/fitc4-dependency-cruiser) is the first: dependency-cruiser's `cruise()` as a scan provider for JavaScript and mixed projects, declaring `fitc4` as a peer dependency. Consumers install both and compose in config. `NamedProvider<ScanProvider>`, the kind vocabulary, and the fail-closed conventions are the whole integration contract.
+Providers that carry runtime dependencies ship as separate npm packages so `fitc4` core keeps zero of them beyond TypeScript and LikeC4. [`@arocnies/fitc4-dependency-cruiser`](../packages/fitc4-dependency-cruiser) is the first: dependency-cruiser's `cruise()` as a scan provider for JavaScript and mixed projects, declaring `@arocnies/fitc4` as a peer dependency. Consumers install both and compose in config. `NamedProvider<ScanProvider>`, the kind vocabulary, and the fail-closed conventions are the whole integration contract.
 
 ## Configuration
 

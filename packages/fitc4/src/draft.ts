@@ -85,7 +85,7 @@ export interface DraftElementFacts {
  * could not run at all, and it aborts the whole draft (see `describeElements`)
  * because an agent that is not there does not abstain, it fails.
  *
- * Typed structurally here so the core stays free of `fitc4/agent`; the
+ * Typed structurally here so the core stays free of `@arocnies/fitc4/agent`; the
  * agent-powered implementation is `draftDescriber` in that entry point.
  */
 export type DraftDescribe = (element: DraftElementFacts) => Promise<string | undefined>

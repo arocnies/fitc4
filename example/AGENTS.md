@@ -7,7 +7,7 @@ This directory is a consumer project under architecture control. It is the check
 - Run `npm run fitc4 -w example` before handing off changes; it checks the code against the LikeC4 architecture model in `arch/model.c4`. Exit 1 is an architecture violation, not a flaky tool.
 - A finding means the code and the contract disagree. Fixing the code is the default. Editing the model is a design decision. It is legitimate when the architecture genuinely changed, never merely to silence a finding. Call out any model change explicitly when handing off.
 - Never delete `sources` metadata or a declared relationship to make a finding go away. That removes code from architecture control entirely.
-- Rule reference: `node_modules/fitc4/README.md#rules` (in this workspace, `packages/fitc4/README.md#rules`). Structured output: `npx fitc4 --json`.
+- Rule reference: `node_modules/@arocnies/fitc4/README.md#rules` (in this workspace, `packages/fitc4/README.md#rules`). Structured output: `npx fitc4 --json`.
 
 ## This example in particular
 

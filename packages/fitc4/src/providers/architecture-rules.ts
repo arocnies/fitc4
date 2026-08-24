@@ -142,7 +142,7 @@ function validateSeverity(severity: ArchitectureRulesOptions['severity']): void 
       throw new Error(
         `architectureRules: 'severity' names unknown rule '${rule}'` +
           (suggestion === undefined ? '' : `, did you mean '${suggestion}'?`) +
-          ` (see node_modules/fitc4/README.md#rules)`,
+          ` (see node_modules/@arocnies/fitc4/README.md#rules)`,
       )
     }
     if (!isSeverity(level)) {

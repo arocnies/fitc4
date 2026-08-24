@@ -1,4 +1,4 @@
-import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
 
 export default defineConfig({
   version: 1,

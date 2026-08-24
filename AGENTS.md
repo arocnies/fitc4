@@ -9,7 +9,7 @@ Run `npm run verify` before handing off a change. It builds the package, runs it
 - Nothing in `packages/fitc4` may assume it lives in the repository it checks. Paths come from the config or the working directory, never from `import.meta.url`.
 - `src/cli.ts` runs the pipeline on import, so nothing else may import it. Anything the CLI can do must also be reachable from `src/index.ts`.
 - Providers are plain functions composed into the config's phase arrays, and the arrays are required: there are no default phases, so a config names everything that runs (`docs/providers.md`). There is no registry, lifecycle, or discovery system, and adding one is a design change rather than a refactor.
-- `src/agent/` is the `fitc4/agent` entry point and nothing in core may import it. The self-check enforces that boundary. Agent findings are additive; each provider's `severity` option says whether it is advisory (the default) or part of the gate. `'error'` also escalates `agent-unavailable` and `agent-truncated`, because a gate whose judge is absent must not pass.
+- `src/agent/` is the `@arocnies/fitc4/agent` entry point and nothing in core may import it. The self-check enforces that boundary. Agent findings are additive; each provider's `severity` option says whether it is advisory (the default) or part of the gate. `'error'` also escalates `agent-unavailable` and `agent-truncated`, because a gate whose judge is absent must not pass.
 - The LikeC4 model is the only architecture-model representation. Do not build a snapshot type that duplicates elements or relationships.
 
 ## The gate must never fail open

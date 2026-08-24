@@ -1,4 +1,4 @@
-# fitc4-dependency-cruiser
+# @arocnies/fitc4-dependency-cruiser
 
 [dependency-cruiser](https://github.com/sverweij/dependency-cruiser) as a [FitC4](https://github.com/arocnies/fitc4) scan provider.
 
@@ -6,12 +6,12 @@ FitC4's built-in scanner reads TypeScript sources with the TypeScript compiler A
 
 Use the built-in `typescriptImports` scanner for pure-TypeScript projects (it has line-level evidence and tsconfig-alias awareness built in). Reach for this package when the code under architecture control is JavaScript, or a JS/TS mix.
 
-This package is versioned and published separately from `fitc4` (it declares `fitc4` as a peer dependency).
+This package is versioned and published separately from `@arocnies/fitc4` (it declares `@arocnies/fitc4` as a peer dependency).
 
 ## Install
 
 ```sh
-npm i -D fitc4 fitc4-dependency-cruiser
+npm i -D @arocnies/fitc4 @arocnies/fitc4-dependency-cruiser
 ```
 
 ## Usage
@@ -19,8 +19,8 @@ npm i -D fitc4 fitc4-dependency-cruiser
 A complete `fitc4.config.ts`:
 
 ```ts
-import { architectureRules, defineConfig, sourceRoot } from 'fitc4'
-import { dependencyCruiser } from 'fitc4-dependency-cruiser'
+import { architectureRules, defineConfig, sourceRoot } from '@arocnies/fitc4'
+import { dependencyCruiser } from '@arocnies/fitc4-dependency-cruiser'
 
 export default defineConfig({
   version: 1,

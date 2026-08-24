@@ -1,5 +1,5 @@
 /**
- * The agent execution contract (`fitc4/agent`).
+ * The agent execution contract (`@arocnies/fitc4/agent`).
  *
  * An `AgentExec` adapts one locally installed agent CLI into a function
  * providers can call, on the user's own install, login, and billing. FitC4

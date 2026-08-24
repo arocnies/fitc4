@@ -69,7 +69,7 @@ function undescribedReason(description: string | undefined): string | undefined 
  * A plain-text description off a LikeC4 element. LikeC4 stores descriptions
  * as a string or a `{ txt | md }` wrapper depending on authoring form.
  * Duplicated from the agent tier's `elementText` on purpose: this provider is
- * core, and core never imports from `fitc4/agent`.
+ * core, and core never imports from `@arocnies/fitc4/agent`.
  */
 function descriptionText(value: unknown): string | undefined {
   if (typeof value === 'string') return value

@@ -25,14 +25,14 @@ cp "$root/example/tsconfig.json" "$root/example/fitc4.config.mts" "$consumer/"
 
 echo "== library entry point loads"
 (cd "$consumer" && node --input-type=module -e "
-  import { runPipeline, resolveConfig, findConfig, exitCodeFor } from 'fitc4'
+  import { runPipeline, resolveConfig, findConfig, exitCodeFor } from '@arocnies/fitc4'
   const result = await runPipeline(await resolveConfig(findConfig(process.cwd())))
   if (exitCodeFor(result) !== 0) { console.error(result.findings); process.exit(1) }
 ")
 
-echo "== fitc4/agent entry point loads"
+echo "== @arocnies/fitc4/agent entry point loads"
 (cd "$consumer" && node --input-type=module -e "
-  import { claudeCli, codexCli, cached, agentOwnershipAdvisor, agentSemanticReview } from 'fitc4/agent'
+  import { claudeCli, codexCli, cached, agentOwnershipAdvisor, agentSemanticReview } from '@arocnies/fitc4/agent'
   const provider = agentOwnershipAdvisor({ exec: claudeCli() })
   if (provider.id !== 'agent-ownership-advisor' || typeof provider.run !== 'function') process.exit(1)
 ")

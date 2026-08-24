@@ -1,5 +1,5 @@
 /**
- * `fitc4/agent`: providers that shell out to local agent CLIs.
+ * `@arocnies/fitc4/agent`: providers that shell out to local agent CLIs.
  *
  * A separate entry point on purpose: the core gate stays deterministic and
  * dependency-free, and nothing in `fitc4` imports this module. Composing an

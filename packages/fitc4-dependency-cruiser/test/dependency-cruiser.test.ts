@@ -11,7 +11,7 @@ import {
   sourceRoot,
   type Observation,
   type PipelineResult,
-} from 'fitc4'
+} from '@arocnies/fitc4'
 import { dependencyCruiser, isTestPath, PROVIDER_ID } from '../src/index.ts'
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures')

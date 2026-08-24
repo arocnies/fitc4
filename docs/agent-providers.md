@@ -1,10 +1,10 @@
 # Agent scan and resolve providers
 
-Two providers from `fitc4/agent` extend the gate to cases the deterministic providers cannot reach, under the same fail-closed discipline: `agentScan` observes model domains no parser covers, and `agentResolve` maps leftover observations onto model elements no `sources` prefix can claim. Both are prototyping tools first. See [Cost and nondeterminism](#cost-and-nondeterminism). [`providers.md`](providers.md) covers the provider contract they implement, the shared exec layer, and the *advisory* validate providers (`agentOwnershipAdvisor`, `agentSemanticReview`). [Context packs](#context-packs) below describes the layer they all prefill from.
+Two providers from `@arocnies/fitc4/agent` extend the gate to cases the deterministic providers cannot reach, under the same fail-closed discipline: `agentScan` observes model domains no parser covers, and `agentResolve` maps leftover observations onto model elements no `sources` prefix can claim. Both are prototyping tools first. See [Cost and nondeterminism](#cost-and-nondeterminism). [`providers.md`](providers.md) covers the provider contract they implement, the shared exec layer, and the *advisory* validate providers (`agentOwnershipAdvisor`, `agentSemanticReview`). [Context packs](#context-packs) below describes the layer they all prefill from.
 
 ## Context packs
 
-The pipeline knows far more than early versions of these providers sent: which files import which, who owns each neighbor, what each element declares and owns. The shared context-pack module (`buildGraph`, `fileNeighborhood`, `elementPack`, code-first excerpts, and a byte-budgeted assembler, all exported from `fitc4/agent`) turns that knowledge into deterministic prefilled context. These are pure functions over what a provider already receives, with no persistence and no I/O beyond bounded excerpt reads.
+The pipeline knows far more than early versions of these providers sent: which files import which, who owns each neighbor, what each element declares and owns. The shared context-pack module (`buildGraph`, `fileNeighborhood`, `elementPack`, code-first excerpts, and a byte-budgeted assembler, all exported from `@arocnies/fitc4/agent`) turns that knowledge into deterministic prefilled context. These are pure functions over what a provider already receives, with no persistence and no I/O beyond bounded excerpt reads.
 
 What each provider prefills:
 
@@ -68,8 +68,8 @@ A failed provider contributes nothing, not even a half-scan. The other providers
 `npx fitc4 init --agent claude` (or `codex`) scaffolds a `fitc4.config.mts` around one shared cached exec, declared as the config's `agent` so `draft --describe` works immediately, and composes the agent providers into the phases they extend: `agentResolve` into resolve, the two advisory providers into validate, each with its cost commented beside it. The consequence is stated in the file: `agentResolve` is fail-closed, so every plain `npx fitc4`, the command the scaffolded `AGENTS.md` tells every coding agent to run before handing off, calls the CLI, and CI without a login hits a `provider-failure` error. A team whose CI carries no login splits the configs: a deterministic discovery config for CI, and the agent-composed one in a non-discovery filename run with `--config`; `example/fitc4.agent.config.ts` in the repository is that pattern. `agentScan` alone is never scaffolded: a fail-closed scanner driven by placeholder instructions is worse than no scanner, so it waits for your own prose.
 
 ```ts
-import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
-import { agentScan, cached, claudeCli, codexCli } from 'fitc4/agent'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
+import { agentScan, cached, claudeCli, codexCli } from '@arocnies/fitc4/agent'
 
 const exec = cached(claudeCli({ model: 'sonnet' }))
 // Or the Codex CLI; gpt-5.6-luna also measured perfect across the eval suite:
@@ -114,8 +114,8 @@ Two instances coexist because `id` suffixes the provider id (`agent-scan:compose
 It is used **alongside** the default resolver, never instead of it:
 
 ```ts
-import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
-import { agentResolve, cached, claudeCli } from 'fitc4/agent'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
+import { agentResolve, cached, claudeCli } from '@arocnies/fitc4/agent'
 
 export default defineConfig({
   version: 1,

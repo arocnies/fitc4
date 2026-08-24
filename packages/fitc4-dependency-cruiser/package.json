@@ -1,5 +1,5 @@
 {
-  "name": "fitc4-dependency-cruiser",
+  "name": "@arocnies/fitc4-dependency-cruiser",
   "version": "0.1.0",
   "description": "dependency-cruiser as a FitC4 scan provider — JS/CJS/ESM dependency observations for the LikeC4 model to judge",
   "license": "MIT",
@@ -47,11 +47,11 @@
     "dependency-cruiser": "^18.2.0"
   },
   "peerDependencies": {
-    "fitc4": "^0.1.0"
+    "@arocnies/fitc4": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
-    "fitc4": "^0.1.0",
+    "@arocnies/fitc4": "^0.1.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }

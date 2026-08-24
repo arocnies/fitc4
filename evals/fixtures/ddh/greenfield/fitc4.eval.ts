@@ -17,8 +17,8 @@
 
 import path from 'node:path'
 
-import { resolveConfig, type PipelineConfig } from 'fitc4'
-import { agentResolve, type AgentExec } from 'fitc4/agent'
+import { resolveConfig, type PipelineConfig } from '@arocnies/fitc4'
+import { agentResolve, type AgentExec } from '@arocnies/fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
 

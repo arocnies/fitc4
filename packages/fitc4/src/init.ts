@@ -79,7 +79,7 @@ const AGENT_EXEC_IMPORTS: Record<InitAgent, string> = {
  */
 function configTemplate(agent: InitAgent | undefined): string {
   if (agent === undefined) {
-    return `import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+    return `import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
 
 export default defineConfig({
   version: 1,
@@ -96,19 +96,19 @@ export default defineConfig({
   // Validate judges the mapped code against the declared architecture. Tune a
   // rule here, such as
   // architectureRules({ severity: { 'unmapped-source': 'error' } })
-  // once you are done adopting: node_modules/fitc4/README.md#rules
+  // once you are done adopting: node_modules/@arocnies/fitc4/README.md#rules
   validate: [architectureRules()],
 })
 `
   }
 
-  return `import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+  return `import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
 import {
   agentOwnershipAdvisor,
   agentResolve,
   agentSemanticReview,
   ${AGENT_EXEC_IMPORTS[agent].replace(', ', ',\n  ')},
-} from 'fitc4/agent'
+} from '@arocnies/fitc4/agent'
 
 // Your own ${agent} CLI, on your own login and billing. cached() makes reruns
 // with unchanged inputs free. This model measured perfect in the fitc4 evals.
@@ -124,7 +124,7 @@ export default defineConfig({
   // The phases are explicit: what runs is what this file names.
   // Scan observes the code: every file and every import under roots. agentScan
   // can join it for domains no parser covers, once you write its instructions:
-  // node_modules/fitc4/README.md#agent-providers
+  // node_modules/@arocnies/fitc4/README.md#agent-providers
   scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
   // Resolve maps observations onto the model. sourceRoot() maps files through
   // 'sources' claims; agentResolve maps what that cannot, such as imports of
@@ -202,7 +202,7 @@ const MCP_COMMANDS: Record<InitAgent, string> = {
   codex: 'codex mcp add likec4 -- npx likec4 mcp --stdio',
 }
 
-const SKILL_INSTALL = `mkdir -p .claude/skills && cp -R node_modules/fitc4/skills/fitc4 .claude/skills/fitc4`
+const SKILL_INSTALL = `mkdir -p .claude/skills && cp -R node_modules/@arocnies/fitc4/skills/fitc4 .claude/skills/fitc4`
 
 /**
  * The "Agent setup" half of AGENTS.md, addressed to whichever CLI was chosen.
@@ -258,7 +258,7 @@ const AGENTS_NORMS = `# Agent instructions
   from a phase, to make a finding go away. How strict the gate is belongs to
   the team; loosening it for a green run is the same evasion as deleting the
   relationship, one layer up.
-- Rule reference: \`node_modules/fitc4/README.md#rules\`. Structured output:
+- Rule reference: \`node_modules/@arocnies/fitc4/README.md#rules\`. Structured output:
   \`npx fitc4 --json\`.
 
 `
@@ -309,7 +309,7 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
     result.skipped.push(AGENTS_FILENAME)
     result.notes.push(
       `AGENTS.md already exists. Merge the fitc4 norms into it yourself; ` +
-        `the copy-paste block is at node_modules/fitc4/README.md#for-ai-agents`,
+        `the copy-paste block is at node_modules/@arocnies/fitc4/README.md#for-ai-agents`,
     )
   } else {
     fs.writeFileSync(agentsPath, AGENTS_NORMS + agentSetupSection(options.agent))

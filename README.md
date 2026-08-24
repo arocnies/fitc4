@@ -13,7 +13,7 @@ A LikeC4 model says which elements exist, which files they own, and which depend
 Requires Node.js `>=22.22.3` and a `tsconfig.json`. FitC4 runs during development and CI, so install it as a dev dependency; `-D` is the short form of `--save-dev`.
 
 ```sh
-npm install --save-dev fitc4
+npm install --save-dev @arocnies/fitc4
 npx fitc4 init
 npx fitc4
 ```
@@ -89,7 +89,7 @@ The config names the phases explicitly. There are no hidden default providers, s
 The smallest useful config looks like this:
 
 ```ts
-import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
 
 export default defineConfig({
   version: 1,
@@ -107,8 +107,8 @@ export default defineConfig({
 | --- | --- |
 | Check a TypeScript project | Use FitC4's built-in `typescriptImports()` scanner. |
 | Adopt an existing codebase | Run `npx fitc4 draft`, then remove drift as the architecture improves. |
-| Check JavaScript or mixed JS/TS | Add [`fitc4-dependency-cruiser`](packages/fitc4-dependency-cruiser/README.md). |
-| Observe domains without a parser | Compose a custom provider, or prototype with [`fitc4/agent`](packages/fitc4/README.md#agent-providers). |
+| Check JavaScript or mixed JS/TS | Add [`@arocnies/fitc4-dependency-cruiser`](packages/fitc4-dependency-cruiser/README.md). |
+| Observe domains without a parser | Compose a custom provider, or prototype with [`@arocnies/fitc4/agent`](packages/fitc4/README.md#agent-providers). |
 | Let coding agents work inside the contract | Run `npx fitc4 init --agent claude` or `npx fitc4 init --agent codex`; read [For AI agents](packages/fitc4/README.md#for-ai-agents). |
 
 Providers are plain functions composed into the three phase arrays. A provider can observe anything the implementation exposes—imports, compose files, runbooks, OpenAPI specs—and the same resolve and validation pipeline judges its observations.
@@ -119,7 +119,7 @@ Providers are plain functions composed into the three phase arrays. A provider c
 - [Worked example](example/README.md) — a small project with boundary, ownership, and drift exercises.
 - [Provider contract](docs/providers.md) — the observation, association, and finding envelopes for custom providers.
 - [Agent provider reference](docs/agent-providers.md) — fail-closed scanning and advisory review providers.
-- [JavaScript provider](packages/fitc4-dependency-cruiser/README.md) — dependency-cruiser integration for JS and mixed projects.
+- [JavaScript provider](packages/fitc4-dependency-cruiser/README.md) — `@arocnies/fitc4-dependency-cruiser` integration for JS and mixed projects.
 - [Design of record](docs/DESIGN.md) — the architecture and invariants behind the tool.
 
 Findings can also link to a published LikeC4 viewer. Set `viewerBaseUrl` in the config after publishing a viewer with `likec4 build`; `--json` then includes links to the relevant model view.

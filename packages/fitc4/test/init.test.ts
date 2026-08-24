@@ -41,7 +41,7 @@ async function resolveScaffolded(root: string): Promise<ResolvedConfig> {
   ).href
   fs.writeFileSync(
     configPath,
-    template.replace(`from 'fitc4/agent'`, `from '${agentUrl}'`).replace(`from 'fitc4'`, `from '${indexUrl}'`),
+    template.replace(`from '@arocnies/fitc4/agent'`, `from '${agentUrl}'`).replace(`from '@arocnies/fitc4'`, `from '${indexUrl}'`),
   )
   return resolveConfig(configPath)
 }
@@ -60,7 +60,7 @@ describe('init', () => {
     expect(result.notes.join('\n')).toContain('src/')
     // Agent setup ships as copy-paste commands, not prose.
     expect(result.notes.join('\n')).toContain(
-      'mkdir -p .claude/skills && cp -R node_modules/fitc4/skills/fitc4 .claude/skills/fitc4',
+      'mkdir -p .claude/skills && cp -R node_modules/@arocnies/fitc4/skills/fitc4 .claude/skills/fitc4',
     )
     expect(result.notes.join('\n')).toContain('claude mcp add likec4 -- npx likec4 mcp --stdio')
 
@@ -144,10 +144,10 @@ describe('init', () => {
     // Loosening the gate from the config is the same evasion, one layer up.
     expect(content).toContain("Never soften a rule's severity")
     expect(content).toContain('never remove a provider')
-    expect(content).toContain('node_modules/fitc4/README.md#rules')
+    expect(content).toContain('node_modules/@arocnies/fitc4/README.md#rules')
     // And the setup commands an agent arriving after init can run itself.
     expect(content).toContain(
-      'mkdir -p .claude/skills && cp -R node_modules/fitc4/skills/fitc4 .claude/skills/fitc4',
+      'mkdir -p .claude/skills && cp -R node_modules/@arocnies/fitc4/skills/fitc4 .claude/skills/fitc4',
     )
     expect(content).toContain('claude mcp add likec4 -- npx likec4 mcp --stdio')
   })

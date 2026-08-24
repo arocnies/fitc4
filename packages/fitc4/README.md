@@ -11,7 +11,7 @@ A [LikeC4](https://likec4.dev) model is a user-defined contract. It says which c
 ## Quickstart
 
 ```sh
-npm install --save-dev fitc4
+npm install --save-dev @arocnies/fitc4
 npx fitc4 init
 ```
 
@@ -20,7 +20,7 @@ npx fitc4 init
 On a brownfield repository the whole path to green is five commands and one edit:
 
 ```sh
-npm install --save-dev fitc4
+npm install --save-dev @arocnies/fitc4
 npx fitc4 init --agent codex     # or claude; plain init scaffolds the gate without agents
 npx fitc4 draft --describe       # writes a model from your code
                                  # then edit arch/model.c4: untag the edges you bless
@@ -68,7 +68,7 @@ model {
 **`fitc4.config.mts`** at your project root. Paths resolve relative to this file, and the three phases are explicit: what runs is what the file names, nothing more.
 
 ```ts
-import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
 
 export default defineConfig({
   version: 1,
@@ -90,7 +90,7 @@ Most projects add a `"fitc4": "fitc4"` script and run `npm run fitc4` in CI.
 
 ## Draft a model from existing code
 
-`init` scaffolds a placeholder. `npx fitc4 draft` goes further on a brownfield repository: it runs the configured scan providers, no model needed, and writes a first-draft model from what they observed. The draft mirrors the structure the observations report, not the filesystem hierarchy: each scan root splits into its first-level directories, and below that a directory splits into nested elements where an observed dependency crosses between two of its subdirectories and collapses into one element where none does, so the granularity comes from the code's own dependency graph rather than a folder convention. One relationship covers each observed cross-element dependency (the count rides a trailing comment), and one stub element claims every observed external package so the resolve tier is quiet on day one. It consumes the observation contract, not TypeScript specifics, so it drafts from whatever scan providers the config composes, `fitc4-dependency-cruiser` and the agent scanners included. Drafting with agent scan providers needs the agent CLI available.
+`init` scaffolds a placeholder. `npx fitc4 draft` goes further on a brownfield repository: it runs the configured scan providers, no model needed, and writes a first-draft model from what they observed. The draft mirrors the structure the observations report, not the filesystem hierarchy: each scan root splits into its first-level directories, and below that a directory splits into nested elements where an observed dependency crosses between two of its subdirectories and collapses into one element where none does, so the granularity comes from the code's own dependency graph rather than a folder convention. One relationship covers each observed cross-element dependency (the count rides a trailing comment), and one stub element claims every observed external package so the resolve tier is quiet on day one. It consumes the observation contract, not TypeScript specifics, so it drafts from whatever scan providers the config composes, `@arocnies/fitc4-dependency-cruiser` and the agent scanners included. Drafting with agent scan providers needs the agent CLI available.
 
 Two more shapes fall out of the same principle. A scan that reports fragment locators (`docker-compose.yml#services.auth`) gets one element per observed fragment, nested under an element for the containing file and claiming the locator verbatim, so a whole service stack drafted from one compose file arrives as one element per service. And a dependency target of a domain-specific kind (a `system`, a `service`) becomes a description-only boundary element beside the package stub, with a plain declared edge; the gate cannot resolve anything onto such an element yet, so tagging that edge as drift would only create noise.
 
@@ -235,7 +235,7 @@ A claim is an exact npm package name, like `pg` or `@aws-sdk/client-s3`. It take
 Everything the CLI does is reachable from the package entry point, so you can assert on architecture inside your own test suite instead of shelling out.
 
 ```ts
-import { findConfig, resolveConfig, runPipeline, exitCodeFor } from 'fitc4'
+import { findConfig, resolveConfig, runPipeline, exitCodeFor } from '@arocnies/fitc4'
 
 const result = await runPipeline(await resolveConfig(findConfig(process.cwd())))
 expect(exitCodeFor(result)).toBe(0)
@@ -247,13 +247,13 @@ Every CLI run narrates its progress to stderr, one plain line per phase and prov
 
 ## Agent providers
 
-`fitc4/agent` adds providers that shell out to your locally installed agent CLIs (`claude`, `codex`). Your login, your billing, no API keys in fitc4. `agentOwnershipAdvisor` suggests an owner for every file the model leaves unowned; `agentSemanticReview` judges whether an element's implementation still matches its declared description. Agent findings are additive, and each provider takes a `severity`: advisory by default, part of the gate when you choose `'error'`. At `'error'` a missing or logged-out CLI fails the build instead of being a `warning` nudge. `cached()` makes reruns with unchanged inputs free and identical.
+`@arocnies/fitc4/agent` adds providers that shell out to your locally installed agent CLIs (`claude`, `codex`). Your login, your billing, no API keys in fitc4. `agentOwnershipAdvisor` suggests an owner for every file the model leaves unowned; `agentSemanticReview` judges whether an element's implementation still matches its declared description. Agent findings are additive, and each provider takes a `severity`: advisory by default, part of the gate when you choose `'error'`. At `'error'` a missing or logged-out CLI fails the build instead of being a `warning` nudge. `cached()` makes reruns with unchanged inputs free and identical.
 
 A complete config:
 
 ```ts
-import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
-import { agentOwnershipAdvisor, agentSemanticReview, cached, claudeCli } from 'fitc4/agent'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
+import { agentOwnershipAdvisor, agentSemanticReview, cached, claudeCli } from '@arocnies/fitc4/agent'
 
 const agent = cached(claudeCli({ model: 'haiku' }))
 
@@ -303,14 +303,14 @@ The one norm an agent cannot infer from the CLI: **the model is the contract. Ed
   from a phase, to make a finding go away. How strict the gate is belongs to
   the team; loosening it for a green run is the same evasion as deleting the
   relationship, one layer up.
-- Rule reference: `node_modules/fitc4/README.md#rules`. Structured output:
+- Rule reference: `node_modules/@arocnies/fitc4/README.md#rules`. Structured output:
   `npx fitc4 --json`.
 ```
 
 `npx fitc4 init` scaffolds an `AGENTS.md` carrying these norms; the block above is for merging them into a file you already have.
 
-The package also ships a Claude Code skill at `skills/fitc4/` covering the full fit workflow: reading severities, when a model edit is legitimate, drift etiquette. Copy it into your project's `.claude/skills/fitc4/`, or reference it in place from `node_modules/fitc4/skills/fitc4/`.
+The package also ships a Claude Code skill at `skills/fitc4/` covering the full fit workflow: reading severities, when a model edit is legitimate, drift etiquette. Copy it into your project's `.claude/skills/fitc4/`, or reference it in place from `node_modules/@arocnies/fitc4/skills/fitc4/`.
 
 ## Links
 
-Source, issues, a full worked example, and the provider contract live in the [GitHub repository](https://github.com/arocnies/fitc4). See [`example/`](https://github.com/arocnies/fitc4/tree/main/example) and [`docs/providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/providers.md). Checking JavaScript or mixed JS/TS projects? The companion package [`fitc4-dependency-cruiser`](https://github.com/arocnies/fitc4/tree/main/packages/fitc4-dependency-cruiser) wraps dependency-cruiser as a scan provider. Install both and compose it in config.
+Source, issues, a full worked example, and the provider contract live in the [GitHub repository](https://github.com/arocnies/fitc4). See [`example/`](https://github.com/arocnies/fitc4/tree/main/example) and [`docs/providers.md`](https://github.com/arocnies/fitc4/blob/main/docs/providers.md). Checking JavaScript or mixed JS/TS projects? The companion package [`@arocnies/fitc4-dependency-cruiser`](https://github.com/arocnies/fitc4/tree/main/packages/fitc4-dependency-cruiser) wraps dependency-cruiser as a scan provider. Install both and compose it in config.

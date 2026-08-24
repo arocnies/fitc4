@@ -25,8 +25,8 @@
 
 import path from 'node:path'
 
-import { architectureRules, sourceRoot, type ResolvedConfig } from 'fitc4'
-import type { AgentExec } from 'fitc4/agent'
+import { architectureRules, sourceRoot, type ResolvedConfig } from '@arocnies/fitc4'
+import type { AgentExec } from '@arocnies/fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
 import { boutiqueScan, SCAN_INSTRUCTIONS } from '../greenfield/fitc4.eval.ts'

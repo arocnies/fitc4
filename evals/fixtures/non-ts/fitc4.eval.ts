@@ -16,8 +16,8 @@
 
 import path from 'node:path'
 
-import { architectureRules, sourceRoot, type PipelineConfig } from 'fitc4'
-import { agentScan, type AgentExec } from 'fitc4/agent'
+import { architectureRules, sourceRoot, type PipelineConfig } from '@arocnies/fitc4'
+import { agentScan, type AgentExec } from '@arocnies/fitc4/agent'
 
 const INSTRUCTIONS =
   'docker-compose.yml defines the services this deployment runs. Each compose service ' +

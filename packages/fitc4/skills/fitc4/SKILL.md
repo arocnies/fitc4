@@ -15,7 +15,7 @@ and import onto that model, and fails where the two disagree.
 - `npx fitc4` reports to stdout and exits 1 when any finding has severity
   `error`.
 - `npx fitc4 --json` prints the full structured result instead of the report
-  (the `PipelineResult` type in `node_modules/fitc4/dist/index.d.ts`).
+  (the `PipelineResult` type in `node_modules/@arocnies/fitc4/dist/index.d.ts`).
 - `npx fitc4 --config <path>` uses a specific config instead of discovery.
 - `npx fitc4 init` scaffolds a project that has no model yet. It writes a
   config, a starter `arch/model.c4` whose one element owns `src/**` so the
@@ -52,7 +52,7 @@ Every finding carries a rule id and a severity:
 
 Projects can tune severities, so trust the severity in the run you are
 reading over the defaults above. Full rule reference:
-`node_modules/fitc4/README.md#rules`.
+`node_modules/@arocnies/fitc4/README.md#rules`.
 
 ## Fix the code, not the contract
 

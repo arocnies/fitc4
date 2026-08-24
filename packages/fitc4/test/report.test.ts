@@ -112,7 +112,7 @@ describe('report', () => {
   test('a report with findings points at the rule reference; a clean one does not', async () => {
     expect(renderReport(await runFixture('ok')).text).not.toContain('rules:')
     expect(renderReport(await runFixture('violations')).text).toContain(
-      'rules: node_modules/fitc4/README.md#rules',
+      'rules: node_modules/@arocnies/fitc4/README.md#rules',
     )
   })
 

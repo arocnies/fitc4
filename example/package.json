@@ -14,6 +14,6 @@
   },
   "devDependencies": {
     "likec4": "^1.59.2",
-    "fitc4": "*"
+    "@arocnies/fitc4": "*"
   }
 }

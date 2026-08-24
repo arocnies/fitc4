@@ -1,5 +1,5 @@
 /**
- * The draft describer (`fitc4/agent`).
+ * The draft describer (`@arocnies/fitc4/agent`).
  *
  * Builds the `describe` callback `draft()` accepts: per eligible element, one
  * one-shot exec call that proposes a one-or-two-sentence description from the

@@ -28,7 +28,7 @@ import type {
   IResolveOptions,
   ITranspileOptions,
 } from 'dependency-cruiser'
-import type { NamedProvider, Observation, ScanContext, ScanProvider } from 'fitc4'
+import type { NamedProvider, Observation, ScanContext, ScanProvider } from '@arocnies/fitc4'
 
 export const PROVIDER_ID = 'dependency-cruiser'
 

@@ -345,7 +345,7 @@ describe('init', () => {
     const scaffolded = path.join(directory, 'fitc4.config.mts')
     fs.writeFileSync(
       scaffolded,
-      fs.readFileSync(scaffolded, 'utf8').replace(`from 'fitc4'`, `from '${INDEX_URL}'`),
+      fs.readFileSync(scaffolded, 'utf8').replace(`from '@arocnies/fitc4'`, `from '${INDEX_URL}'`),
     )
 
     const { status, stdout } = runCli(['draft'], directory)

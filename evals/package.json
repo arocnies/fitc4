@@ -7,6 +7,6 @@
     "eval": "node run.ts"
   },
   "devDependencies": {
-    "fitc4": "*"
+    "@arocnies/fitc4": "*"
   }
 }

@@ -43,8 +43,8 @@ import {
   sourceRoot,
   typescriptImports,
   type ResolvedConfig,
-} from 'fitc4'
-import type { AgentExec } from 'fitc4/agent'
+} from '@arocnies/fitc4'
+import type { AgentExec } from '@arocnies/fitc4/agent'
 
 /**
  * Opt into the describe pass: the harness builds a draft describer from this

@@ -61,7 +61,7 @@ import {
   typescriptImports,
   type Finding,
   type ValidateContext,
-} from 'fitc4'
+} from '@arocnies/fitc4'
 
 const PROVIDER_ID = 'import-budget'
 const BUDGET = 20
@@ -105,7 +105,7 @@ Discovery checks `fitc4.config.ts`, `.mts`, `.js`, `.mjs`, in the working direct
 The standard rules take per-rule severity overrides. `architectureRules()` returns a ready `NamedProvider`, so tuning it is one line:
 
 ```ts
-import { architectureRules } from 'fitc4'
+import { architectureRules } from '@arocnies/fitc4'
 
 // Once adoption is done, new unowned code should fail the gate. Its
 // dependencies are never boundary-checked while it stays unowned.
@@ -114,15 +114,15 @@ validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]
 
 Any rule id from the rules table can be promoted or softened, and the standard severities apply where no override is given. Tolerated drift is tuned the same way. `{ 'drift-relationship': 'error' }` forbids it outright, and `{ 'unused-drift': 'error' }` fails the build until a drift edge the code no longer exercises is deleted. `architectureRules({ driftTag })` renames the tag itself.
 
-## Agent providers (`fitc4/agent`)
+## Agent providers (`@arocnies/fitc4/agent`)
 
 A separate entry point on purpose: nothing in `fitc4` imports it, the core gate stays deterministic, and composing an agent provider into a phase is an explicit act in your config file. The adapters shell out to **locally installed agent CLIs**, meaning your own `claude` or `codex` install, login, and billing. FitC4 never holds an API key.
 
-`fitc4/agent` ships two tiers. This section is the standing contract for the **advisory validate providers** (`agentOwnershipAdvisor`, `agentSemanticReview`) and the exec layer they all share. The **fail-closed scan and resolve providers** (`agentScan`, `agentResolve`) are load-bearing. An absent scanner or resolver must not look like a clean run, so they throw into `provider-failure` instead of degrading. They are documented per provider in [`agent-providers.md`](agent-providers.md).
+`@arocnies/fitc4/agent` ships two tiers. This section is the standing contract for the **advisory validate providers** (`agentOwnershipAdvisor`, `agentSemanticReview`) and the exec layer they all share. The **fail-closed scan and resolve providers** (`agentScan`, `agentResolve`) are load-bearing. An absent scanner or resolver must not look like a clean run, so they throw into `provider-failure` instead of degrading. They are documented per provider in [`agent-providers.md`](agent-providers.md).
 
 ```ts
-import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
-import { cached, claudeCli, agentOwnershipAdvisor, agentSemanticReview } from 'fitc4/agent'
+import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
+import { cached, claudeCli, agentOwnershipAdvisor, agentSemanticReview } from '@arocnies/fitc4/agent'
 
 const cheap = cached(claudeCli({ model: 'haiku' }))
 const strong = cached(claudeCli({ model: 'sonnet' }))

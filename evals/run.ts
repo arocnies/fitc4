@@ -32,7 +32,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
-import { draft, runPipeline, type PipelineConfig, type ResolvedConfig } from 'fitc4'
+import { draft, runPipeline, type PipelineConfig, type ResolvedConfig } from '@arocnies/fitc4'
 import {
   cached,
   claudeCli,
@@ -40,7 +40,7 @@ import {
   DEFAULT_CLAUDE_MODEL,
   draftDescriber,
   type AgentExec,
-} from 'fitc4/agent'
+} from '@arocnies/fitc4/agent'
 
 import { scoreDescribeReview, scoreDraft, type DraftExpectations } from './harness/draft.ts'
 import { externalManifest, hasCheckout } from './harness/external.ts'
