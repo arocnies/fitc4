@@ -76,4 +76,4 @@ jobs:
         working-directory: packages/fitc4
 
       - name: build and test fitc4 against it
-        run: npm run check -w fitc4
+        run: npm run check -w packages/fitc4
