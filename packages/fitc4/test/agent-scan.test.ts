@@ -119,6 +119,10 @@ describe('agentScan happy path', () => {
     expect(request?.context).toContain('- src/core/health.ts')
     expect(request?.context).not.toContain('truncated')
     expect(request?.prompt).toContain('examined')
+    // Exploration is told its working directory is the repository root, so it
+    // passes the listed paths as written instead of inventing an absolute
+    // prefix its read tool then refuses (measured live on the python eval).
+    expect(request?.prompt).toContain('working directory is the repository root')
     // The scan budgets its own long call: exploration of a real repository
     // takes minutes, and the adapter's 120s extraction default would kill it.
     expect(request?.timeoutMs).toBe(600_000)

@@ -187,6 +187,18 @@ const PROMPT =
   'An empty `examined` is treated as a failed scan.'
 
 /**
+ * Appended to the prompt in agentic mode only. Live measurement (see
+ * `evals/fixtures/python`) showed a model that cannot ask for its working
+ * directory inventing an absolute prefix for the listed paths, feeding it to
+ * its read tool, and giving up when the guessed paths were denied. The tools
+ * resolve the listed paths as they are; the model just has to be told so.
+ */
+const EXPLORATION_NOTE =
+  ' Your working directory is the repository root, so every tool accepts the ' +
+  'repository-relative paths exactly as listed in the context. Pass them as written; never ' +
+  'prefix them with a guessed absolute directory.'
+
+/**
  * An agent-driven scan provider: prose instructions in, standard observations out.
  *
  * See the module JSDoc for the fail-closed contract. Compose the exec with
@@ -212,7 +224,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
     const request =
       options.focus === undefined
         ? {
-            prompt: PROMPT,
+            prompt: PROMPT + EXPLORATION_NOTE,
             context: composeContext(
               instructions,
               roots,
