@@ -101,85 +101,19 @@ The model itself lives wherever `model` points. It is authored architecture docu
 
 ## Rules
 
-| Rule | Severity | Meaning |
-|---|---|---|
-| `unmapped-source` | warning | A source file is owned by no model element |
-| `ambiguous-source` | error | Two elements claim the same source file |
-| `missing-relationship` | error | Code crosses a boundary the model does not declare |
-| `relationship-direction` | error | The model declares only the opposite direction |
-| `unresolved-import` | warning | An import resolves to nothing, so it cannot be checked. Look for a broken path, a dead tsconfig alias, or an undeclared package |
-| `drift-relationship` | info | Code still exercises a drift-tagged relationship; burn it down, then delete the relationship |
-| `unused-drift` | warning | A drift-tagged relationship no code exercises anymore; delete it from the model |
-| `unobserved-elements` | info | Leaf elements with neither `sources` nor `packages`; nothing checks them |
-| `invalid-sources` | error | Ownership metadata the prefix matcher cannot honour |
-| `unmatched-sources` | error | Ownership metadata that matches no scanned file |
-| `invalid-packages` | error | A `packages` claim that is not an exact npm package name |
-| `ambiguous-package` | error | Two elements claim the same package |
-| `unmatched-packages` | error | A claimed package that no scanned file imports |
-| `duplicate-relationship` | info | Two relationships share one stable identity |
-| `unknown-observation-kind` | info | A provider emitted facts no rule interprets |
-| `orphaned-association` | error | A provider referenced an observation that does not exist |
-| `provider-failure` | error | A provider threw; other providers still ran |
+Every finding carries a rule id and a severity. The boundary rules (`missing-relationship`, `relationship-direction`) judge dependencies against the declared model; the ownership rules (`unmapped-source`, `ambiguous-source`) judge files against `sources` claims; and everything from `invalid-sources` down exists so the gate cannot fail open. A typo in `sources` used to make every prefix stop matching, which turned architecture errors into a clean exit 0.
 
-Everything from `invalid-sources` down exists so the gate cannot fail open. A typo in `sources` used to make every prefix stop matching, which turned architecture errors into a clean exit 0.
-
-The severities are defaults, not policy. `validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]` makes new unowned code fail the gate. That is worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked. Every rule id in the table accepts an override.
-
-Above five `unmapped-source` findings the report renders one grouped block: the total, a by-directory breakdown, and the first ten paths. A brownfield repository's 450 unowned files are one adoption fact, not 450 separate ones. `--json` is unchanged and keeps every finding.
+The full table of all seventeen rules lives in the [package README](packages/fitc4/README.md#rules). The severities are defaults, not policy: every rule id accepts an override, as in `validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })]`, which is worth doing once adoption is finished, since dependencies from unowned files are never boundary-checked.
 
 ## Tolerated drift
 
-A brownfield codebase fails a truthful model on day one. The escape hatch is not a baseline file. It is the model itself: declare the dependencies that really exist and tag them as drift.
+A brownfield codebase fails a truthful model on day one. The escape hatch is not a baseline file. It is the model itself: declare the dependencies that really exist and tag them `#drift`. A drift-tagged relationship is declared, so the code it covers passes, and it is counted: each exercised edge is one info finding, the report carries a burn-down line (`drift: 12 declared, 9 exercised, 3 unused`), and an edge no code exercises anymore becomes a warning whose only fix is deleting it. Declared drift can only shrink, it lives in reviewable model text, and there is no baseline file to regenerate or rubber-stamp.
 
-```
-specification {
-  tag drift
-
-  element system
-  element container
-  element component
-}
-
-model {
-  // ... elements as above ...
-
-  example.app.interface -> example.app.core 'uses'
-
-  example.app.core -> example.app.interface 'legacy reach-around' {
-    #drift
-  }
-}
-```
-
-A drift-tagged relationship is a declared relationship, so the code it covers is permitted. Permitted and counted. Each exercised drift edge is one `drift-relationship` info finding, and the report carries a burn-down line:
-
-```text
-info (1)
-  drift-relationship  example.app.core -> example.app.interface is declared drift; 1 dependency still rides it. Remove the code path, then delete the tagged relationship from the model.
-    architecture-rules  architecture-rules/drift-relationship/example.app.core::_::example.app.interface
-    src/core/bad.ts:1  ../interface/index.js
-
-drift: 1 declared, 1 exercised, 0 unused
-```
-
-When the last code path dies, the edge flips to an `unused-drift` warning whose only fix is deleting the relationship. A drift edge the code no longer exercises must be deleted, so declared drift can only shrink. Tolerated debt cannot quietly persist. The debt lives in model text rather than machine state. Every drift edge is visible in the diagram, added and removed in reviewable diffs, and every run recomputes the counts from the code, so there is no baseline file to regenerate or rubber-stamp.
-
-The tag is `drift` by default (`architectureRules({ driftTag })` changes it) and must be declared in the specification, since LikeC4 rejects unknown tags. Two promotions tune the policy. `severity: { 'drift-relationship': 'error' }` forbids tolerated drift entirely; `{ 'unused-drift': 'error' }` makes a dead drift edge fail the build until someone deletes it. [`example/README.md`](example/README.md) walks the full loop as Exercise 3.
+The mechanics, the tag configuration, and the severity promotions are in the [package README](packages/fitc4/README.md#tolerated-drift); [`example/README.md`](example/README.md) walks the full loop as Exercise 3.
 
 ## Package claims
 
-`sources` covers code the repository owns; `packages` metadata claims the external packages an element stands for:
-
-```
-infra = component 'Infrastructure' {
-  metadata {
-    sources 'src/infra/**'
-    packages 'pg'
-  }
-}
-```
-
-A claim is an exact npm package name, like `pg` or `@aws-sdk/client-s3`. It takes a string or an array, same as `sources`, and imports of any subpath map onto the claim. An import of a claimed package resolves onto the claiming element, and from there the standard relationship rules judge the edge exactly like a file-to-file crossing. "Only infra may import `pg`" is nothing more than the absence of a declared relationship from anywhere else. Unclaimed packages stay unrestricted, and the claims are fail-closed like `sources`: a value that is not an exact package name (`invalid-packages`), a package claimed by two elements (`ambiguous-package`), or a claim no scanned file imports (`unmatched-packages`) is an error, never a silent no-op.
+`sources` covers code the repository owns; `packages` metadata claims the external packages an element stands for (`packages 'pg'`). An import of a claimed package resolves onto the claiming element and the standard relationship rules judge the edge like any file-to-file crossing, so "only infra may import `pg`" is nothing more than the absence of a declared relationship from anywhere else. Claims are fail-closed like `sources`: invalid, ambiguous, or unmatched claims are errors, never silent no-ops. Details in the [package README](packages/fitc4/README.md#package-claims).
 
 ## The model
 
@@ -202,37 +136,9 @@ const result = await runPipeline(await resolveConfig(findConfig(process.cwd())))
 expect(exitCodeFor(result)).toBe(0)
 ```
 
-Providers are plain functions composed into phase arrays: `ScanProvider`, `ResolveProvider`, `ValidateProvider`. A resolved config is a runnable `PipelineConfig`; a caller wanting a different scanner builds its own and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system.
+Providers are plain functions composed into the config's phase arrays: `ScanProvider`, `ResolveProvider`, `ValidateProvider`. A resolved config is a runnable `PipelineConfig`; a caller wanting a different scanner builds its own and passes it to `runPipeline`. There is no registry, lifecycle, or discovery system. The provider contract, the envelope, and the kind vocabulary that crosses provider boundaries are specified in [`docs/providers.md`](docs/providers.md).
 
-The `fitc4/agent` entry point adds agent providers over locally installed agent CLIs (`claude`, `codex`). They cache on their inputs, and the core never imports them. They come in two tiers. The validate providers (ownership advice, semantic review) are advisory: additive findings, `severity` per provider, part of the gate only when you choose `'error'`. The scan and resolve providers (`agentScan`, `agentResolve`) are load-bearing and therefore fail closed. `agentScan` observes model domains no parser covers from prose instructions. `agentResolve` maps external and unresolvable dependencies onto elements the code cannot reach, including description-only ones. Any failure or off-schema reply is a `provider-failure` error rather than a quietly thinner run. They are the prototyping path: prose explores a new domain, and a domain that proves out graduates to a small deterministic provider, same envelope and same rules. See [`docs/agent-providers.md`](docs/agent-providers.md). The agent providers are measured, not just tested. [`evals/`](evals) runs four fixture projects with planted ground truth, scored against expected findings: greenfield, brownfield with tolerated drift, a docker-compose model domain no TypeScript parser sees (the worked non-TS `agentScan` example), and an exploratory markdown-runbook domain where the agent walks the repository itself. The default is a free stub mode; `npm run eval -- --exec claude` runs them against a real agent CLI.
-
-Extending a phase means adding a provider to the config's array, as in `validate: [architectureRules(), myProvider]`. Every report names the providers that composed each phase. See [`docs/providers.md`](docs/providers.md) for the provider contract.
-
-## The provider vocabulary
-
-The one contract that crosses provider boundaries is the `kind` on an `Observation` or a `Ref`. A scanner emitting `import` where the rules read `dependency` produces no findings and a clean exit, indistinguishable from a healthy repository. So [`kinds.ts`](packages/fitc4/src/kinds.ts) names the standard set rather than leaving it as string literals in two files.
-
-| `Observation.kind` | Meaning |
-|---|---|
-| `file` | A source file exists and is in scope for ownership |
-| `dependency` | `subject` depends on `target` |
-| `unresolved-dependency` | A dependency whose target could not be resolved |
-| `scan-root` | A path the provider actually looked at |
-
-| `Ref.kind` | Points at |
-|---|---|
-| `element` | A LikeC4 element, whatever its C4 kind |
-| `relationship` | A declared relationship, by stable derived id |
-| `file` | A repository-relative source path |
-| `directory` | A repository-relative directory path |
-| `module` | A module specifier as written |
-| `symbol` | A named declaration inside a file (reserved) |
-| `observation` | An earlier observation, by id |
-| `provider` | A provider, by its composed id |
-
-Kinds stay open: a provider may emit its own, and two that understand each other's private kinds may cooperate. What the standard set buys is a default that works. A kind outside it is reported at `info`, so a vocabulary mismatch is visible rather than silent.
-
-`element` rather than `component` on purpose. An element carrying `sources` may be a container just as easily, and copying the C4 kind out of the model is how a copy starts contradicting it.
+The `fitc4/agent` entry point adds agent providers over locally installed agent CLIs (`claude`, `codex`): advisory validate providers, and fail-closed scan and resolve providers for what no parser covers. They are documented in the [package README](packages/fitc4/README.md#agent-providers) and specified in [`docs/agent-providers.md`](docs/agent-providers.md), and they are measured, not just tested: [`evals/`](evals) scores them against planted ground truth, free in stub mode by default.
 
 ## Developing
 
