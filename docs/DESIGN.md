@@ -22,7 +22,7 @@ Each phase has one provider type ([`types.ts`](../packages/fitc4/src/types.ts)):
 
 A scanner observes the repository and knows nothing about the model; a resolver maps facts onto the model without judging; a validator judges without gathering. Providers are plain async functions composed into phase arrays, with no registry, lifecycle, or discovery system. The core ([`pipeline.ts`](../packages/fitc4/src/pipeline.ts)) sequences the phases, namespaces every emitted id with the provider's composed id, checks `data` for JSON-round-trip safety, and contains failures. A provider that throws becomes one `provider-failure` error finding, and the other providers still run.
 
-The default composition ([`defaults.ts`](../packages/fitc4/src/defaults.ts)) is `typescript-imports` → `source-root` → `architecture-rules`. Every report names the providers that composed each phase, so a replaced phase is visible in the output, not only in the config.
+The standard composition, the one `init` scaffolds, is `typescript-imports` → `source-root` → `architecture-rules`. It lives in the config file, not in the package: every report names the providers that composed each phase, so what judged the run is visible in the output as well as in the config.
 
 ## The envelope
 

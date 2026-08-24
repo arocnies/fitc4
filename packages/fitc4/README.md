@@ -21,13 +21,13 @@ On a brownfield repository the whole path to green is five commands and one edit
 
 ```sh
 npm install --save-dev fitc4
-npx fitc4 init --agent codex     # or claude; plain init skips the agent exec
+npx fitc4 init --agent codex     # or claude; plain init scaffolds the gate without agents
 npx fitc4 draft --describe       # writes a model from your code
                                  # then edit arch/model.c4: untag the edges you bless
 npx fitc4
 ```
 
-**With `--agent claude` or `--agent codex`**, the scaffolded config also declares one shared cached exec around that CLI's measured model as its `agent`, so [`draft --describe`](#draft-a-model-from-existing-code) works immediately. The exec runs your own CLI on your own login and billing. No [agent provider](#agent-providers) joins the gate itself, because that would make every `fitc4` run call your CLI, which bills per run and fails in CI without a login. Everything else init does is identical.
+**With `--agent claude` or `--agent codex`**, the scaffolded config declares one shared cached exec around that CLI's measured model as its `agent`, so [`draft --describe`](#draft-a-model-from-existing-code) works immediately, and composes the [agent providers](#agent-providers) into the phases: `agentResolve` in resolve, the two advisory providers in validate. The exec runs your own CLI on your own login and billing, and `agentResolve` is fail-closed, so every `fitc4` run calls the CLI and a run without a login fails. Each provider's cost is commented beside it in the scaffold; remove the ones your CI cannot carry, or keep a deterministic config for CI beside it (below). Everything else init does is identical.
 
 **Requirements.** Node >= 22.22.3, since the CLI loads `.ts` configs with Node's native type stripping, and a `tsconfig.json`, whose module resolution the scanner uses.
 
@@ -271,7 +271,7 @@ export default defineConfig({
 
 The advisor makes zero calls on a clean repository; the review makes one call per described element (cached after the first run), and skips elements whose description is absent, empty, or still a `TODO`, since a placeholder is a known-absent description the deterministic `missing-descriptions` rule already counts.
 
-Keep a config like this in a non-discovery filename run with `--config`, beside the deterministic config CI runs. Composing agent providers into the discovery-named config makes every plain `npx fitc4` call your CLI, which bills per run and fails in CI without a login; it is also why `init --agent` declares the exec but composes no agent provider into the phases.
+Composing agent providers into the discovery-named config, as `init --agent` does, makes every plain `npx fitc4` call your CLI, which bills per run and, for the fail-closed `agentResolve`, fails in CI without a login. The pattern for a team whose CI carries no CLI login is a split: a deterministic discovery config for CI, and a config like the one above in a non-discovery filename run on demand with `--config`.
 
 Judgment quality is measured, not assumed. Against planted ground truth in [`evals/`](https://github.com/arocnies/fitc4/tree/main/evals), `sonnet` and `gpt-5.6-luna` both score a perfect 35/35 across the full suite, checked-in and external fixtures alike (measured 2026-08-21). The cheap-model failure mode is measured too, and it runs in both directions: `haiku` over-reports, and it also under-reports on subtle single-line signals in large files. In the same run its scan missed a planted one-line violation, which then passed the gate undetected. An extra is noise a human dismisses; a scan miss is fail-open, invisible to the gate by construction. That asymmetry is the measured argument for keeping the validate providers advisory by default and for graduating proven domains to deterministic providers.
 

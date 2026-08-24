@@ -38,7 +38,8 @@ export type InitAgent = (typeof INIT_AGENTS)[number]
 export interface InitOptions {
   /**
    * Also declare this agent CLI as the config's `agent` exec, so
-   * `fitc4 draft --describe` works immediately. Everything else init does is
+   * `fitc4 draft --describe` works immediately, and compose the agent
+   * providers into the scaffolded phases. Everything else init does is
    * identical.
    */
   agent?: InitAgent
@@ -61,52 +62,90 @@ const AGENT_EXEC_IMPORTS: Record<InitAgent, string> = {
 
 /**
  * The config `init` scaffolds. Every line is live configuration, and the
- * phases are written out in full: what runs is what the file names, so
- * reading the config is reading the gate. This becomes the user's file to
- * own, so it carries their settings, never a tutorial.
+ * phases are written out in full with a comment saying what each one does:
+ * what runs is what the file names, so reading the config is reading the
+ * gate. This becomes the user's file to own, so it carries their settings,
+ * never a tutorial.
  *
- * With `--agent`, one exec is declared and nothing spends money until a
- * command asks for it. The agent gate providers are deliberately not wired
- * in: they would make every plain `npx fitc4`, the command the scaffolded
- * AGENTS.md tells every coding agent to run before handoff, bill a live call
- * on every machine and fail in CI where no CLI is logged in. A config that
- * bills per gate run is a config a team turns off, which is worse than one
- * they graduate into.
+ * With `--agent`, the agent providers join the phases they extend: a user
+ * who named an agent CLI asked for it in the gate, and a scaffold that only
+ * hints at the providers makes them look optional extras rather than the
+ * point of the flag. The costs live in the comments beside each provider.
+ * agentResolve is fail-closed, so every run calls the CLI and a run without
+ * a login fails; the two validate providers are advisory and degrade to a
+ * visible agent-unavailable finding. agentScan alone is not scaffolded: it
+ * is fail-closed and needs the user's own instructions, and a scanner driven
+ * by placeholder prose is worse than no scanner.
  */
 function configTemplate(agent: InitAgent | undefined): string {
-  const execBlock =
-    agent === undefined
-      ? ''
-      : `import { ${AGENT_EXEC_IMPORTS[agent]} } from 'fitc4/agent'
+  if (agent === undefined) {
+    return `import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+
+export default defineConfig({
+  version: 1,
+  // Paths in this file resolve relative to the file itself.
+  repositoryRoot: '.',
+  // The directory holding the LikeC4 model, the contract the code is checked against.
+  model: '${MODEL_DIR}',
+
+  // The phases are explicit: what runs is what this file names.
+  // Scan observes the code: every file and every import under roots.
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
+  // Resolve maps each observation onto the element whose 'sources' claims it.
+  resolve: [sourceRoot()],
+  // Validate judges the mapped code against the declared architecture. Tune a
+  // rule here, such as
+  // architectureRules({ severity: { 'unmapped-source': 'error' } })
+  // once you are done adopting: node_modules/fitc4/README.md#rules
+  validate: [architectureRules()],
+})
+`
+  }
+
+  return `import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
+import {
+  agentOwnershipAdvisor,
+  agentResolve,
+  agentSemanticReview,
+  ${AGENT_EXEC_IMPORTS[agent].replace(', ', ',\n  ')},
+} from 'fitc4/agent'
 
 // Your own ${agent} CLI, on your own login and billing. cached() makes reruns
 // with unchanged inputs free. This model measured perfect in the fitc4 evals.
 ${AGENT_EXEC_LINES[agent]}
-`
-  const agentField =
-    agent === undefined
-      ? ''
-      : `
-  // The exec commands use directly, such as fitc4 draft --describe. Declaring
-  // it costs nothing: no call happens until a command asks for one. Gate
-  // providers from fitc4/agent could join validate, but each fitc4 run would
-  // then call your ${agent} CLI: node_modules/fitc4/README.md#agent-providers
-  agent: exec,`
 
-  return `import { architectureRules, defineConfig, sourceRoot, typescriptImports } from 'fitc4'
-${execBlock}
 export default defineConfig({
   version: 1,
+  // Paths in this file resolve relative to the file itself.
   repositoryRoot: '.',
+  // The directory holding the LikeC4 model, the contract the code is checked against.
   model: '${MODEL_DIR}',
 
-  // The phases are explicit: what runs is what this file names. Tune a rule
-  // on its provider, such as
-  // architectureRules({ severity: { 'unmapped-source': 'error' } })
-  // once you are done adopting: node_modules/fitc4/README.md#rules
+  // The phases are explicit: what runs is what this file names.
+  // Scan observes the code: every file and every import under roots. agentScan
+  // can join it for domains no parser covers, once you write its instructions:
+  // node_modules/fitc4/README.md#agent-providers
   scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
-  resolve: [sourceRoot()],
-  validate: [architectureRules()],${agentField}
+  // Resolve maps observations onto the model. sourceRoot() maps files through
+  // 'sources' claims; agentResolve maps what that cannot, such as imports of
+  // external packages onto elements that own no files. It is fail-closed:
+  // every fitc4 run calls your ${agent} CLI, and a run without a login fails.
+  resolve: [sourceRoot(), agentResolve({ exec })],
+  validate: [
+    // The gate. Tune a rule here, such as
+    // architectureRules({ severity: { 'unmapped-source': 'error' } })
+    architectureRules(),
+    // Advisory, so without a logged-in CLI these two degrade to a visible
+    // agent-unavailable finding instead of failing the run.
+    // Suggests an owner for any file no element claims. No calls when clean.
+    agentOwnershipAdvisor({ exec }),
+    // Reviews each described element's implementation against its
+    // description, one call per described element.
+    agentSemanticReview({ exec }),
+  ],
+  // Commands also use the exec directly: fitc4 draft --describe proposes each
+  // drafted element's description with it.
+  agent: exec,
 })
 `
 }
@@ -248,9 +287,10 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
   if (options.agent !== undefined) {
     result.notes.push(
       `${CONFIG_FILENAME} declares the ${options.agent} CLI as the config's agent exec, ` +
-        `so fitc4 draft --describe works immediately. No agent provider joins the gate itself: ` +
-        `that would call your CLI on every fitc4 run and fail in CI without a login. The ` +
-        `config says where to read about enabling them`,
+        `so fitc4 draft --describe works immediately, and composes the agent providers ` +
+        `into the gate. agentResolve is fail-closed: every fitc4 run calls your CLI and ` +
+        `will fail in CI without a login. Each provider's cost is commented beside it; ` +
+        `remove the ones your CI cannot carry`,
     )
   }
 

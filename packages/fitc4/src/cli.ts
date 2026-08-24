@@ -25,10 +25,10 @@ Commands:
                    directory. Never overwrites existing files. The starter
                    model is marked as a placeholder, so a later draft may
                    replace it; editing it makes it yours. With --agent,
-                   the config also declares that agent CLI as its exec so
-                   draft --describe works immediately. No agent provider
-                   joins the gate itself, since that would call your CLI on
-                   every run.
+                   the config also declares that agent CLI as its exec, so
+                   draft --describe works immediately, and composes the
+                   agent providers into the phases; each fitc4 run then
+                   calls your CLI, and the costs are commented in the file.
   draft            Run the configured scan providers and write a first-draft
                    model.c4 into the configured model directory. Elements
                    mirror the structure the observations report: a directory

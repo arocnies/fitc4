@@ -174,15 +174,17 @@ describe('the scaffolded config', () => {
     // The measured-perfect model, one shared exec, declared as the agent.
     expect(config).toContain(`const exec = cached(claudeCli({ model: 'sonnet' }))`)
     expect(config).toContain('agent: exec,')
-    // The phases are explicit and name exactly the standard gate. No agent
-    // provider is composed into them: that would make every plain `fitc4`
-    // run bill a live call and fail in CI without a login. The caveat is
-    // stated, and the composition lives in the README.
+    // Naming an agent CLI asked for it in the gate, so the agent providers
+    // are composed live into the phases they extend, each with its cost
+    // commented beside it. agentScan stays out: it is fail-closed and needs
+    // the user's own instructions, so the comment points at where to start.
     expect(config).toContain(
       `scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],`,
     )
-    expect(config).toContain('resolve: [sourceRoot()],')
-    expect(config).toContain('validate: [architectureRules()],')
+    expect(config).toContain('resolve: [sourceRoot(), agentResolve({ exec })],')
+    expect(config).toContain('architectureRules(),')
+    expect(config).toContain('agentOwnershipAdvisor({ exec }),')
+    expect(config).toContain('agentSemanticReview({ exec }),')
     expect(config).toContain('README.md#agent-providers')
 
     // Nothing ships commented out. Thirty of fifty lines of switched-off
@@ -192,9 +194,10 @@ describe('the scaffolded config', () => {
       .split('\n')
       .filter((line) => /^\s*\/\/\s*(resolve|validate|scan|agent):/.test(line))
     expect(commentedConfig).toEqual([])
-    expect(config.split('\n').length).toBeLessThan(30)
+    expect(config.split('\n').length).toBeLessThan(50)
 
     // The severity hint points at the provider, where the tuning now lives.
+    // The composed provider ids are pinned by the template-load test below.
     expect(config).toContain(`severity: { 'unmapped-source': 'error' }`)
   })
 
@@ -204,9 +207,9 @@ describe('the scaffolded config', () => {
 
     const config = fs.readFileSync(path.join(root, CONFIG_FILENAME), 'utf8')
     expect(config).toContain(`const exec = cached(codexCli({ model: 'gpt-5.6-luna' }))`)
-    expect(config).toContain('call your codex CLI')
+    expect(config).toContain('calls your codex CLI')
     // The agent path says what changed: the exec, draft --describe, and the
-    // caveat on the providers it deliberately did not compose.
+    // cost of the fail-closed provider it composed into the gate.
     expect(result.notes.join('\n')).toContain("config's agent exec")
     expect(result.notes.join('\n')).toContain('fitc4 draft --describe')
     expect(result.notes.join('\n')).toContain('fail in CI without a login')
@@ -254,11 +257,14 @@ describe('the scaffolded config', () => {
       expect(resolved.agent?.id).toBe(
         agent === 'claude' ? 'claude-cli/sonnet' : 'codex-cli/gpt-5.6-luna',
       )
-      // The exec is declared and the phases are the deterministic standard,
-      // so the plain gate makes zero live calls.
+      // Naming an agent CLI composes the agent providers into the phases.
       expect(resolved.scan.map((provider) => provider.id)).toEqual(['typescript-imports'])
-      expect(resolved.resolve.map((provider) => provider.id)).toEqual(['source-root'])
-      expect(resolved.validate.map((provider) => provider.id)).toEqual(['architecture-rules'])
+      expect(resolved.resolve.map((provider) => provider.id)).toEqual(['source-root', 'agent-resolve'])
+      expect(resolved.validate.map((provider) => provider.id)).toEqual([
+        'architecture-rules',
+        'agent-ownership-advisor',
+        'agent-semantic-review',
+      ])
     },
   )
 
