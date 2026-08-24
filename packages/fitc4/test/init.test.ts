@@ -168,6 +168,7 @@ describe('init', () => {
 describe('the scaffolded config', () => {
   test('every line is live: explicit phases, no commented-out configuration', () => {
     const root = scratch()
+    fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
     init(root, { agent: 'claude' })
 
     const config = fs.readFileSync(path.join(root, CONFIG_FILENAME), 'utf8')
@@ -176,11 +177,13 @@ describe('the scaffolded config', () => {
     expect(config).toContain('agent: exec,')
     // Naming an agent CLI asked for it in the gate, so the agent providers
     // are composed live into the phases they extend, each with its cost
-    // commented beside it. agentScan stays out: it is fail-closed and needs
-    // the user's own instructions, so the comment points at where to start.
+    // commented beside it. With a tsconfig present, agentScan stays out: the
+    // deterministic scanner already observes the imports, and a second
+    // scanner over them would cost a call per run for nothing.
     expect(config).toContain(
       `scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],`,
     )
+    expect(config).not.toContain('agentScan({ exec })')
     expect(config).toContain('resolve: [sourceRoot(), agentResolve({ exec })],')
     expect(config).toContain('architectureRules(),')
     expect(config).toContain('agentOwnershipAdvisor({ exec }),')
@@ -246,7 +249,8 @@ describe('the scaffolded config', () => {
 
   // The template is a working config, not pseudocode: a named import the
   // entry points do not export fails at module link time inside
-  // resolveScaffolded.
+  // resolveScaffolded. A bare directory has no tsconfig, so this is also the
+  // any-language scaffold: agentScan carries the scan phase.
   test.each(['claude', 'codex'] as const)(
     'the scaffolded %s template loads through resolveConfig',
     async (agent) => {
@@ -258,7 +262,7 @@ describe('the scaffolded config', () => {
         agent === 'claude' ? 'claude-cli/sonnet' : 'codex-cli/gpt-5.6-luna',
       )
       // Naming an agent CLI composes the agent providers into the phases.
-      expect(resolved.scan.map((provider) => provider.id)).toEqual(['typescript-imports'])
+      expect(resolved.scan.map((provider) => provider.id)).toEqual(['agent-scan'])
       expect(resolved.resolve.map((provider) => provider.id)).toEqual(['source-root', 'agent-resolve'])
       expect(resolved.validate.map((provider) => provider.id)).toEqual([
         'architecture-rules',
@@ -267,6 +271,30 @@ describe('the scaffolded config', () => {
       ])
     },
   )
+
+  test('with a tsconfig the agent scaffold keeps the deterministic scanner', async () => {
+    const root = scratch()
+    fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
+    init(root, { agent: 'claude' })
+
+    const resolved = await resolveScaffolded(root)
+    expect(resolved.scan.map((provider) => provider.id)).toEqual(['typescript-imports'])
+  })
+
+  test('without a tsconfig the agent scaffold scans with the agent, and says so', () => {
+    const root = scratch()
+    const result = init(root, { agent: 'claude' })
+
+    const config = fs.readFileSync(path.join(root, CONFIG_FILENAME), 'utf8')
+    expect(config).toContain('scan: [agentScan({ exec })],')
+    expect(config).not.toContain('typescriptImports')
+    // The note names the swap and the default behind it.
+    expect(result.notes.join('\n')).toContain('the scan phase is agentScan')
+    expect(result.notes.join('\n')).toContain('general import scan')
+    // agentScan lists from the repository root, so the roots: ['src'] note
+    // belongs to the TypeScript scaffold only.
+    expect(result.notes.join('\n')).not.toContain("roots are ['src']")
+  })
 
   test('never overwrites: any existing config form still blocks init --agent', () => {
     const root = scratch()

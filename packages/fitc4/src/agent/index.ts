@@ -37,6 +37,7 @@ export {
 
 export {
   agentScan,
+  DEFAULT_INSTRUCTIONS as AGENT_SCAN_DEFAULT_INSTRUCTIONS,
   PROVIDER_ID as AGENT_SCAN_PROVIDER_ID,
   type AgentScanOptions,
 } from './scan.ts'

@@ -8,10 +8,13 @@
  *   finding must be claimed by one entry (otherwise an extra) — so a
  *   deterministic rule that stops firing and a semantic reviewer that flags a
  *   healthy element are both visible, as a miss and an extra respectively.
- * - `associations.must` / `associations.mustNot` and `observations.must`
- *   pin the agent phases whose quality does not surface as findings: the
- *   mapping `agentResolve` must make, the abstention it must keep, the
- *   observations and attestation `agentScan` must report.
+ * - `associations.must` / `associations.mustNot` and `observations.must` /
+ *   `observations.mustNot` pin the agent phases whose quality does not
+ *   surface as findings: the mapping `agentResolve` must make, the abstention
+ *   it must keep, the observations and attestation `agentScan` must report,
+ *   and the noise it must not (a standard-library import the general import
+ *   scan is told to skip stays silent in the gate, so only a named must-not
+ *   can catch it).
  *
  * Scores are grouped per provider, because that is the unit of judgment: the
  * deterministic providers are expected to be exact, and each agent provider's
@@ -61,7 +64,7 @@ export interface Expectations {
   /** Named regressions: matches are extras reported under this label. */
   findingsMustNot?: ExpectedFinding[]
   associations?: { must?: ExpectedAssociation[]; mustNot?: ExpectedAssociation[] }
-  observations?: { must?: ExpectedObservation[] }
+  observations?: { must?: ExpectedObservation[]; mustNot?: ExpectedObservation[] }
 }
 
 export interface ProviderScore {
@@ -206,6 +209,20 @@ export function scoreFixture(
       claimedObservations.add(match)
       row(expected.provider).hits += 1
     }
+  }
+  // Named regressions, mirroring associations: a must-not observation that
+  // appears is an extra on its provider's row, under the fixture's label.
+  const observationsMustNot = expectations.observations?.mustNot ?? []
+  for (const observation of result.observations) {
+    if (claimedObservations.has(observation)) continue
+    const named = observationsMustNot.find((entry) => observationMatches(entry, observation))
+    if (named === undefined) continue
+    claimedObservations.add(observation)
+    const target = row(observation.provider)
+    target.extras += 1
+    target.notes.push(
+      `must-not observation appeared: ${named.label ?? describeExpectedObservation(named)}`,
+    )
   }
 
   return { fixture, providers: [...rows.values()].sort((a, b) => a.provider.localeCompare(b.provider)) }

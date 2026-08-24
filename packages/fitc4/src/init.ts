@@ -15,7 +15,10 @@
  * note (both are authored documentation, not this tool's property).
  * Prerequisites this command cannot create for you, a tsconfig or a source
  * tree, become notes rather than created files, because guessing a project's
- * TypeScript setup wrong is worse than asking.
+ * TypeScript setup wrong is worse than asking. One glance at the directory
+ * does inform the scaffold: `--agent` in a directory without a tsconfig.json
+ * scaffolds `agentScan` in place of the TypeScript scanner, so a repository
+ * in any language starts working without one.
  */
 
 import fs from 'node:fs'
@@ -73,11 +76,13 @@ const AGENT_EXEC_IMPORTS: Record<InitAgent, string> = {
  * point of the flag. The costs live in the comments beside each provider.
  * agentResolve is fail-closed, so every run calls the CLI and a run without
  * a login fails; the two validate providers are advisory and degrade to a
- * visible agent-unavailable finding. agentScan alone is not scaffolded: it
- * is fail-closed and needs the user's own instructions, and a scanner driven
- * by placeholder prose is worse than no scanner.
+ * visible agent-unavailable finding. The scan phase follows the directory:
+ * with a tsconfig.json it is the deterministic TypeScript scanner, and
+ * agentScan stays out because it would re-observe the same imports at a
+ * per-run cost; without one it is `agentScan({ exec })` running its default
+ * general import scan, so a repository in any language works out of the box.
  */
-function configTemplate(agent: InitAgent | undefined): string {
+function configTemplate(agent: InitAgent | undefined, hasTsconfig: boolean): string {
   if (agent === undefined) {
     return `import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
 
@@ -102,12 +107,31 @@ export default defineConfig({
 `
   }
 
-  return `import { architectureRules, defineConfig, sourceRoot, typescriptImports } from '@arocnies/fitc4'
+  const coreImports = hasTsconfig
+    ? 'architectureRules, defineConfig, sourceRoot, typescriptImports'
+    : 'architectureRules, defineConfig, sourceRoot'
+  const agentImports = [
+    'agentOwnershipAdvisor',
+    'agentResolve',
+    ...(hasTsconfig ? [] : ['agentScan']),
+    'agentSemanticReview',
+    ...AGENT_EXEC_IMPORTS[agent].split(', '),
+  ]
+  const scanSection = hasTsconfig
+    ? `  // Scan observes the code: every file and every import under roots. agentScan
+  // can join it for domains no parser covers; without instructions it runs
+  // the general import scan: node_modules/@arocnies/fitc4/README.md#agent-providers
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],`
+    : `  // No tsconfig.json was here at init time, so the scan is agent-driven: your
+  // ${agent} CLI reads the repository and reports every source file and import,
+  // whatever the language. Fail-closed: a run without a login fails rather
+  // than passing on an absent scan. Bound it with roots, or steer it with
+  // your own instructions: node_modules/@arocnies/fitc4/README.md#agent-providers
+  scan: [agentScan({ exec })],`
+
+  return `import { ${coreImports} } from '@arocnies/fitc4'
 import {
-  agentOwnershipAdvisor,
-  agentResolve,
-  agentSemanticReview,
-  ${AGENT_EXEC_IMPORTS[agent].replace(', ', ',\n  ')},
+  ${agentImports.join(',\n  ')},
 } from '@arocnies/fitc4/agent'
 
 // Your own ${agent} CLI, on your own login and billing. cached() makes reruns
@@ -122,10 +146,7 @@ export default defineConfig({
   model: '${MODEL_DIR}',
 
   // The phases are explicit: what runs is what this file names.
-  // Scan observes the code: every file and every import under roots. agentScan
-  // can join it for domains no parser covers, once you write its instructions:
-  // node_modules/@arocnies/fitc4/README.md#agent-providers
-  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],
+${scanSection}
   // Resolve maps observations onto the model. sourceRoot() maps files through
   // 'sources' claims; agentResolve maps what that cannot, such as imports of
   // external packages onto elements that own no files. It is fail-closed:
@@ -282,7 +303,9 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
 
   const result: InitResult = { created: [], skipped: [], notes: [] }
 
-  fs.writeFileSync(path.join(target, CONFIG_FILENAME), configTemplate(options.agent))
+  const hasTsconfig = fs.existsSync(path.join(target, 'tsconfig.json'))
+
+  fs.writeFileSync(path.join(target, CONFIG_FILENAME), configTemplate(options.agent, hasTsconfig))
   result.created.push(CONFIG_FILENAME)
   if (options.agent !== undefined) {
     result.notes.push(
@@ -316,12 +339,21 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
     result.created.push(AGENTS_FILENAME)
   }
 
-  if (!fs.existsSync(path.join(target, 'tsconfig.json'))) {
+  if (!hasTsconfig) {
     result.notes.push(
-      `no tsconfig.json here. Create one, or point the config's 'tsconfig' at your real one`,
+      options.agent === undefined
+        ? `no tsconfig.json here, and the TypeScript scanner observes nothing without one. ` +
+            `Point the config's 'tsconfig' at your real one, or for a project in another ` +
+            `language delete the config and rerun init --agent claude|codex: its agent ` +
+            `scan reads any language`
+        : `no tsconfig.json here, so the scan phase is agentScan: your ${options.agent} CLI ` +
+            `reads the repository, whatever the language, running the general import scan ` +
+            `unless you write your own instructions`,
     )
   }
-  if (!fs.existsSync(path.join(target, 'src'))) {
+  // The src note belongs to the TypeScript scaffold's roots: ['src']. The
+  // agentScan scaffold lists from the repository root and needs no src/.
+  if ((options.agent === undefined || hasTsconfig) && !fs.existsSync(path.join(target, 'src'))) {
     result.notes.push(`the scaffolded scan roots are ['src'] but src/ does not exist. Create it or edit 'roots'`)
   }
 

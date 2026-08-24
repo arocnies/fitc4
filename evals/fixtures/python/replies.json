@@ -1,0 +1,56 @@
+[
+  {
+    "when": {
+      "promptIncludes": "Carry out the scan instructions"
+    },
+    "reply": {
+      "observations": [
+        {
+          "kind": "file",
+          "subject": { "kind": "file", "id": "src/app/api/routes.py" }
+        },
+        {
+          "kind": "file",
+          "subject": { "kind": "file", "id": "src/app/core/engine.py" }
+        },
+        {
+          "kind": "file",
+          "subject": { "kind": "file", "id": "src/app/store/db.py" }
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/app/api/routes.py" },
+          "target": { "kind": "file", "id": "src/app/core/engine.py" },
+          "description": "routes.py imports score from app.core.engine",
+          "evidence": [{ "path": "src/app/api/routes.py", "line": 5 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/app/api/routes.py" },
+          "target": { "kind": "file", "id": "src/app/store/db.py" },
+          "description": "routes.py imports latest_result from app.store.db",
+          "evidence": [{ "path": "src/app/api/routes.py", "line": 6 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/app/core/engine.py" },
+          "target": { "kind": "file", "id": "src/app/store/db.py" },
+          "description": "engine.py imports save_result from app.store.db",
+          "evidence": [{ "path": "src/app/core/engine.py", "line": 7 }]
+        },
+        {
+          "kind": "dependency",
+          "subject": { "kind": "file", "id": "src/app/core/engine.py" },
+          "target": { "kind": "module", "id": "yaml" },
+          "description": "engine.py imports the external yaml package",
+          "evidence": [{ "path": "src/app/core/engine.py", "line": 5 }]
+        }
+      ],
+      "examined": [
+        "src/app/api/routes.py",
+        "src/app/core/engine.py",
+        "src/app/store/db.py"
+      ]
+    }
+  }
+]

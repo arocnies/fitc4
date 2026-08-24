@@ -17,7 +17,7 @@ import { afterAll, describe, expect, test, vi } from 'vitest'
 
 import { cached } from '../src/agent/cache.ts'
 import type { AgentExec, AgentReply, AgentRequest } from '../src/agent/exec.ts'
-import { agentScan, PROVIDER_ID as SCAN_ID } from '../src/agent/scan.ts'
+import { agentScan, DEFAULT_INSTRUCTIONS, PROVIDER_ID as SCAN_ID } from '../src/agent/scan.ts'
 import type { Finding, Observation } from '../src/types.ts'
 import { findingFor, fixturePath, runFixture } from './helpers.ts'
 
@@ -122,6 +122,22 @@ describe('agentScan happy path', () => {
     // The scan budgets its own long call: exploration of a real repository
     // takes minutes, and the adapter's 120s extraction default would kill it.
     expect(request?.timeoutMs).toBe(600_000)
+  })
+
+  test('instructions default to the general import scan', async () => {
+    const exec = stubExec([goodReply()])
+
+    const result = await runFixture('violations', { scan: [agentScan({ exec })] })
+
+    // agentScan({ exec }) is a working scanner with nothing written: the
+    // shipped instructions are the generic import scan every first user of a
+    // non-TypeScript repository was otherwise hand-writing in their config.
+    const context = exec.requests[0]?.context ?? ''
+    expect(context).toContain('### Scan instructions')
+    expect(context).toContain(DEFAULT_INSTRUCTIONS)
+    expect(DEFAULT_INSTRUCTIONS).toContain('whatever the language')
+    expect(DEFAULT_INSTRUCTIONS).toContain('standard library')
+    expect(providerFailure(result.findings)).toBeUndefined()
   })
 
   test('timeoutMs overrides the scan budget, on whichever request shape', async () => {

@@ -1,0 +1,46 @@
+specification {
+  element system
+  element component
+}
+
+model {
+  app = system 'Prediction service' {
+    api = component 'HTTP API' {
+      description 'Parses requests and answers with scores; talks to the engine only'
+      metadata {
+        sources 'src/app/api/**'
+      }
+    }
+
+    core = component 'Scoring engine' {
+      description 'Computes scores; the only component allowed to touch the store'
+      metadata {
+        sources 'src/app/core/**'
+      }
+    }
+
+    store = component 'Result store' {
+      description 'Persists scoring results; reachable from the engine only'
+      metadata {
+        sources 'src/app/store/**'
+      }
+    }
+
+    vendor = component 'External packages' {
+      description 'Third-party dependencies'
+      metadata {
+        packages 'yaml'
+      }
+    }
+  }
+
+  app.api -> app.core 'requests scores'
+  app.core -> app.store 'persists results'
+  app.core -> app.vendor 'parses the weights file'
+}
+
+views {
+  view index of app {
+    include *
+  }
+}

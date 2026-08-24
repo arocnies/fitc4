@@ -54,7 +54,9 @@ Options:
   --json           Emit the full result as JSON instead of a report.
   --agent <cli>    With init: scaffold a fitc4.config.mts declaring 'claude'
                    or 'codex' as the config's agent exec. The exec runs your
-                   own CLI on your own login and billing.
+                   own CLI on your own login and billing. Without a
+                   tsconfig.json in the directory, the scan phase is the
+                   agent's general import scan, so any language works.
   --no-drift       With draft: emit plain relationships instead of
                    drift-tagged ones.
   --drift-tag <t>  With draft: tag relationships with this tag instead of

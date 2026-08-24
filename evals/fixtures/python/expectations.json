@@ -1,0 +1,105 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "subject": { "kind": "element", "id": "app.api" },
+      "related": ["app.store"],
+      "label": "the planted api -> store import is forbidden by the model"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan",
+        "kind": "scan-root",
+        "subject": "src/app/api/routes.py",
+        "label": "the scan attests to having read the api routes"
+      },
+      {
+        "provider": "agent-scan",
+        "kind": "scan-root",
+        "subject": "src/app/core/engine.py",
+        "label": "the scan attests to having read the engine"
+      },
+      {
+        "provider": "agent-scan",
+        "kind": "scan-root",
+        "subject": "src/app/store/db.py",
+        "label": "the scan attests to having read the store"
+      },
+      {
+        "provider": "agent-scan",
+        "kind": "dependency",
+        "subject": "src/app/api/routes.py",
+        "target": "src/app/core/engine.py"
+      },
+      {
+        "provider": "agent-scan",
+        "kind": "dependency",
+        "subject": "src/app/api/routes.py",
+        "target": "src/app/store/db.py",
+        "label": "the scan reports the forbidden api -> store import honestly"
+      },
+      {
+        "provider": "agent-scan",
+        "kind": "dependency",
+        "subject": "src/app/core/engine.py",
+        "target": "src/app/store/db.py"
+      },
+      {
+        "provider": "agent-scan",
+        "kind": "dependency",
+        "subject": "src/app/core/engine.py",
+        "target": "yaml",
+        "label": "the external yaml package is reported as a module target"
+      }
+    ],
+    "mustNot": [
+      {
+        "provider": "agent-scan",
+        "kind": "dependency",
+        "target": "json",
+        "label": "the standard-library json import was reported; the default instructions say to skip the standard library"
+      },
+      {
+        "provider": "agent-scan",
+        "kind": "dependency",
+        "target": "typing",
+        "label": "the standard-library typing import was reported; the default instructions say to skip the standard library"
+      },
+      {
+        "provider": "agent-scan",
+        "kind": "dependency",
+        "target": "pathlib",
+        "label": "the standard-library pathlib import was reported; the default instructions say to skip the standard library"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "app.api",
+        "target": "app.core",
+        "declared": true,
+        "label": "the permitted api -> core import resolves onto the declared relationship"
+      },
+      {
+        "provider": "source-root",
+        "source": "app.core",
+        "target": "app.store",
+        "declared": true,
+        "label": "the permitted core -> store import resolves onto the declared relationship"
+      },
+      {
+        "provider": "source-root",
+        "source": "app.core",
+        "target": "app.vendor",
+        "declared": true,
+        "label": "the yaml import resolves onto the vendor element through its package claim"
+      }
+    ]
+  }
+}

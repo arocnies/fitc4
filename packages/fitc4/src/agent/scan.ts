@@ -1,9 +1,11 @@
 /**
  * The `agent-scan` scan provider.
  *
- * Lets a user enforce model domains the TypeScript scanner cannot see: docs,
- * configs, infra files, anything. The user writes instructions describing in
- * prose what to observe, the agent explores the repository read-only
+ * Lets a user enforce model domains the TypeScript scanner cannot see: any
+ * language, docs, configs, infra files, anything. The instructions describe
+ * in prose what to observe, defaulting to `DEFAULT_INSTRUCTIONS`, the general
+ * import scan, so `agentScan({ exec })` works out of the box on a repository
+ * in any language. The agent explores the repository read-only
  * (`agentic: true`), and its observations feed the same deterministic resolve
  * and validate phases as any other scanner's. The prefilled context is only
  * the instructions plus a bounded file listing, so it is deterministic and
@@ -44,13 +46,40 @@ import type { AgentExec } from './exec.ts'
 
 export const PROVIDER_ID = 'agent-scan'
 
+/**
+ * The instructions `agentScan` runs with when the user writes none: the
+ * general import scan, language-neutral on purpose. This is the scan every
+ * first user of a non-TypeScript repository was hand-writing in their own
+ * words (and at their own model's quality), so the tool ships it: files as
+ * `file` observations, imports as `dependency` observations with `file`
+ * targets inside the repository and `module` targets outside it, standard
+ * library and generated code skipped. Exported so a config can extend it
+ * rather than restate it.
+ */
+export const DEFAULT_INSTRUCTIONS =
+  'Map the source code as a language-neutral dependency graph, whatever the language. ' +
+  "Emit one 'file' observation for every source file you read. " +
+  "Emit one 'dependency' observation for every import, include, require, or use declaration: " +
+  "subject is the importing file; target is { kind: 'file' } with the imported file's " +
+  'repository-relative path when the import stays inside this repository, or ' +
+  "{ kind: 'module' } with the package name as written when it names an external package. " +
+  'When a repository-local import points at a file you cannot find, emit ' +
+  "'unresolved-dependency' with the specifier as written in a { kind: 'module' } target " +
+  "instead of guessing a path. Skip imports of the language's own standard library: they " +
+  'are part of the runtime, not of this architecture. Skip generated code, vendored ' +
+  'dependencies, lockfiles, and build output entirely. ' +
+  'Cite the file and line of each import as evidence.'
+
 export interface AgentScanOptions {
   exec: AgentExec
   /**
-   * What to observe, in prose. For example: "read docker-compose.yml and emit
-   * a dependency observation for each service-to-service link".
+   * What to observe, in prose, for a domain the general import scan does not
+   * cover. For example: "read docker-compose.yml and emit a dependency
+   * observation for each service-to-service link". Default:
+   * `DEFAULT_INSTRUCTIONS`, the general import scan, so `agentScan({ exec })`
+   * is a working scanner for a repository in any language.
    */
-  instructions: string
+  instructions?: string
   /**
    * Repository-relative directories whose files are listed in the prefilled
    * context. Default: the repository root. These bound the listing, not the
@@ -170,6 +199,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
 
   const excerptChars = options.excerptChars ?? DEFAULT_EXCERPT_CHARS
   const timeoutMs = options.timeoutMs ?? DEFAULT_SCAN_TIMEOUT_MS
+  const instructions = options.instructions ?? DEFAULT_INSTRUCTIONS
 
   const run: ScanProvider = async (context: ScanContext): Promise<Observation[]> => {
     const files = enumerateFiles(context.repositoryRoot, roots)
@@ -184,7 +214,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
         ? {
             prompt: PROMPT,
             context: composeContext(
-              options.instructions,
+              instructions,
               roots,
               files.slice(0, maxFiles),
               Math.max(0, files.length - maxFiles),
@@ -198,7 +228,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
             prompt: PROMPT,
             context: composeFocusedContext(
               context.repositoryRoot,
-              options.instructions,
+              instructions,
               roots,
               files,
               options.focus,
