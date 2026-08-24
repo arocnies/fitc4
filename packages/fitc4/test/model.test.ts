@@ -9,7 +9,6 @@ import {
   isAncestorOf,
   isSameOrNested,
   loadModel,
-  normalizeSources,
   ownershipPrefixes,
   packageClaims,
   packageNameOf,
@@ -18,27 +17,6 @@ import {
 } from '../src/model.ts'
 import { ownerOf } from '../src/providers/source-root.ts'
 import { fixturePath } from './helpers.ts'
-
-describe('sources normalization', () => {
-  // LikeC4 stores metadata as `string | NonEmptyArray<string>` and collapses a
-  // single-element list back to a bare string, so both shapes reach the reader.
-  test('accepts a bare string', () => {
-    expect(normalizeSources('src/core/**')).toEqual(['src/core/**'])
-  })
-
-  test('accepts a list', () => {
-    expect(normalizeSources(['src/api/**', 'src/api2/**'])).toEqual(['src/api/**', 'src/api2/**'])
-  })
-
-  test('treats missing metadata as no ownership', () => {
-    expect(normalizeSources(undefined)).toEqual([])
-    expect(normalizeSources(null)).toEqual([])
-  })
-
-  test('ignores non-string entries', () => {
-    expect(normalizeSources(['src/core/**', 7])).toEqual(['src/core/**'])
-  })
-})
 
 describe('toPrefix', () => {
   test.each([

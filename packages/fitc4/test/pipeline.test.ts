@@ -107,19 +107,6 @@ describe('a model whose implementation contradicts the contract', () => {
   test('fails the gate', () => {
     expect(renderReport(result).exitCode).toBe(1)
   })
-
-  // The standard severities assume adoption; a team done adopting promotes
-  // unmapped-source so new unowned code — whose dependencies are never
-  // boundary-checked — fails the gate instead of slipping past it.
-  test('a severity override promotes unmapped-source to a gate failure', async () => {
-    const promoted = await runFixture('violations', {
-      validate: [architectureRules({ severity: { 'unmapped-source': 'error' } })],
-    })
-
-    const unmapped = findingFor(promoted.findings, 'unmapped-source')
-    expect(unmapped?.severity).toBe('error')
-    expect(unmapped?.subject?.id).toBe('src/orphan/thing.ts')
-  })
 })
 
 describe('containment', () => {

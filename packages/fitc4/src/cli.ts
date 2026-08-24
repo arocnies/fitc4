@@ -13,6 +13,7 @@ import { findConfig, resolveConfig } from './config.ts'
 import { draft, type DraftDescribe } from './draft.ts'
 import { closestName, messageOf } from './errors.ts'
 import { init, INIT_AGENTS, type InitAgent } from './init.ts'
+import { DEFAULT_DRIFT_TAG } from './providers/architecture-rules.ts'
 import { runPipeline } from './pipeline.ts'
 import { count, exitCodeFor, renderReport } from './report.ts'
 
@@ -56,6 +57,10 @@ Options:
                    own CLI on your own login and billing.
   --no-drift       With draft: emit plain relationships instead of
                    drift-tagged ones.
+  --drift-tag <t>  With draft: tag relationships with this tag instead of
+                   'drift'. Match it to the gate's setting when the config
+                   tunes architectureRules({ driftTag }), or the drafted
+                   debt is not counted down.
   --describe       With draft: replace each eligible element's TODO
                    description with one or two sentences proposed by the
                    config's agent exec from the files the element owns. A
@@ -95,6 +100,7 @@ interface Arguments {
   configPath: string | undefined
   json: boolean
   noDrift: boolean
+  driftTag: string | undefined
   describe: boolean
   agent: InitAgent | undefined
   quiet: boolean
@@ -107,6 +113,7 @@ const KNOWN_OPTIONS = [
   '--json',
   '--agent',
   '--no-drift',
+  '--drift-tag',
   '--describe',
   '--quiet',
 ]
@@ -128,6 +135,7 @@ function parseArguments(argv: string[]): Arguments {
     configPath: undefined,
     json: false,
     noDrift: false,
+    driftTag: undefined,
     describe: false,
     agent: undefined,
     quiet: false,
@@ -144,6 +152,13 @@ function parseArguments(argv: string[]): Arguments {
       parsed.json = true
     } else if (argument === '--no-drift') {
       parsed.noDrift = true
+    } else if (argument === '--drift-tag') {
+      index += 1
+      const value = argv[index]
+      if (value === undefined || value.startsWith('-')) {
+        throw new Error('--drift-tag requires a tag name, such as --drift-tag legacy-debt')
+      }
+      parsed.driftTag = value
     } else if (argument === '--describe') {
       parsed.describe = true
     } else if (argument === '--agent') {
@@ -182,6 +197,14 @@ function parseArguments(argv: string[]): Arguments {
   // `fitc4 --no-drift` would run the default check and look like a draft ran.
   if (parsed.noDrift && parsed.command !== 'draft') {
     throw new Error('--no-drift only applies to the draft command')
+  }
+  if (parsed.driftTag !== undefined && parsed.command !== 'draft') {
+    throw new Error('--drift-tag only applies to the draft command')
+  }
+  // A tag for relationships the draft is told not to tag is a contradiction
+  // worth stopping: one of the two flags is not doing what the user thinks.
+  if (parsed.driftTag !== undefined && parsed.noDrift) {
+    throw new Error('--drift-tag and --no-drift contradict each other; pass one')
   }
   if (parsed.describe && parsed.command !== 'draft') {
     throw new Error('--describe only applies to the draft command')
@@ -268,6 +291,7 @@ async function runDraft(options: Arguments): Promise<void> {
 
   const result = await draft(config, {
     drift: !options.noDrift,
+    ...(options.driftTag === undefined ? {} : { driftTag: options.driftTag }),
     ...(describe === undefined ? {} : { describe }),
     onProgress: narrationFor(options),
   })
@@ -312,8 +336,8 @@ async function runDraft(options: Arguments): Promise<void> {
   ]
   if (!options.noDrift) {
     lines.push(
-      `every relationship is tagged as drift; run npx fitc4 to see the burn-down, ` +
-        `untag an edge to bless it`,
+      `every relationship is tagged as ${options.driftTag ?? DEFAULT_DRIFT_TAG}; ` +
+        `run npx fitc4 to see the burn-down, untag an edge to bless it`,
     )
   }
   process.stdout.write(`${[...lines, ...summary].join('\n')}\n`)

@@ -189,6 +189,30 @@ describe('draft', () => {
     expect(status).toBe(1)
     expect(stderr).toContain('fitc4: --no-drift only applies to the draft command')
   })
+
+  // The gate reads its tag from architectureRules({ driftTag }); a draft that
+  // could only write the default tag produced debt the tuned gate never
+  // counted down.
+  test('--drift-tag writes the custom tag and the summary names it', HEAVY, () => {
+    const root = fixturePath('drift')
+    const modelDir = path.join(tempDir(), 'arch')
+    const configPath = writeConfig(root, modelDir)
+
+    const { status, stdout } = runCli(['draft', '--config', configPath, '--drift-tag', 'legacy-debt'])
+
+    expect(status).toBe(0)
+    expect(stdout).toContain('tagged as legacy-debt')
+    const model = fs.readFileSync(path.join(modelDir, 'model.c4'), 'utf8')
+    expect(model).toContain('tag legacy-debt')
+    expect(model).toContain('#legacy-debt')
+    expect(model).not.toContain('#drift')
+  })
+
+  test('--drift-tag guards: needs a value, a draft, and no --no-drift', () => {
+    expect(runCli(['draft', '--drift-tag']).stderr).toContain('--drift-tag requires a tag name')
+    expect(runCli(['--drift-tag', 'x']).stderr).toContain('only applies to the draft command')
+    expect(runCli(['draft', '--drift-tag', 'x', '--no-drift']).stderr).toContain('contradict')
+  })
 })
 
 describe('draft --describe', () => {
@@ -231,41 +255,28 @@ describe('draft --describe', () => {
     expect(fs.existsSync(modelDir)).toBe(false)
   })
 
-  test('an abstaining exec keeps the TODOs and still exits 0', HEAVY, () => {
+  // Abstention and success are one spawned run: the exec declines the first
+  // element and describes the rest, covering both branches of the CLI's
+  // summary line. The abstention/failure semantics themselves are pinned
+  // in-process by draft.test.ts and agent-describe.test.ts.
+  test('descriptions land, an abstention keeps its TODO, and the summary counts both', HEAVY, () => {
     const root = fixturePath('drift')
     const modelDir = path.join(tempDir(), 'arch')
     const configPath = writeConfig(
       root,
       modelDir,
-      `  agent: { id: 'stub/model', run: async () => ({ ok: true, value: { description: '' }, raw: '' }) },\n`,
-    )
-
-    const { status, stdout } = runCli(['draft', '--describe', '--config', configPath])
-
-    expect(status).toBe(0)
-    expect(stdout).toContain('described 0 of 3 eligible elements; 3 elements kept the TODO')
-    expect(fs.readFileSync(path.join(modelDir, 'model.c4'), 'utf8')).toContain(
-      'TODO: what is this component responsible for?',
-    )
-  })
-
-  test('with a module config declaring a stub exec, descriptions land in the draft', HEAVY, () => {
-    const root = fixturePath('drift')
-    const modelDir = path.join(tempDir(), 'arch')
-    const configPath = writeConfig(
-      root,
-      modelDir,
-      `  agent: { id: 'stub/model', run: async () => ({ ok: true, value: { description: 'Does fixture things.' }, raw: '' }) },\n`,
+      `  agent: (() => { let calls = 0; return { id: 'stub/model', run: async () => ` +
+        `({ ok: true, value: { description: ++calls === 1 ? '' : 'Does fixture things.' }, raw: '' }) } })(),\n`,
     )
 
     const { status, stdout, stderr } = runCli(['draft', '--describe', '--config', configPath])
 
     expect(status).toBe(0)
-    expect(stdout).toContain('described 3 of 3 eligible elements')
+    expect(stdout).toContain('described 2 of 3 eligible elements; 1 element kept the TODO')
     expect(stderr).toContain('describe: app.core...')
     const model = fs.readFileSync(path.join(modelDir, 'model.c4'), 'utf8')
     expect(model).toContain(`description 'Does fixture things.'`)
-    expect(model).not.toContain('TODO: what is this component responsible for?')
+    expect(model).toContain('TODO: what is this component responsible for?')
   })
 })
 

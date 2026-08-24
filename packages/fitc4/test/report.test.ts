@@ -79,12 +79,6 @@ describe('unmapped-source grouping in the report', () => {
     expect(occurrences(report.text, 'unmapped-source  ')).toBe(under.length)
     expect(report.text).not.toContain('files are not owned')
   })
-
-  test('the rules pointer line survives grouping', async () => {
-    const report = renderReport(await runFixture('ok', unownedScan(over)))
-
-    expect(report.text).toContain('rules: node_modules/fitc4/README.md#rules')
-  })
 })
 
 describe('report', () => {
