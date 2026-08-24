@@ -125,4 +125,11 @@ AGENTS.md            norms for AI agents here: the model is the contract
 src/                 the implementation being checked
 ```
 
+Two workspace-isms not to copy. This example depends on `fitc4: "*"` and its
+scripts run the sibling package's built CLI by path
+(`node ../packages/fitc4/dist/cli.js`), because on a cold clone of this
+repository the `fitc4` bin has not been built yet when npm links workspaces. In
+your own project, `fitc4` is an ordinary dev dependency and the script is just
+`"fitc4": "fitc4"`, or `npx fitc4` with no script at all.
+
 `npm run check -w example` chains model validation, typecheck, tests, and the gate. `npm run view -w example` opens the live LikeC4 diagram.
