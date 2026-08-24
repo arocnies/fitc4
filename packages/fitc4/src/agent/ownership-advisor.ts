@@ -19,6 +19,7 @@
  */
 
 import { findingId } from '../ids.ts'
+import { count } from '../report.ts'
 import type {
   Finding,
   JsonObject,
@@ -121,6 +122,11 @@ export function agentOwnershipAdvisor(
     for (const drop of pack.dropped) {
       findings.push(agentTruncated(PROVIDER_ID, drop.count, drop.what, severity))
     }
+
+    // Announce before the call: it is the slow part, and the count says why.
+    context.progress?.(
+      `asking ${options.exec.id} to suggest owners for ${count(sent.length, 'unowned file')}`,
+    )
 
     const reply = await options.exec.run({
       prompt: PROMPT,

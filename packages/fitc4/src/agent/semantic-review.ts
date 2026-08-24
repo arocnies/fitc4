@@ -97,7 +97,7 @@ export function agentSemanticReview(options: SemanticReviewOptions): NamedProvid
 
     const graph = buildGraph(context.model, context.observations, context.associations)
 
-    for (const element of reviewed) {
+    for (const [index, element] of reviewed.entries()) {
       const excerpted = element.files.slice(0, maxFilesPerElement)
       const pack = assemblePack(
         [
@@ -119,6 +119,12 @@ export function agentSemanticReview(options: SemanticReviewOptions): NamedProvid
       for (const drop of pack.dropped) {
         findings.push(agentTruncated(PROVIDER_ID, drop.count, drop.what, severity))
       }
+
+      // One line per call: this loop is the run's slowest stretch, and a
+      // count makes the wait finite instead of open-ended.
+      context.progress?.(
+        `judging ${element.id} against its description with ${options.exec.id} (${index + 1} of ${reviewed.length})`,
+      )
 
       const reply = await options.exec.run({
         prompt:

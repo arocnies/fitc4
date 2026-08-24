@@ -326,7 +326,7 @@ export function withLoginHint(
 }
 
 /** A duration for a human: `120s`, `0.2s`, never `120000ms`. */
-function seconds(milliseconds: number): string {
+export function seconds(milliseconds: number): string {
   const value = milliseconds / 1000
   return `${Number.isInteger(value) ? value : Number(value.toFixed(1))}s`
 }
@@ -419,11 +419,16 @@ export async function runCliProcess(
   const captured = `${result.stdout}\n${result.stderr}`
 
   if (result.timedOut) {
+    // The tail of whatever the CLI said before the kill, like the non-zero
+    // exit path below: a CLI killed mid-retry or mid-login-prompt has already
+    // printed why it was stuck, and hiding that leaves only the symptom.
+    const tail = tailExcerpt(result.stderr || result.stdout, FAILURE_EXCERPT_LIMIT)
     return {
       ok: false,
       error: withLoginHint(
         `${binary} timed out after ${seconds(options.timeoutMs)}; ` +
-          `raise it with ${options.factory}({ timeoutMs })`,
+          `raise it with ${options.factory}({ timeoutMs })` +
+          (tail === '' ? '' : `. Its last output: ${tail}`),
         captured,
         options.loginCommand,
       ),

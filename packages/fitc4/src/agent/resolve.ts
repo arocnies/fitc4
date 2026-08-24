@@ -56,6 +56,7 @@ import {
   packageClaims,
   packageNameOf,
 } from '../model.ts'
+import { count } from '../report.ts'
 import type {
   Association,
   JsonObject,
@@ -125,6 +126,9 @@ export function agentResolve(options: AgentResolveOptions): NamedProvider<Resolv
 
     const sent = decisions.slice(0, maxObservations)
     const dropped = decisions.length - sent.length
+
+    // Announce before the call: it is the slow part, and the count says why.
+    context.progress?.(`asking ${options.exec.id} to map ${count(sent.length, 'candidate')}`)
 
     const reply = await options.exec.run({
       prompt: PROMPT,

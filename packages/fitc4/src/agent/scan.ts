@@ -36,10 +36,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { count } from '../report.ts'
+import { count, elapsed } from '../report.ts'
 import type { Evidence, JsonObject, NamedProvider, Observation, Ref, ScanContext, ScanProvider } from '../types.ts'
 import { assemblePack, DEFAULT_PACK_BUDGET_BYTES, fencedExcerpt } from './context-pack.ts'
-import { schemaMismatch, truncate } from './exec.ts'
+import { schemaMismatch, seconds, truncate } from './exec.ts'
 import type { AgentExec } from './exec.ts'
 
 export const PROVIDER_ID = 'agent-scan'
@@ -83,10 +83,22 @@ export interface AgentScanOptions {
   focus?: string[]
   /** Characters of each focused file embedded in the context, code-first. */
   excerptChars?: number
+  /**
+   * Hard budget for this scan's one call. Default: 10 minutes, overriding the
+   * adapter's default, because a scan is the big call of a run: an agentic
+   * exploration of a real repository takes minutes, and so can a one-shot
+   * answering over a full context pack. The adapter's `timeoutMs` keeps
+   * governing the small extraction calls the other providers make.
+   */
+  timeoutMs?: number
 }
 
 const DEFAULT_MAX_FILES = 300
 const DEFAULT_EXCERPT_CHARS = 4_000
+const DEFAULT_SCAN_TIMEOUT_MS = 600_000
+
+/** Cadence of the "still waiting" narration during the one long call. */
+const PROGRESS_TICK_MS = 30_000
 
 /** Never listed, at any depth. */
 const SKIPPED_DIRECTORIES = new Set(['node_modules'])
@@ -157,6 +169,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
   const maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES
 
   const excerptChars = options.excerptChars ?? DEFAULT_EXCERPT_CHARS
+  const timeoutMs = options.timeoutMs ?? DEFAULT_SCAN_TIMEOUT_MS
 
   const run: ScanProvider = async (context: ScanContext): Promise<Observation[]> => {
     const files = enumerateFiles(context.repositoryRoot, roots)
@@ -179,6 +192,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
             schema: REPLY_SCHEMA,
             agentic: true as const,
             cwd: context.repositoryRoot,
+            timeoutMs,
           }
         : {
             prompt: PROMPT,
@@ -193,6 +207,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
             ),
             schema: REPLY_SCHEMA,
             cwd: context.repositoryRoot,
+            timeoutMs,
           }
 
     // Announce the call before it starts: agent calls are the slow part of a
@@ -203,7 +218,22 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
         : `asking ${options.exec.id} one-shot, about ${roughKilobytes(request.context)} of instructions and excerpts`,
     )
 
-    const reply = await options.exec.run(request)
+    // The scan is one call and it is minutes long on a real repository, with
+    // nothing on the wire until the CLI finishes. A quiet line on a fixed
+    // cadence keeps that wait distinguishable from a hang, and names the
+    // budget so a reader knows when the hard stop comes.
+    const started = Date.now()
+    const ticker = setInterval(() => {
+      context.progress?.(`still waiting on ${options.exec.id}, ${elapsed(started)} of the ${seconds(timeoutMs)} budget`)
+    }, PROGRESS_TICK_MS)
+    ticker.unref?.()
+
+    let reply
+    try {
+      reply = await options.exec.run(request)
+    } finally {
+      clearInterval(ticker)
+    }
 
     if (!reply.ok) {
       throw new Error(`Agent scan was unavailable (${options.exec.id}): ${reply.error}`)

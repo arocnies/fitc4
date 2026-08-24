@@ -138,8 +138,16 @@ describe('agentResolve end to end', () => {
 
   test('the context carries the element catalog and only the leftover decisions', async () => {
     const exec = stubExec([ok([])])
+    const messages: string[] = []
 
-    await runFixture('external', { resolve: resolvePhase(exec) })
+    await runFixture('external', {
+      resolve: resolvePhase(exec),
+      onProgress: (message) => void messages.push(message),
+    })
+
+    // The call is announced before it starts: it is the slow part of the
+    // phase, and the candidate count says what is being paid for.
+    expect(messages).toContainEqual('agent-resolve: asking stub/model to map 3 candidates')
 
     const request = exec.requests[0]
     expect(exec.requests).toHaveLength(1)

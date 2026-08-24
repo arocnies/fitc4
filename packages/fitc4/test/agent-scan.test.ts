@@ -13,7 +13,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, test } from 'vitest'
+import { afterAll, describe, expect, test, vi } from 'vitest'
 
 import { cached } from '../src/agent/cache.ts'
 import type { AgentExec, AgentReply, AgentRequest } from '../src/agent/exec.ts'
@@ -119,6 +119,22 @@ describe('agentScan happy path', () => {
     expect(request?.context).toContain('- src/core/health.ts')
     expect(request?.context).not.toContain('truncated')
     expect(request?.prompt).toContain('examined')
+    // The scan budgets its own long call: exploration of a real repository
+    // takes minutes, and the adapter's 120s extraction default would kill it.
+    expect(request?.timeoutMs).toBe(600_000)
+  })
+
+  test('timeoutMs overrides the scan budget, on whichever request shape', async () => {
+    const exec = stubExec([goodReply(), goodReply()])
+
+    await runFixture('violations', {
+      scan: [
+        agentScan({ exec, id: 'a', instructions: 'x', timeoutMs: 90_000 }),
+        agentScan({ exec, id: 'b', instructions: 'x', focus: ['docs/**'], timeoutMs: 90_000 }),
+      ],
+    })
+
+    expect(exec.requests.map((request) => request.timeoutMs)).toEqual([90_000, 90_000])
   })
 
   test('focus assembles a one-shot request: excerpts embedded, no agentic flag', async () => {
@@ -270,6 +286,42 @@ describe('agentScan narration', () => {
     expect(messages).toContainEqual(
       expect.stringMatching(/^agent-scan: asking stub\/model one-shot, about \d+ KB of instructions and excerpts$/),
     )
+  })
+
+  test('a long call narrates a still-waiting line with the elapsed time and the budget', async () => {
+    vi.useFakeTimers()
+    try {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      const exec: AgentExec = {
+        id: 'stub/slow',
+        async run() {
+          await gate
+          return goodReply()
+        },
+      }
+      const messages: string[] = []
+      const provider = agentScan({ exec, instructions: 'x' })
+      const running = provider.run({
+        repositoryRoot: fixturePath('violations'),
+        progress: (message) => void messages.push(message),
+      })
+
+      // Two ticks in: the wait is narrated, and stays distinguishable from a
+      // hang because each line carries the elapsed time and the hard stop.
+      await vi.advanceTimersByTimeAsync(61_000)
+      release()
+      await running
+
+      expect(messages).toContainEqual('still waiting on stub/slow, 30.0s of the 600s budget')
+      expect(messages).toContainEqual('still waiting on stub/slow, 60.0s of the 600s budget')
+      // The ticker dies with the call: nothing narrates after the reply.
+      const after = messages.length
+      await vi.advanceTimersByTimeAsync(61_000)
+      expect(messages).toHaveLength(after)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

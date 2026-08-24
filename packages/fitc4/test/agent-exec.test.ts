@@ -86,6 +86,12 @@ process.stdin.on('end', () => {
 
 const slowBinary = fakeBinary('fake-slow.cjs', 'setTimeout(() => {}, 30000)\n')
 
+// Says why it is stuck, then hangs — the shape of a CLI mid-retry.
+const noisySlowBinary = fakeBinary(
+  'fake-noisy-slow.cjs',
+  'process.stderr.write("retrying request 2 of 5\\n"); setTimeout(() => {}, 30000)\n',
+)
+
 describe('claudeCli', () => {
   test('runs isolated and tool-less by default, with the composed input on stdin', async () => {
     captureTo('claude-default.json')
@@ -166,6 +172,18 @@ describe('claudeCli', () => {
     // where to change it.
     expect(!reply.ok && reply.error).toContain('timed out after 0.2s')
     expect(!reply.ok && reply.error).toContain('raise it with claudeCli({ timeoutMs })')
+    // A silent hang has no tail to show, and the error must not pretend it does.
+    expect(!reply.ok && reply.error).not.toContain('Its last output')
+  })
+
+  test("a timeout shows the CLI's last output — a kill mid-retry has already said why", async () => {
+    // A wait long enough that the fake CLI has certainly booted and written
+    // its stderr line before the kill; at 200ms the kill can beat node's boot.
+    const reply = await claudeCli({ binary: noisySlowBinary, timeoutMs: 1_500 }).run({ prompt: 'x' })
+
+    expect(reply.ok).toBe(false)
+    expect(!reply.ok && reply.error).toContain('timed out after 1.5s')
+    expect(!reply.ok && reply.error).toContain('Its last output: retrying request 2 of 5')
   })
 })
 

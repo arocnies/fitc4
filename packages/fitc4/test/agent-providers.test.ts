@@ -45,7 +45,16 @@ describe('agentOwnershipAdvisor', () => {
       }),
     ])
 
-    const result = await runFixture('violations', { validate: [agentOwnershipAdvisor({ exec })] })
+    const messages: string[] = []
+    const result = await runFixture('violations', {
+      validate: [agentOwnershipAdvisor({ exec })],
+      onProgress: (message) => void messages.push(message),
+    })
+
+    // The call is announced before it starts: it is the slow part of the phase.
+    expect(messages).toContainEqual(
+      'agent-ownership-advisor: asking stub/model to suggest owners for 1 unowned file',
+    )
 
     expect(ruleIds(result.findings)).toEqual(['ownership-suggestion'])
     const finding = findingFor(result.findings, 'ownership-suggestion')
@@ -197,7 +206,20 @@ describe('agentSemanticReview', () => {
       ok({ matches: true, issues: [] }),
     ])
 
-    const result = await runFixture('described', { validate: [agentSemanticReview({ exec })] })
+    const messages: string[] = []
+    const result = await runFixture('described', {
+      validate: [agentSemanticReview({ exec })],
+      onProgress: (message) => void messages.push(message),
+    })
+
+    // Each element's call is announced with a count: the loop is the run's
+    // slowest stretch, and the count makes the wait finite.
+    expect(messages).toContainEqual(
+      'agent-semantic-review: judging demo.core against its description with stub/model (1 of 2)',
+    )
+    expect(messages).toContainEqual(
+      'agent-semantic-review: judging demo.extra against its description with stub/model (2 of 2)',
+    )
 
     expect(result.findings).toHaveLength(1)
     expect(ruleIds(result.findings)).toEqual(['description-drift'])
