@@ -66,14 +66,22 @@ export interface DraftElementFacts {
   name: string
   /** The dot-joined identifier path under the wrapping system, e.g. `billing.invoices`. */
   path: string
-  /** The `sources` claim the element declares. */
-  declared: string
+  /** The `sources` claim the element declares; absent on a pure container. */
+  declared?: string
   /**
    * Repository-relative paths of the observed files that resolve to this
    * element, by the same longest-claim ownership the edges use. For a fragment
    * element this is the containing file; the fragment locator is `declared`.
+   * Empty for a pure container, which owns nothing itself.
    */
   ownedFiles: string[]
+  /**
+   * For a pure container: its child elements, each with whatever description
+   * the pass has settled on so far. Containers are offered after their
+   * children, deepest first, so a container is described from its children's
+   * fresh descriptions instead of from files it does not own.
+   */
+  children?: { path: string; name: string; description?: string }[]
 }
 
 /**
@@ -102,8 +110,9 @@ export interface DraftOptions {
   /**
    * Replace each eligible element's TODO description with what this callback
    * proposes from the element's own facts. Eligible means a declared `sources`
-   * claim plus at least one owned observed file; claimless containers, the
-   * boundary elements, and the vendor stub keep their placeholders.
+   * claim plus at least one owned observed file, or a pure container, which is
+   * offered after its children with their fresh descriptions as its facts; the
+   * boundary elements and the vendor stub keep their placeholders.
    *
    * `undefined` keeps the element's TODO, narrated and non-fatal: a
    * placeholder description is an honest state. A thrown error aborts the
@@ -341,10 +350,14 @@ export async function draft(
  * Eligibility is having something to describe from: a declared `sources`
  * claim and at least one observed file resolving to it, which covers
  * directory elements, root catch-alls, and fragment elements. Claimless
- * containers have no files of their own, and the boundary and vendor stubs
- * are not `DraftElement`s at all, so none of them are offered. The pass only
- * ever edits description text: claims, structure, and edges are already
- * fixed, so a misbehaving callback cannot change what the draft gates.
+ * containers have no files of their own, so they are offered differently and
+ * later: after the file-owning elements settle, containers go in waves from
+ * the deepest up, each with its children's fresh descriptions as its facts,
+ * so the top of the tree is synthesized from what was just written below it
+ * at zero additional file reads. The boundary and vendor stubs are not
+ * `DraftElement`s at all and are never offered. The pass only ever edits
+ * description text: claims, structure, and edges are already fixed, so a
+ * misbehaving callback cannot change what the draft gates.
  *
  * An abstention (`undefined`) keeps the element's TODO, narrated and never
  * fatal: a draft with placeholder descriptions is exactly as correct as one
@@ -386,28 +399,56 @@ async function describeElements(
     owned.get(owner.elementId)?.add(filePath)
   }
 
-  const eligible: { element: DraftElement; declared: string; ownedFiles: string[] }[] = []
-  const collect = (scope: DraftElement[]): void => {
+  const eligible: { element: DraftElement; facts: () => DraftElementFacts }[] = []
+  const containersByDepth = new Map<number, { element: DraftElement; facts: () => DraftElementFacts }[]>()
+  const collect = (scope: DraftElement[], depth: number): void => {
     for (const element of scope) {
       const files = owned.get(element.path)
       if (element.declared !== undefined && files !== undefined && files.size > 0) {
-        eligible.push({ element, declared: element.declared, ownedFiles: [...files].sort() })
+        const declared = element.declared
+        const ownedFiles = [...files].sort()
+        eligible.push({
+          element,
+          facts: () => ({ name: element.name, path: element.path, declared, ownedFiles }),
+        })
+      } else if (element.children.length > 0) {
+        // A pure container owns no files, so it is described from its
+        // children instead, after they have been. The facts thunk reads the
+        // children at call time, so the descriptions the earlier waves just
+        // wrote are what the container's call sees.
+        const entry = {
+          element,
+          facts: (): DraftElementFacts => ({
+            name: element.name,
+            path: element.path,
+            ownedFiles: [],
+            children: element.children.map((child) => ({
+              path: child.path,
+              name: child.name,
+              ...(child.description === undefined ? {} : { description: child.description }),
+            })),
+          }),
+        }
+        const level = containersByDepth.get(depth)
+        if (level === undefined) containersByDepth.set(depth, [entry])
+        else level.push(entry)
       }
-      collect(element.children)
+      collect(element.children, depth + 1)
     }
   }
-  collect(elements)
+  collect(elements, 0)
 
-  narrate?.(`describe: ${count(eligible.length, 'element')}`)
+  const containerCount = [...containersByDepth.values()].reduce((sum, level) => sum + level.length, 0)
+  narrate?.(`describe: ${count(eligible.length + containerCount, 'element')}`)
 
   let described = 0
   const describeOne = async (entry: (typeof eligible)[number]): Promise<void> => {
-    const { element, declared, ownedFiles } = entry
+    const { element } = entry
     narrate?.(`describe: app.${element.path}...`)
     const started = Date.now()
     let proposed: string | undefined
     try {
-      proposed = await describe({ name: element.name, path: element.path, declared, ownedFiles })
+      proposed = await describe(entry.facts())
     } catch (error) {
       // Not caught to be swallowed: caught to say which element the describer
       // was on and that nothing was written, then rethrown so the draft fails.
@@ -428,26 +469,37 @@ async function describeElements(
   // The same pool discipline as agentScan's batches: the first failure is the
   // one that aborts, workers drain instead of starting new calls, and the
   // in-flight remainder settles before the throw so no call outlives the pass.
-  let failure: unknown
-  let nextIndex = 0
-  await Promise.all(
-    Array.from({ length: Math.min(DESCRIBE_CONCURRENCY, eligible.length) }, async () => {
-      while (failure === undefined) {
-        const index = nextIndex
-        nextIndex += 1
-        const entry = eligible[index]
-        if (entry === undefined) return
-        try {
-          await describeOne(entry)
-        } catch (error) {
-          failure ??= error
+  const runPool = async (entries: typeof eligible): Promise<void> => {
+    let failure: unknown
+    let nextIndex = 0
+    await Promise.all(
+      Array.from({ length: Math.min(DESCRIBE_CONCURRENCY, entries.length) }, async () => {
+        while (failure === undefined) {
+          const index = nextIndex
+          nextIndex += 1
+          const entry = entries[index]
+          if (entry === undefined) return
+          try {
+            await describeOne(entry)
+          } catch (error) {
+            failure ??= error
+          }
         }
-      }
-    }),
-  )
-  if (failure !== undefined) throw failure
+      }),
+    )
+    if (failure !== undefined) throw failure
+  }
 
-  return { describeAttempted: eligible.length, described }
+  await runPool(eligible)
+  // Containers go in waves, deepest first, each wave a pool of its own: a
+  // container's children were all described by an earlier wave (file-owning
+  // ones in the first pool, deeper containers in a deeper wave), so its facts
+  // carry their settled descriptions rather than a snapshot of TODOs.
+  for (const depth of [...containersByDepth.keys()].sort((a, b) => b - a)) {
+    await runPool(containersByDepth.get(depth) ?? [])
+  }
+
+  return { describeAttempted: eligible.length + containerCount, described }
 }
 
 /** All elements in a subtree, the element itself included. */

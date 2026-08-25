@@ -32,9 +32,10 @@
  * An *unanswered* candidate is different: mapping zero, some, or all
  * candidates is a legitimate "I don't know", and an unmapped candidate simply
  * keeps its deterministic `unresolved` association, still visible through
- * the existing rules. Candidates beyond `maxObservations` are treated the
- * same way: truncation is announced in the context (so the model knows its
- * list is partial) and the rest stay unmapped, not failed.
+ * the existing rules. Scale never truncates: candidates run in batches of
+ * `maxObservations` through a small worker pool, each batch announced by its
+ * position, so a repository with a thousand leftover decisions costs more
+ * calls, never silently unmapped candidates.
  *
  * **Candidates are decisions, not import sites.** Twelve imports of `stripe`
  * from files owned by one element are one question, "which element does that
@@ -82,15 +83,24 @@ export interface AgentResolveOptions {
   /** Suffix for the provider id: `agent-resolve:<id>` instead of `agent-resolve`. */
   id?: string
   /**
-   * Candidate *decisions* sent per run, meaning distinct (owning-element,
-   * target) pairs, not import sites. The context announces the rest as
-   * truncated and they stay unmapped, visible through the existing rules, not
-   * a failure.
+   * Candidate *decisions* sent per call, meaning distinct (owning-element,
+   * target) pairs, not import sites. Decisions beyond one call's worth are
+   * not dropped: they run as further batches through the worker pool, each
+   * announced by its position.
    */
   maxObservations?: number
 }
 
 const DEFAULT_MAX_OBSERVATIONS = 100
+
+/**
+ * Batches run through the same worker-pool shape as agentScan's: they are
+ * independent questions over disjoint decision chunks, guards apply per
+ * batch, and associations merge in batch order so a pooled run returns
+ * byte-identically to a sequential one. Fail-closed stays fail-closed: the
+ * first batch failure aborts the provider after the in-flight calls settle.
+ */
+const RESOLVE_CONCURRENCY = 4
 
 /** Import sites named per decision line before the count elides the rest. */
 const SITES_SHOWN = 5
@@ -123,97 +133,136 @@ const PROMPT =
 export function agentResolve(options: AgentResolveOptions): NamedProvider<ResolveProvider> {
   const providerId = options.id === undefined ? PROVIDER_ID : `${PROVIDER_ID}:${options.id}`
   const maxObservations = options.maxObservations ?? DEFAULT_MAX_OBSERVATIONS
+  // Fail-closed means a budget that can map nothing is a misconfiguration,
+  // not a quiet run: zero candidates per call would loop forever or skip the
+  // resolve this provider exists to perform.
+  if (maxObservations < 1) {
+    throw new Error(`agentResolve maxObservations must be at least 1, got ${maxObservations}`)
+  }
 
   const run: ResolveProvider = async (context: ResolveContext): Promise<Association[]> => {
     const decisions = leftoverDecisions(context)
     if (decisions.length === 0) return []
 
-    const sent = decisions.slice(0, maxObservations)
-    const dropped = decisions.length - sent.length
-
-    // Announce before the call: it is the slow part, and the count says why.
-    context.progress?.(`asking ${options.exec.id} to map ${count(sent.length, 'candidate')}`)
-
-    const reply = await options.exec.run({
-      prompt: PROMPT,
-      context: composeContext(context, options.instructions, sent, dropped),
-      schema: REPLY_SCHEMA,
-      cwd: context.repositoryRoot,
-    })
-
-    if (!reply.ok) {
-      throw new Error(`Agent resolve was unavailable (${options.exec.id}): ${reply.error}`)
+    const batches: Decision[][] = []
+    for (let start = 0; start < decisions.length; start += maxObservations) {
+      batches.push(decisions.slice(start, start + maxObservations))
     }
 
-    // The exec layer enforced the schema on a live reply, but a custom adapter
-    // or a cache entry recorded against an older schema must not flow
-    // malformed mappings into the pipeline as associations.
-    const mismatch = schemaMismatch(reply.value, REPLY_SCHEMA)
-    if (mismatch !== undefined) {
-      throw new Error(`Agent resolve reply did not match the requested schema: ${mismatch}`)
-    }
-
-    const mappings = reply.value as unknown as {
-      candidateId: string
-      elementId: string
-      reason?: string
-    }[]
-
-    const byCandidateId = new Map(sent.map((decision) => [decision.candidateId, decision]))
     const knownElements = new Set<string>([...context.model.elements()].map((element) => element.id))
     const declared = declaredRelationships(context.model)
+    const perBatch: Association[][] = new Array<Association[]>(batches.length)
 
-    const associations: Association[] = []
-    const mapped = new Set<string>()
+    const runBatch = async (index: number): Promise<void> => {
+      const sent = batches[index] as Decision[]
 
-    for (const mapping of mappings) {
-      // Hard hallucination guards. Ids the reply was never given, and elements
-      // the model does not contain, fail the provider visibly. Dropping the
-      // entry would let the rest of an untrustworthy reply pass as clean.
-      const decision = byCandidateId.get(mapping.candidateId)
-      if (decision === undefined) {
-        throw new Error(
-          `Agent resolve reply named a candidateId it was not given: '${truncate(mapping.candidateId, 160)}'`,
-        )
-      }
-      if (mapped.has(mapping.candidateId)) {
-        throw new Error(
-          `Agent resolve reply mapped '${truncate(mapping.candidateId, 160)}' more than once`,
-        )
-      }
-      mapped.add(mapping.candidateId)
+      // Announce before the call: it is the slow part, and the count says why.
+      context.progress?.(
+        `asking ${options.exec.id} to map ${count(sent.length, 'candidate')}` +
+          (batches.length > 1 ? ` (batch ${index + 1} of ${batches.length})` : ''),
+      )
 
-      if (!knownElements.has(mapping.elementId)) {
-        throw new Error(
-          `Agent resolve reply named an element that is not in the model: '${truncate(mapping.elementId, 160)}'`,
-        )
+      const reply = await options.exec.run({
+        prompt: PROMPT,
+        context: composeContext(context, options.instructions, sent),
+        schema: REPLY_SCHEMA,
+        cwd: context.repositoryRoot,
+      })
+
+      if (!reply.ok) {
+        throw new Error(`Agent resolve was unavailable (${options.exec.id}): ${reply.error}`)
       }
 
-      const match = hasRelationship(declared, decision.sourceElementId, mapping.elementId)
-
-      // One accepted decision fans back out to one association per underlying
-      // observation, so the standard rules still see every import site.
-      for (const observation of decision.observations) {
-        const targetName = observation.target?.id ?? observation.id
-        associations.push({
-          id: `mapped:${observation.id}`,
-          observationId: observation.id,
-          status: 'resolved',
-          source: { kind: 'element', id: decision.sourceElementId },
-          target: { kind: 'element', id: mapping.elementId },
-          ...(match === undefined ? {} : { relationship: { kind: 'relationship', id: match.id } }),
-          description: `${decision.sourceElementId} -> ${mapping.elementId} (agent-mapped from ${targetName})`,
-          data: {
-            agent: options.exec.id,
-            candidateId: decision.candidateId,
-            ...(mapping.reason === undefined ? {} : { reason: mapping.reason }),
-          },
-          provider: providerId,
-        })
+      // The exec layer enforced the schema on a live reply, but a custom
+      // adapter or a cache entry recorded against an older schema must not
+      // flow malformed mappings into the pipeline as associations.
+      const mismatch = schemaMismatch(reply.value, REPLY_SCHEMA)
+      if (mismatch !== undefined) {
+        throw new Error(`Agent resolve reply did not match the requested schema: ${mismatch}`)
       }
+
+      const mappings = reply.value as unknown as {
+        candidateId: string
+        elementId: string
+        reason?: string
+      }[]
+
+      const byCandidateId = new Map(sent.map((decision) => [decision.candidateId, decision]))
+      const associations: Association[] = []
+      const mapped = new Set<string>()
+
+      for (const mapping of mappings) {
+        // Hard hallucination guards. Ids the reply was never given, and elements
+        // the model does not contain, fail the provider visibly. Dropping the
+        // entry would let the rest of an untrustworthy reply pass as clean.
+        const decision = byCandidateId.get(mapping.candidateId)
+        if (decision === undefined) {
+          throw new Error(
+            `Agent resolve reply named a candidateId it was not given: '${truncate(mapping.candidateId, 160)}'`,
+          )
+        }
+        if (mapped.has(mapping.candidateId)) {
+          throw new Error(
+            `Agent resolve reply mapped '${truncate(mapping.candidateId, 160)}' more than once`,
+          )
+        }
+        mapped.add(mapping.candidateId)
+
+        if (!knownElements.has(mapping.elementId)) {
+          throw new Error(
+            `Agent resolve reply named an element that is not in the model: '${truncate(mapping.elementId, 160)}'`,
+          )
+        }
+
+        const match = hasRelationship(declared, decision.sourceElementId, mapping.elementId)
+
+        // One accepted decision fans back out to one association per underlying
+        // observation, so the standard rules still see every import site.
+        for (const observation of decision.observations) {
+          const targetName = observation.target?.id ?? observation.id
+          associations.push({
+            id: `mapped:${observation.id}`,
+            observationId: observation.id,
+            status: 'resolved',
+            source: { kind: 'element', id: decision.sourceElementId },
+            target: { kind: 'element', id: mapping.elementId },
+            ...(match === undefined ? {} : { relationship: { kind: 'relationship', id: match.id } }),
+            description: `${decision.sourceElementId} -> ${mapping.elementId} (agent-mapped from ${targetName})`,
+            data: {
+              agent: options.exec.id,
+              candidateId: decision.candidateId,
+              ...(mapping.reason === undefined ? {} : { reason: mapping.reason }),
+            },
+            provider: providerId,
+          })
+        }
+      }
+
+      perBatch[index] = associations
     }
 
-    return associations
+    // The same pool discipline as agentScan's batches: the first failure is
+    // the one that aborts, workers drain instead of starting new calls, and
+    // the in-flight remainder settles before the throw.
+    let failure: unknown
+    let nextIndex = 0
+    await Promise.all(
+      Array.from({ length: Math.min(RESOLVE_CONCURRENCY, batches.length) }, async () => {
+        while (failure === undefined) {
+          const index = nextIndex
+          nextIndex += 1
+          if (index >= batches.length) return
+          try {
+            await runBatch(index)
+          } catch (error) {
+            failure ??= error
+          }
+        }
+      }),
+    )
+    if (failure !== undefined) throw failure
+
+    return perBatch.flat()
   }
 
   return { id: providerId, run }
@@ -307,7 +356,6 @@ function composeContext(
   context: ResolveContext,
   instructions: string | undefined,
   sent: Decision[],
-  dropped: number,
 ): string {
   const parts = [elementCatalog(context.model)]
 
@@ -337,13 +385,7 @@ function composeContext(
       `at ${sites.length} ${siteNoun}: ${siteList}`
     )
   })
-  parts.push(
-    '### Candidate decisions\n\n' +
-      lines.join('\n') +
-      (dropped > 0
-        ? `\n\nNOTE: this listing is truncated — ${dropped} more candidate decisions exist beyond the configured limit and will simply stay unmapped this run.`
-        : ''),
-  )
+  parts.push('### Candidate decisions\n\n' + lines.join('\n'))
 
   return parts.join('\n\n')
 }

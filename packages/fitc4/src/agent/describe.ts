@@ -70,6 +70,72 @@ export function draftDescriber(options: DraftDescriberOptions): DraftDescribe {
   const excerptChars = options.excerptChars ?? DEFAULT_EXCERPT_CHARS
 
   return async (element: DraftElementFacts): Promise<string | undefined> => {
+    const request =
+      element.children !== undefined && element.children.length > 0
+        ? containerRequest(element)
+        : element.declared === undefined
+          ? undefined
+          : fileRequest(element, element.declared)
+    // Nothing to describe from is an abstention, not a call: no files, no
+    // children, no claim means no facts a model could answer over.
+    if (request === undefined) return undefined
+
+    const reply = await options.exec.run({
+      ...request,
+      schema: REPLY_SCHEMA,
+      cwd: repositoryRoot,
+    })
+
+    // A transport failure is not an abstention. It aborts the draft, carrying
+    // the exec id and whatever the adapter said, which is where "not logged
+    // in" actually lives.
+    if (!reply.ok) {
+      throw new Error(`${options.exec.id} could not run: ${reply.error}`)
+    }
+
+    const description = (reply.value as { description?: unknown }).description
+    if (typeof description !== 'string') return undefined
+
+    // LikeC4 descriptions here are single-line strings, so whitespace runs and
+    // newlines collapse; an all-whitespace proposal is no proposal.
+    const flattened = description.replace(/\s+/g, ' ').trim()
+    return flattened === '' ? undefined : flattened
+  }
+
+  /**
+   * A pure container's request: zero file reads, because the pass already
+   * paid for its children. The children arrive deepest-wave-first (see
+   * `describeElements`), so their descriptions here are the settled ones,
+   * and a child that abstained shows as exactly that rather than as blank.
+   */
+  function containerRequest(element: DraftElementFacts): { prompt: string; context: string } {
+    const children = element.children ?? []
+    const listing = children
+      .map(
+        (child) =>
+          `- ${child.name} (app.${child.path}): ${child.description ?? 'no description yet'}`,
+      )
+      .join('\n')
+    return {
+      prompt:
+        `The context lists the child elements of ${element.name} (app.${element.path}), a ` +
+        'container element of a drafted architecture model that owns no files of its own. ' +
+        'Write one or two plain sentences stating what this container as a whole is ' +
+        'responsible for, synthesized from what its children do. State durable ' +
+        'responsibility: what this part of the system provides to the rest, and why ' +
+        'something else would depend on it. Do not enumerate the children, do not restate ' +
+        'the container name as if it were a responsibility, and do not speculate beyond ' +
+        'what the children support: if they say little, say only that little.',
+      context:
+        `### Container: ${element.name} (app.${element.path})\n` +
+        `Child elements (${children.length}):\n${listing}`,
+    }
+  }
+
+  function fileRequest(
+    element: DraftElementFacts,
+    declared: string,
+  ): { prompt: string; context: string } {
     const excerpted = element.ownedFiles.slice(0, maxFiles)
     // A fragment element's owned file is the whole containing file, but its
     // subject is one section of it, and a head-of-file excerpt routinely
@@ -77,13 +143,13 @@ export function draftDescriber(options: DraftDescriberOptions): DraftDescribe {
     // stack's fragment elements each saw the file header and the first
     // service, and the honest models could only reply "cannot be determined".
     // So a fragment claim anchors the excerpt at the fragment instead.
-    const anchor = fragmentAnchor(element.declared)
+    const anchor = fragmentAnchor(declared)
     const pack = assemblePack(
       [
         {
           header:
             `### Drafted element: ${element.name} (app.${element.path})\n` +
-            `Declared sources claim: ${element.declared}\n` +
+            `Declared sources claim: ${declared}\n` +
             `Owned files (${element.ownedFiles.length}):\n` +
             element.ownedFiles.map((file) => `- ${file}`).join('\n'),
           items: [],
@@ -112,10 +178,10 @@ export function draftDescriber(options: DraftDescriberOptions): DraftDescribe {
     // The claim rides in the prompt so the request is self-describing: the
     // cache key, a recorded eval reply, and a human reading a transcript can
     // all tell which element was being described.
-    const reply = await options.exec.run({
+    return {
       prompt:
         `The context shows one element of a drafted architecture model: ` +
-        `${element.name}, claiming '${element.declared}'. Write one or two plain sentences ` +
+        `${element.name}, claiming '${declared}'. Write one or two plain sentences ` +
         'stating what this component is responsible for, based only on the files shown. ' +
         'State durable responsibility: what this element does for the rest of the system, ' +
         'and why something else would depend on it. Leave out configuration that can change ' +
@@ -124,24 +190,7 @@ export function draftDescriber(options: DraftDescriberOptions): DraftDescribe {
         'technology as if it were a responsibility, and do not speculate beyond the files ' +
         'shown: if they support little, say only that little.',
       context: pack.text,
-      schema: REPLY_SCHEMA,
-      cwd: repositoryRoot,
-    })
-
-    // A transport failure is not an abstention. It aborts the draft, carrying
-    // the exec id and whatever the adapter said, which is where "not logged
-    // in" actually lives.
-    if (!reply.ok) {
-      throw new Error(`${options.exec.id} could not run: ${reply.error}`)
     }
-
-    const description = (reply.value as { description?: unknown }).description
-    if (typeof description !== 'string') return undefined
-
-    // LikeC4 descriptions here are single-line strings, so whitespace runs and
-    // newlines collapse; an all-whitespace proposal is no proposal.
-    const flattened = description.replace(/\s+/g, ' ').trim()
-    return flattened === '' ? undefined : flattened
   }
 }
 

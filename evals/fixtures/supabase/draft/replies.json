@@ -522,5 +522,13 @@
     "reply": {
       "description": "The connection pooler in front of the Postgres database."
     }
+  },
+  {
+    "when": {
+      "promptIncludes": "child elements of docker-compose.yml"
+    },
+    "reply": {
+      "description": "The self-hosted Supabase stack as one deployable unit: the gateway, the Postgres database, and the services that expose it."
+    }
   }
 ]

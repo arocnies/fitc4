@@ -218,31 +218,37 @@ describe('agentResolve abstention is legitimate', () => {
     expect(findingFor(result.findings, 'unresolved-import')?.severity).toBe('warning')
   })
 
-  test('truncation counts decisions, is announced in the context, and is non-fatal', async () => {
+  test('decisions beyond one call run as further batches, none dropped', async () => {
+    // One decision per call: three decisions become three batches, in
+    // candidateId order, each context carrying only its own chunk. The old
+    // behavior dropped everything past maxObservations; batching means scale
+    // costs more calls, never silently unmapped candidates.
     const exec = stubExec([
       ok([{ candidateId: MISSING_DECISION, elementId: 'demo.external.payments' }]),
+      ok([{ candidateId: AMQP_DECISION, elementId: 'demo.external.queue' }]),
+      ok([{ candidateId: STRIPE_DECISION, elementId: 'demo.external.payments' }]),
     ])
 
     const result = await runFixture('external', {
       resolve: resolvePhase(exec, { maxObservations: 1 }),
     })
 
-    const context = exec.requests[0]?.context ?? ''
-    // Decisions sort by candidateId, so the unresolvable specifier is the one
-    // sent; the stripe decision (two sites) and amqplib stay behind the limit.
-    expect(context).toContain(MISSING_DECISION)
-    expect(context).not.toContain(STRIPE_DECISION)
-    expect(context).not.toContain(AMQP_DECISION)
-    expect(context).toContain('truncated')
-    expect(context).toContain('2 more candidate decisions')
+    expect(exec.requests).toHaveLength(3)
+    expect(exec.requests[0]?.context).toContain(MISSING_DECISION)
+    expect(exec.requests[0]?.context).not.toContain(STRIPE_DECISION)
+    expect(exec.requests[0]?.context).not.toContain(AMQP_DECISION)
+    expect(exec.requests[1]?.context).toContain(AMQP_DECISION)
+    expect(exec.requests[2]?.context).toContain(STRIPE_DECISION)
+    expect(exec.requests[0]?.context).not.toContain('truncated')
 
-    // The truncated decisions are simply unmapped; the sent one still lands.
+    // Every batch's mappings land, merged in batch order.
     expect(providerFailure(result.findings)).toBeUndefined()
-    const mapped = result.associations.find(
+    const mapped = result.associations.filter(
       (association) => association.provider === 'agent-resolve',
     )
-    expect(mapped?.observationId).toBe(MISSING_ID)
-    expect(mapped?.target).toEqual({ kind: 'element', id: 'demo.external.payments' })
+    expect(mapped[0]?.observationId).toBe(MISSING_ID)
+    expect(mapped[0]?.target).toEqual({ kind: 'element', id: 'demo.external.payments' })
+    expect(mapped.map((association) => association.observationId)).toContain(STRIPE_ID)
   })
 })
 

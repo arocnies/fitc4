@@ -11,8 +11,9 @@
  *
  * One call per element rather than one batch, so a response cache keyed on
  * inputs re-reviews only the elements whose files actually changed. Calls run
- * sequentially, and the first exec failure stops the run, producing one
- * `agent-unavailable` finding rather than one per element against a dead CLI.
+ * through a small worker pool, and the first exec failure stops the pool from
+ * scheduling more, producing one `agent-unavailable` finding rather than one
+ * per element against a dead CLI.
  *
  * Each element's context is a context pack. The element's facts come first:
  * description, declared relationships, observed resolved edges, and the
@@ -54,7 +55,12 @@ export interface SemanticReviewOptions {
    * unavailable CLI or truncated input then fails the build.
    */
   severity?: Severity
-  /** Elements reviewed per run; the rest are reported as truncated. */
+  /**
+   * Optional ceiling on elements reviewed per run, reported as truncated when
+   * it bites. Unset, every described element is reviewed: the pool and the
+   * per-element progress lines are what make a large model bearable, and a
+   * reviewed element is cached until its description or files change.
+   */
   maxElements?: number
   /**
    * Owned files excerpted per element, in path order. Files beyond the cap
@@ -88,7 +94,7 @@ const REVIEW_CONCURRENCY = 4
 
 export function agentSemanticReview(options: SemanticReviewOptions): NamedProvider<ValidateProvider> {
   const severity = options.severity ?? 'warning'
-  const maxElements = options.maxElements ?? 10
+  const maxElements = options.maxElements ?? Number.POSITIVE_INFINITY
   const maxFilesPerElement = options.maxFilesPerElement ?? 8
   const excerptChars = options.excerptChars ?? 1_500
 

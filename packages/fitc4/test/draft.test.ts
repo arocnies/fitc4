@@ -495,23 +495,39 @@ describe('draft', () => {
       const result = await draft(config, {
         describe: async (element) => {
           offered.push(element.path)
+          if (element.children !== undefined) {
+            // The claimless file-container is offered as a container: no
+            // files, its fragments as children, carrying the description the
+            // web fragment's call settled on moments earlier.
+            expect(element.ownedFiles).toEqual([])
+            expect(element.children.map((child) => child.path).sort()).toEqual([
+              'stack.compose_yml.api',
+              'stack.compose_yml.web',
+            ])
+            const web = element.children.find((child) => child.path.endsWith('.web'))
+            expect(web?.description).toBe('Serves the web UI.')
+            return 'The service stack, one element per compose service.'
+          }
           expect(element.ownedFiles).toEqual([compose])
-          if (element.declared.endsWith('#services.web')) return 'Serves the web UI.'
+          if (element.declared?.endsWith('#services.web')) return 'Serves the web UI.'
           return undefined
         },
       })
 
       // The stack directory owns the plain compose observation; each fragment
-      // owns its locator, stripped to the readable file. The claimless
-      // file-container element is never offered.
+      // owns its locator, stripped to the readable file. The file-container
+      // comes last: containers describe after their children.
+      expect(offered.at(-1)).toBe('stack.compose_yml')
       expect(offered.sort()).toEqual([
         'stack',
+        'stack.compose_yml',
         'stack.compose_yml.api',
         'stack.compose_yml.web',
       ])
-      expect(result.describeAttempted).toBe(3)
-      expect(result.described).toBe(1)
+      expect(result.describeAttempted).toBe(4)
+      expect(result.described).toBe(2)
       expect(result.text).toContain(`description 'Serves the web UI.'`)
+      expect(result.text).toContain(`description 'The service stack, one element per compose service.'`)
       expect(result.text).toContain(`sources 'src/stack/compose.yml#services.web'`)
     })
 

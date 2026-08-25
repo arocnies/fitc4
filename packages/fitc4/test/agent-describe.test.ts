@@ -40,6 +40,40 @@ const CORE: DraftElementFacts = {
 }
 
 describe('draftDescriber', () => {
+  test('a container is described from its children, zero file reads', async () => {
+    const exec = stubExec(ok({ description: 'Everything the demo serves.' }))
+    const describe = draftDescriber({ exec, repositoryRoot: fixturePath('drift') })
+
+    const container: DraftElementFacts = {
+      name: 'src',
+      path: 'src',
+      ownedFiles: [],
+      children: [
+        { path: 'src.core', name: 'core', description: 'Reports service health.' },
+        { path: 'src.legacy', name: 'legacy' },
+      ],
+    }
+    await expect(describe(container)).resolves.toBe('Everything the demo serves.')
+
+    const request = exec.requests[0]
+    expect(request?.prompt).toContain('container element')
+    expect(request?.prompt).toContain('synthesized from what its children do')
+    // A described child arrives with its settled description; an abstained
+    // one is announced as such rather than shown blank.
+    expect(request?.context).toContain('- core (app.src.core): Reports service health.')
+    expect(request?.context).toContain('- legacy (app.src.legacy): no description yet')
+  })
+
+  test('no claim, no files, no children is an abstention without a call', async () => {
+    const exec = stubExec(ok({ description: 'should never be asked' }))
+    const describe = draftDescriber({ exec, repositoryRoot: fixturePath('drift') })
+
+    await expect(
+      describe({ name: 'ghost', path: 'ghost', ownedFiles: [] }),
+    ).resolves.toBeUndefined()
+    expect(exec.requests).toHaveLength(0)
+  })
+
   test('one one-shot call: owned files excerpted in the context, claim in the prompt, schema enforced', async () => {
     const exec = stubExec(ok({ description: 'Reports service health.' }))
     const describe = draftDescriber({ exec, repositoryRoot: fixturePath('drift') })
