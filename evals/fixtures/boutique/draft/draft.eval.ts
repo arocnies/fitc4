@@ -13,11 +13,12 @@
  * `file` observations, and the dependency-only greenfield scan emits none, so
  * the instructions also ask for one `file` observation per service stand-in.
  * That is the same rule a user drafting from an agent-scan config would have
- * to write. The rule must carve out redis-cart explicitly: the manifests
- * deploy it but no src/ directory implements it, and the first live pass
- * proved every model otherwise invents a stand-in path the path guard
- * rejects, killing the whole scan. Everything else, the roots, the focus,
- * the env-var oracle, is the greenfield scan verbatim.
+ * to write. It used to need a named exemption for redis-cart, which the
+ * manifests deploy and no src/ directory implements: asked for a file per
+ * service and shown no listing, a model invented src/redis-cart/Dockerfile and
+ * the guard threw away all twenty-six observations with it. The exemption is
+ * gone, and the inventory in the request is why. Everything else, the roots,
+ * the focus, the env-var oracle, is the greenfield scan verbatim.
  *
  * Scoring lives in harness/draft.ts: the drafted elements and relationships
  * against expectations.json, which restates the reference model as data.
@@ -36,8 +37,7 @@ export const DRAFT_INSTRUCTIONS =
   " Additionally, emit one observation of kind 'file' with subject { kind: 'file', id: <stand-in " +
   'file> } for every service a manifest deploys and for every target service of a dependency you ' +
   'report, one observation per distinct stand-in file, citing the manifest that names the ' +
-  'service as evidence. Only services with a build directory under src/ have a stand-in file. ' +
-  'redis-cart has none, so it gets no file observation.'
+  'service as evidence.'
 
 export default function boutiqueDraft(exec: AgentExec, root: string): ResolvedConfig {
   const fixtureDir = path.dirname(root)
@@ -67,4 +67,28 @@ export default function boutiqueDraft(exec: AgentExec, root: string): ResolvedCo
     resolve: [sourceRoot()],
     validate: [architectureRules()],
   }
+}
+
+/**
+ * The same draft with the inventory taken away.
+ *
+ * `roots` narrows to the focused directory, restoring the request shape that
+ * made the redis-cart exemption necessary: the model is asked for one `file`
+ * observation per service, sent to src/<name> for the path, and shown no
+ * src/ listing to check against. A `file` observation's subject goes through
+ * the throwing path guard, not the dependency-target downgrade, so an invented
+ * path here costs every other observation in the reply.
+ *
+ * It shares the base expectations, which the base run now reaches with no
+ * service named in its prose. That is the whole claim of the inventory, stated
+ * as two rows that can be read side by side.
+ */
+export const angles = {
+  'no-inventory': (exec: AgentExec, root: string): ResolvedConfig => {
+    const config = boutiqueDraft(exec, root)
+    return {
+      ...config,
+      scan: [boutiqueScan(exec, DRAFT_INSTRUCTIONS, ['kubernetes-manifests'])],
+    }
+  },
 }

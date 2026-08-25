@@ -1,115 +1,597 @@
 [
   {
-    "when": {"promptIncludes": "Carry out the scan instructions"},
+    "when": {
+      "promptIncludes": "Carry out the scan instructions",
+      "contextIncludes": "declares every service of the Supabase self-hosting stack"
+    },
     "reply": {
       "observations": [
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.api-gw"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.studio"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.api-gw"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.studio"
+          },
           "description": "api-gw declares depends_on studio",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 88}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 88
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.auth"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.db"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.auth"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.db"
+          },
           "description": "auth declares depends_on db",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 127}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 127
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.rest"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.db"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.rest"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.db"
+          },
           "description": "rest declares depends_on db",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 254}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 254
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.realtime"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.db"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.realtime"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.db"
+          },
           "description": "realtime declares depends_on db",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 291}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 291
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.storage"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.db"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.storage"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.db"
+          },
           "description": "storage declares depends_on db",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 337}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 337
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.storage"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.rest"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.storage"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.rest"
+          },
           "description": "storage declares depends_on rest",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 340}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 340
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.storage"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.imgproxy"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.storage"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.imgproxy"
+          },
           "description": "storage declares depends_on imgproxy",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 342}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 342
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.meta"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.db"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.meta"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.db"
+          },
           "description": "meta declares depends_on db",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 423}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 423
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.functions"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.api-gw"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.functions"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.api-gw"
+          },
           "description": "functions declares depends_on api-gw",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 443}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 443
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.supavisor"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.db"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.supavisor"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.db"
+          },
           "description": "supavisor declares depends_on db",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 557}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 557
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.studio"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.meta"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.studio"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.meta"
+          },
           "description": "studio wires STUDIO_PG_META_URL to http://meta:8080",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 33}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 33
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.studio"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.api-gw"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.studio"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.api-gw"
+          },
           "description": "studio wires SUPABASE_URL to http://api-gw:8000",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 51}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 51
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.storage"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.rest"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.storage"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.rest"
+          },
           "description": "storage wires POSTGREST_URL to http://rest:3000",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 361}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 361
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.storage"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.imgproxy"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.storage"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.imgproxy"
+          },
           "description": "storage wires IMGPROXY_URL to http://imgproxy:5001",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 388}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 388
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": {"kind": "file", "id": "docker/docker-compose.yml#services.functions"},
-          "target": {"kind": "file", "id": "docker/docker-compose.yml#services.api-gw"},
+          "subject": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.functions"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docker/docker-compose.yml#services.api-gw"
+          },
           "description": "functions wires SUPABASE_URL to http://api-gw:8000",
-          "evidence": [{"path": "docker/docker-compose.yml", "line": 457}]
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 457
+            }
+          ]
         }
       ],
-      "examined": ["docker/docker-compose.yml"]
+      "examined": [
+        "docker/docker-compose.yml"
+      ]
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "Carry out the scan instructions",
+      "contextIncludes": "Map the source code as a language-neutral dependency graph"
+    },
+    "reply": {
+      "observations": [
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/reset.sh"
+          },
+          "description": "docker/reset.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/reset.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/run.sh"
+          },
+          "description": "docker/run.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/run.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/setup.sh"
+          },
+          "description": "docker/setup.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/setup.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/update.sh"
+          },
+          "description": "docker/update.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/update.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/tests/test-auth-keys.sh"
+          },
+          "description": "docker/tests/test-auth-keys.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/tests/test-auth-keys.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/tests/test-container-logs.sh"
+          },
+          "description": "docker/tests/test-container-logs.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/tests/test-container-logs.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/tests/test-pg17-upgrade.sh"
+          },
+          "description": "docker/tests/test-pg17-upgrade.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/tests/test-pg17-upgrade.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/tests/test-s3-backend.sh"
+          },
+          "description": "docker/tests/test-s3-backend.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/tests/test-s3-backend.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/tests/test-s3.sh"
+          },
+          "description": "docker/tests/test-s3.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/tests/test-s3.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/tests/test-self-hosted.sh"
+          },
+          "description": "docker/tests/test-self-hosted.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/tests/test-self-hosted.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/tests/test-update.sh"
+          },
+          "description": "docker/tests/test-update.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/tests/test-update.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/tests/test-upgrades-manifest.sh"
+          },
+          "description": "docker/tests/test-upgrades-manifest.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/tests/test-upgrades-manifest.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/utils/add-new-auth-keys.sh"
+          },
+          "description": "docker/utils/add-new-auth-keys.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/utils/add-new-auth-keys.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/utils/db-passwd.sh"
+          },
+          "description": "docker/utils/db-passwd.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/utils/db-passwd.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/utils/generate-keys.sh"
+          },
+          "description": "docker/utils/generate-keys.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/utils/generate-keys.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/utils/reassign-owner.sh"
+          },
+          "description": "docker/utils/reassign-owner.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/utils/reassign-owner.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/utils/rotate-new-api-keys.sh"
+          },
+          "description": "docker/utils/rotate-new-api-keys.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/utils/rotate-new-api-keys.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/utils/upgrade-pg17.sh"
+          },
+          "description": "docker/utils/upgrade-pg17.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/utils/upgrade-pg17.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/volumes/api/envoy/docker-entrypoint.sh"
+          },
+          "description": "docker/volumes/api/envoy/docker-entrypoint.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/volumes/api/envoy/docker-entrypoint.sh",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker/volumes/api/kong-entrypoint.sh"
+          },
+          "description": "docker/volumes/api/kong-entrypoint.sh is a shell script of the self-hosting tooling",
+          "evidence": [
+            {
+              "path": "docker/volumes/api/kong-entrypoint.sh",
+              "line": 1
+            }
+          ]
+        }
+      ],
+      "examined": [
+        "docker/reset.sh",
+        "docker/run.sh",
+        "docker/setup.sh",
+        "docker/update.sh",
+        "docker/tests/test-auth-keys.sh",
+        "docker/tests/test-container-logs.sh",
+        "docker/tests/test-pg17-upgrade.sh",
+        "docker/tests/test-s3-backend.sh",
+        "docker/tests/test-s3.sh",
+        "docker/tests/test-self-hosted.sh",
+        "docker/tests/test-update.sh",
+        "docker/tests/test-upgrades-manifest.sh",
+        "docker/utils/add-new-auth-keys.sh",
+        "docker/utils/db-passwd.sh",
+        "docker/utils/generate-keys.sh",
+        "docker/utils/reassign-owner.sh",
+        "docker/utils/rotate-new-api-keys.sh",
+        "docker/utils/upgrade-pg17.sh",
+        "docker/volumes/api/envoy/docker-entrypoint.sh",
+        "docker/volumes/api/kong-entrypoint.sh"
+      ]
     }
   }
 ]

@@ -11,6 +11,13 @@
  * env var as a `dependency` observation between the services' stand-in files,
  * and the stock resolver and rules judge those edges exactly as they judge
  * imports. Pristine manifests, transcribed model: the gate must be green.
+ *
+ * The instructions used to carry a correction to their own convention, naming
+ * the one service whose Dockerfile sits a directory deeper than src/<name>.
+ * Both models needed it, and neither should have: the fact was in the
+ * repository the whole time and the request simply never showed it. `roots`
+ * now covers src/ for its inventory, so the path is in the listing and the
+ * prose is a domain oracle again, with nothing in it about cartservice.
  */
 
 import path from 'node:path'
@@ -24,9 +31,8 @@ export const SCAN_INSTRUCTIONS =
   'Each kubernetes-manifests/<name>.yaml deploys the Online Boutique service <name>. A manifest ' +
   'declares its service\'s outbound dependencies as container env vars whose names end in ' +
   "_SERVICE_ADDR; each value is '<target>:<port>' where <target> is the name of the target " +
-  'service. Every service <name> is implemented by its build directory src/<name>, and the file ' +
-  'src/<name>/Dockerfile stands in for the service wherever a fact needs a file (the one ' +
-  'exception is cartservice, whose Dockerfile lives at src/cartservice/src/Dockerfile). For ' +
+  'service. Every service <name> is implemented by its build directory src/<name>, and the ' +
+  "service's Dockerfile under that directory stands in for it wherever a fact needs a file. For " +
   "every _SERVICE_ADDR env var, emit one observation of kind 'dependency' with subject " +
   "{ kind: 'file', id: <the declaring service's stand-in file> } and target { kind: 'file', " +
   "id: <the target service's stand-in file> }, citing the manifest and the env var's line as " +
@@ -36,14 +42,34 @@ export const SCAN_INSTRUCTIONS =
   'no dependencies.'
 
 /**
- * The `agent-scan` options the variants share; only the workdir differs, and
- * the draft variant appends one rule to the instructions.
+ * What the scan can SEE exists, as distinct from what it can read.
+ *
+ * The manifests are focused, so their contents are embedded. `src` is here for
+ * its inventory alone: the instructions send the model to a Dockerfile under
+ * src/<name>, and until the roots covered src/ there was no way to check that
+ * a path was real. Two models independently wrote src/cartservice/Dockerfile
+ * for a file that lives at src/cartservice/src/Dockerfile, and one of them
+ * invented src/redis-cart/Dockerfile for a service with no build directory at
+ * all, losing its entire reply to the path guard. Both facts are in this
+ * listing. Paths cost almost nothing; contents would not fit.
  */
-export function boutiqueScan(exec: AgentExec, instructions: string = SCAN_INSTRUCTIONS) {
+export const ROOTS = ['kubernetes-manifests', 'src']
+
+/**
+ * The `agent-scan` options the variants share; only the workdir differs, and
+ * the draft variant appends one rule to the instructions. `roots` is a
+ * parameter so the `no-inventory` angles can narrow it back to the focused
+ * directory and measure what the listing is worth.
+ */
+export function boutiqueScan(
+  exec: AgentExec,
+  instructions: string = SCAN_INSTRUCTIONS,
+  roots: string[] = ROOTS,
+) {
   return agentScan({
     exec,
     id: 'manifests',
-    roots: ['kubernetes-manifests'],
+    roots,
     // One-shot focused mode: the manifests' CONTENT is embedded in the
     // request, so the reply can only come from them, and a `cached()` live
     // run is invalidated by any edit to a manifest. 4500 chars covers the
@@ -76,4 +102,26 @@ export default function boutiqueGreenfield(exec: AgentExec, root: string): Pipel
     resolve: [sourceRoot()],
     validate: [architectureRules()],
   }
+}
+
+/**
+ * The same manifests with the inventory taken away.
+ *
+ * `roots` narrows to the focused directory, which is what every focused scan
+ * looked like before the inventory existed: the model is told a convention for
+ * paths under src/ and given no way to check one. Sharing the base
+ * expectations makes the comparison direct, and the divergence is the price of
+ * the missing listing, in the units that matter. It is a measured price, not a
+ * hypothetical: both models wrote src/cartservice/Dockerfile here, and the
+ * dependency-target downgrade turned each into a warning rather than a dead
+ * scan, so this row reads as two lost edges instead of nothing at all.
+ */
+export const angles = {
+  'no-inventory': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = boutiqueGreenfield(exec, root)
+    return {
+      ...config,
+      scan: [boutiqueScan(exec, SCAN_INSTRUCTIONS, ['kubernetes-manifests'])],
+    }
+  },
 }

@@ -25,6 +25,16 @@ import { architectureRules, sourceRoot, type PipelineConfig } from '@arocnies/fi
 import { agentScan, type AgentExec } from '@arocnies/fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
+import { without } from '../../../harness/prose.ts'
+
+/**
+ * Where the fragment locator this fixture teaches must NOT appear. Named so
+ * the `no-fragment-note` angle subtracts exactly it: it is a rule about the
+ * reply format, not a fact about the compose file.
+ */
+export const FRAGMENT_NOTE =
+  'Evidence paths and examined entries are plain file paths without fragments; ' +
+  'list every file you read in examined.'
 
 export const SCAN_INSTRUCTIONS =
   'docker/docker-compose.yml declares every service of the Supabase self-hosting stack under ' +
@@ -41,8 +51,8 @@ export const SCAN_INSTRUCTIONS =
   'like ${POSTGRES_HOST} is a deployment choice, not a literal service reference; ignore it. ' +
   'Also ignore healthcheck commands, container names, network aliases, ports, and volume ' +
   'mounts. Report both kinds even when they duplicate each other, and report exactly what the ' +
-  'file says rather than what looks consistent. Evidence paths and examined entries are plain ' +
-  'file paths without fragments; list every file you read in examined.'
+  'file says rather than what looks consistent. ' +
+  FRAGMENT_NOTE
 
 /**
  * The `agent-scan` options every variant shares; only the workdir differs.
@@ -86,4 +96,73 @@ export default function supabaseGreenfield(exec: AgentExec, root: string): Pipel
     resolve: [sourceRoot()],
     validate: [architectureRules()],
   }
+}
+
+/**
+ * The same compose file with the fragment-format rule removed.
+ *
+ * This fixture teaches the model a locator form the shipped prompt allows,
+ * `<path>#<fragment>`, and then has to spend a clause telling it where that
+ * form is NOT allowed: evidence paths and `examined` entries take plain
+ * paths. Both go through the throwing path guard with the fragment attached,
+ * so a model that carries the locator into its citations kills the scan.
+ *
+ * The shipped prompt states the permission and never states the limit, which
+ * makes this clause a patch over a gap in the prompt rather than a fact about
+ * Supabase. The angle drops it and keeps the `examined` sentence it was
+ * bundled with, so the only variable is whether the model works out on its
+ * own that a citation is a file, not a region.
+ */
+export const angles = {
+  /**
+   * The working config plus a second scanner pointed at the whole repository:
+   * default `roots`, default instructions, the general import scan exploring
+   * read-only. This is `agentScan({ exec })` with nothing configured, which is
+   * what a user gets for writing the shortest possible agent scan.
+   *
+   * The question is over-interpretation, and this repository asks it fairly
+   * without any planting. Upstream ships ELEVEN alternative compose files
+   * beside the one the architecture describes: caddy, envoy, kong, nginx,
+   * pg15, pg17, pgbouncer, rustfs, s3, logs, dev. Each declares its own
+   * `services:` block for a deployment variant that is not this architecture.
+   * A scanner that reads them as statements about the system produces edges the
+   * model has no reason to declare, and every one of those becomes a
+   * `missing-relationship` error against a model that was correct.
+   *
+   * What it pins is corruption, not noise, because the first live pass showed
+   * those are different things. Sonnet read fifty-odd files and produced
+   * fifty-one findings the model has no use for, every one a warning: 49
+   * `unmapped-source` for infrastructure config the model never claimed, and 2
+   * `unresolved-import` for paths leading out of the repository (a dev compose
+   * build context at ../apps/studio, and a container-internal /etc/envoy
+   * path). It invented no edge between model elements and produced no error at
+   * all. So `findingsMustNot` pins the errors, `missing-relationship` and
+   * `relationship-direction`, and the warnings are left to accumulate as the
+   * measured cost.
+   *
+   * That cost is mostly arithmetic. The model claims compose fragments, so
+   * every file this scan reports is unowned and each one is a warning.
+   * Pointing a scanner at more repository than the model describes buys a
+   * warning per file, by design, and the judgement call it leaves a user is
+   * whether that noise is worth the coverage.
+   */
+  'whole-repo': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = supabaseGreenfield(exec, root)
+    return { ...config, scan: [...config.scan, agentScan({ exec, id: 'repo' })] }
+  },
+  'no-fragment-note': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = supabaseGreenfield(exec, root)
+    return {
+      ...config,
+      scan: [
+        supabaseScan(
+          exec,
+          // Subtract the bundled sentence whole, then restate only the half
+          // that is not under test: `examined` is the shipped prompt's own
+          // rule, repeated here, and removing it would change two things.
+          `${without(SCAN_INSTRUCTIONS, FRAGMENT_NOTE, 'no-fragment-note')} List every file you read in examined.`,
+        ),
+      ],
+    }
+  },
 }

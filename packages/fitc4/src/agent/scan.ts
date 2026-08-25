@@ -40,10 +40,10 @@
  * scan. Any exec failure, off-schema reply, hallucinated path, or empty
  * `examined` attestation therefore THROWS, which the pipeline reports as one
  * `provider-failure` error finding attributed to this provider. The one
- * carve-out is a dependency's `file` target that names no real file: that is
- * a failed resolution, not a coverage lie, so it downgrades to an
- * 'unresolved-dependency' the gate reports as a warning instead of costing
- * every completed batch.
+ * carve-out is a dependency's `file` or `directory` target that names nothing
+ * on disk: that is a failed resolution, not a coverage lie, so it downgrades
+ * to an 'unresolved-dependency' the gate reports as a warning instead of
+ * costing every completed batch.
  *
  * Coverage attestation: the reply's required `examined` array names the files
  * the model actually read, and each becomes a standard `scan-root`
@@ -106,6 +106,12 @@ export interface AgentScanOptions {
    * context. Default: the repository root. These bound the listing, not the
    * exploration. The model may still read any repository file it names in
    * `examined`.
+   *
+   * With `focus`, the roots do double duty: the focused files' contents are
+   * embedded, and every other file under the roots is listed as a path with
+   * no contents. That inventory is what lets a one-shot scan check a path
+   * before reporting it, so widening the roots past the focused files is how
+   * you tell a one-shot scan which paths exist. Cheap: paths, not contents.
    */
   roots?: string[]
   /**
@@ -129,6 +135,11 @@ export interface AgentScanOptions {
    * recorded reply. A focus that matches nothing fails loudly. A scan of
    * zero files must not look like a clean domain. Matches beyond `maxFiles`
    * or the byte budget are announced in the context as not shown.
+   *
+   * `focus` picks whose contents are embedded; `roots` picks whose paths are
+   * known to exist. Set roots wider than focus when the instructions refer to
+   * files outside the focused set, which is the usual shape: read the
+   * manifests, refer to the directories they deploy.
    */
   focus?: string[]
   /** Characters of each focused file embedded in the context, code-first. */
@@ -290,6 +301,13 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
       dropped = matched.length - covered.length
     }
 
+    // The inventory is the rest of the listing: paths under the roots whose
+    // contents no focus glob embedded. Only focused mode uses it, since
+    // exploration already receives the full listing and can read what it
+    // names.
+    const coveredSet = new Set(covered)
+    const inventory = options.focus === undefined ? [] : files.filter((file) => !coveredSet.has(file))
+
     const batches = partitionListing(covered, batchFiles)
     const concurrency = Math.min(concurrencyOption, batches.length)
 
@@ -333,6 +351,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
                 batch,
                 batchDropped,
                 excerptChars,
+                inventory,
                 batchInfo,
               ),
               schema: REPLY_SCHEMA,
@@ -535,7 +554,7 @@ function toObservation(
   // fail-closed: those are the claims that say what was covered.
   let kind = entry.kind
   let target = entry.target === undefined ? undefined : guardedTarget(entry, guard)
-  if (entry.kind === 'dependency' && entry.target?.kind === 'file' && target === undefined) {
+  if (entry.kind === 'dependency' && entry.target !== undefined && target === undefined) {
     kind = 'unresolved-dependency'
     target = { kind: 'module', id: entry.target.id }
   }
@@ -587,16 +606,38 @@ function naturalKeyOf(observation: Observation): string {
  */
 /**
  * Guard an observation's target: like `guardedRef`, except a dependency's
- * plain `file` target that does not exist returns undefined for the caller to
- * downgrade instead of throwing. Every other shape keeps the throwing guard.
+ * plain `file` or `directory` target that does not exist returns undefined for
+ * the caller to downgrade instead of throwing. Every other shape keeps the
+ * throwing guard.
+ *
+ * `directory` is here because a target's kind is the model's choice of words
+ * for the same failed resolution. Measured on
+ * `evals/fixtures/supabase/greenfield@whole-repo`: a general scan of the
+ * repository root read a compose volume mount and reported
+ * `{ kind: 'directory', id: 'docker/volumes/storage' }`, a path the stack
+ * creates at runtime. The identical claim written as `kind: 'file'` would have
+ * cost a warning; written as `directory` it cost the whole scan, on a batch
+ * that had nothing else wrong with it. That asymmetry was an oversight, not a
+ * policy: a dependency pointing at something absent is a failed resolution
+ * either way.
  */
 function guardedTarget(entry: ReplyObservation, guard: PathGuard): Ref | undefined {
   const target = entry.target as { kind: string; id: string }
-  if (entry.kind === 'dependency' && target.kind === 'file' && !target.id.includes('#')) {
+  if (entry.kind === 'dependency' && isDowngradableTarget(target)) {
     const checked = guard.probe(target.id, 'target')
-    return checked.exists ? { kind: 'file', id: checked.path } : undefined
+    return checked.exists ? { kind: target.kind, id: checked.path } : undefined
   }
   return guardedRef(target, guard, 'target')
+}
+
+/**
+ * A path-carrying target whose absence downgrades rather than throws. A
+ * fragment locator is excluded: it scopes a region of a file the instructions
+ * defined, so a missing one is a misread of the scheme, not a failed lookup.
+ */
+function isDowngradableTarget(target: { kind: string; id: string }): boolean {
+  if (target.kind === 'directory') return true
+  return target.kind === 'file' && !target.id.includes('#')
 }
 
 function guardedRef(ref: { kind: string; id: string }, guard: PathGuard, where: string): Ref {
@@ -789,13 +830,29 @@ function composeContext(
 }
 
 /**
- * The focused, one-shot context: instructions plus code-first excerpts of one
- * batch of the files the focus globs matched, assembled as a context pack.
+ * The focused, one-shot context: instructions, code-first excerpts of one
+ * batch of the files the focus globs matched, and an inventory of the other
+ * files under the scanned roots, assembled as a context pack.
  *
  * Matches beyond `maxFiles` or the pack's byte budget are announced inline,
  * never silently thinned; since the one-shot request has no tools, an
  * unexcerpted file is a file the model genuinely cannot see, and it must
  * know that.
+ *
+ * The inventory is why `roots` and `focus` are separate options. `focus`
+ * chooses whose CONTENTS are embedded; `roots` chooses whose PATHS are known
+ * to exist. Without it, a one-shot scan was asked to report paths and given no
+ * way to check one, and every instruction of the form "service <name> lives in
+ * src/<name>" had to hard-code the exceptions to its own convention or watch a
+ * model invent a path and lose the whole reply to the guard. Measured on
+ * boutique, where two models independently wrote src/cartservice/Dockerfile for
+ * a Dockerfile that lives one directory deeper. Paths only, never contents: an
+ * inventory is cheap where an excerpt is not, and existence is all the guard
+ * asks about.
+ *
+ * It goes last on purpose. The excerpts are what the reply is made of, so they
+ * take budget first and the inventory is what truncates, announced, if the
+ * roots are wide.
  */
 function composeFocusedContext(
   repositoryRoot: string,
@@ -804,26 +861,35 @@ function composeFocusedContext(
   shown: string[],
   alreadyDropped: number,
   excerptChars: number,
+  inventory: string[],
   batchInfo?: BatchInfo,
 ): string {
-  const pack = assemblePack(
-    [
-      { header: `### Scan instructions\n\n${instructions}`, items: [], what: 'instructions' },
-      {
-        header:
-          `### Focused files under ${roots.join(', ')} (repository-relative${batchHeading(batchInfo)})\n\n` +
-          'Answer from these excerpts alone; they are your entire view of the repository.' +
-          batchNote(batchInfo),
-        items: shown.map(
-          (file) => `### ${file}\n${fencedExcerpt(repositoryRoot, file, excerptChars)}`,
-        ),
-        what: 'focused files',
-        alreadyDropped,
-      },
-    ],
-    DEFAULT_PACK_BUDGET_BYTES,
-  )
-  return pack.text
+  const sections = [
+    { header: `### Scan instructions\n\n${instructions}`, items: [], what: 'instructions' },
+    {
+      header:
+        `### Focused files under ${roots.join(', ')} (repository-relative${batchHeading(batchInfo)})\n\n` +
+        'These excerpts are the only file CONTENTS you have; answer from them.' +
+        batchNote(batchInfo),
+      items: shown.map(
+        (file) => `### ${file}\n${fencedExcerpt(repositoryRoot, file, excerptChars)}`,
+      ),
+      what: 'focused files',
+      alreadyDropped,
+    },
+  ]
+  if (inventory.length > 0) {
+    sections.push({
+      header:
+        `### Other files that exist under ${roots.join(', ')} (paths only, no contents)\n\n` +
+        'Use these to check a path before you report it. A path not listed here and not ' +
+        'excerpted above may still exist, but you have no evidence of it, so do not report it.',
+      items: inventory.map((file) => `- ${file}`),
+      what: 'inventory paths',
+      alreadyDropped: 0,
+    })
+  }
+  return assemblePack(sections, DEFAULT_PACK_BUDGET_BYTES).text
 }
 
 /**

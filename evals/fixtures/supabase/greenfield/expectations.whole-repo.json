@@ -1,0 +1,401 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/reset.sh"
+      },
+      "label": "docker/reset.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/run.sh"
+      },
+      "label": "docker/run.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/setup.sh"
+      },
+      "label": "docker/setup.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/update.sh"
+      },
+      "label": "docker/update.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/tests/test-auth-keys.sh"
+      },
+      "label": "docker/tests/test-auth-keys.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/tests/test-container-logs.sh"
+      },
+      "label": "docker/tests/test-container-logs.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/tests/test-pg17-upgrade.sh"
+      },
+      "label": "docker/tests/test-pg17-upgrade.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/tests/test-s3-backend.sh"
+      },
+      "label": "docker/tests/test-s3-backend.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/tests/test-s3.sh"
+      },
+      "label": "docker/tests/test-s3.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/tests/test-self-hosted.sh"
+      },
+      "label": "docker/tests/test-self-hosted.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/tests/test-update.sh"
+      },
+      "label": "docker/tests/test-update.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/tests/test-upgrades-manifest.sh"
+      },
+      "label": "docker/tests/test-upgrades-manifest.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/utils/add-new-auth-keys.sh"
+      },
+      "label": "docker/utils/add-new-auth-keys.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/utils/db-passwd.sh"
+      },
+      "label": "docker/utils/db-passwd.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/utils/generate-keys.sh"
+      },
+      "label": "docker/utils/generate-keys.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/utils/reassign-owner.sh"
+      },
+      "label": "docker/utils/reassign-owner.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/utils/rotate-new-api-keys.sh"
+      },
+      "label": "docker/utils/rotate-new-api-keys.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/utils/upgrade-pg17.sh"
+      },
+      "label": "docker/utils/upgrade-pg17.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/volumes/api/envoy/docker-entrypoint.sh"
+      },
+      "label": "docker/volumes/api/envoy/docker-entrypoint.sh is unowned: the model claims compose fragments, not tooling"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/volumes/api/kong-entrypoint.sh"
+      },
+      "label": "docker/volumes/api/kong-entrypoint.sh is unowned: the model claims compose fragments, not tooling"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:compose",
+        "kind": "scan-root",
+        "subject": "docker/docker-compose.yml",
+        "label": "the scan attests to having examined docker/docker-compose.yml"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.api-gw",
+        "target": "docker/docker-compose.yml#services.studio"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.auth",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.rest",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.realtime",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.storage",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.storage",
+        "target": "docker/docker-compose.yml#services.rest"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.storage",
+        "target": "docker/docker-compose.yml#services.imgproxy"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.meta",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.functions",
+        "target": "docker/docker-compose.yml#services.api-gw"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.supavisor",
+        "target": "docker/docker-compose.yml#services.db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.studio",
+        "target": "docker/docker-compose.yml#services.meta"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.studio",
+        "target": "docker/docker-compose.yml#services.api-gw"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.storage",
+        "target": "docker/docker-compose.yml#services.rest",
+        "label": "the env URL restatement of storage -> rest (POSTGREST_URL)"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.storage",
+        "target": "docker/docker-compose.yml#services.imgproxy",
+        "label": "the env URL restatement of storage -> imgproxy (IMGPROXY_URL)"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "docker/docker-compose.yml#services.functions",
+        "target": "docker/docker-compose.yml#services.api-gw",
+        "label": "the env URL restatement of functions -> api-gw (SUPABASE_URL)"
+      },
+      {
+        "provider": "agent-scan:repo",
+        "kind": "scan-root",
+        "subject": "docker/setup.sh",
+        "label": "the whole-repo scan attests to what it read"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "supabase.apiGw",
+        "target": "supabase.studio",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.auth",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.rest",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.realtime",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.storage",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.storage",
+        "target": "supabase.rest",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.storage",
+        "target": "supabase.imgproxy",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.meta",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.functions",
+        "target": "supabase.apiGw",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.supavisor",
+        "target": "supabase.db",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.studio",
+        "target": "supabase.meta",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "supabase.studio",
+        "target": "supabase.apiGw",
+        "declared": true
+      }
+    ]
+  },
+  "findingsMustNot": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "label": "the whole-repo scan invented an architectural edge the model does not declare"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "relationship-direction",
+      "label": "the whole-repo scan reversed an architectural edge"
+    }
+  ]
+}

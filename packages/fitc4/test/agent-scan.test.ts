@@ -176,12 +176,34 @@ describe('agentScan happy path', () => {
     // also what closes the agentic cache-staleness hole.
     expect(request?.context).toContain('### docs/notes.md')
     expect(request?.context).toContain('# notes')
-    // Unmatched files are not excerpted.
+    // Unmatched files are not excerpted, but they ARE inventoried: a one-shot
+    // scan has to be able to check a path before reporting it, or it invents
+    // one and the guard discards the whole reply.
     expect(request?.context).not.toContain('### src/core/health.ts')
+    expect(request?.context).toContain('paths only, no contents')
+    expect(request?.context).toContain('- src/core/health.ts')
 
     // The reply flows through the pipeline exactly as in agentic mode.
     expect(providerFailure(result.findings)).toBeUndefined()
     expect(observationIds(result.observations)).toContain('agent-scan/scan-root:docs/notes.md')
+  })
+
+  test('the inventory covers only what focus left out, and only in focused mode', async () => {
+    const exec = stubExec([goodReply()])
+    await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'x', focus: ['docs/**'] })],
+    })
+    const focused = exec.requests[0]?.context ?? ''
+    // The excerpted file is not repeated in the inventory: one entry per file,
+    // in the section that says what the model has of it.
+    expect(focused).toContain('- src/core/health.ts')
+    expect(focused).not.toContain('- docs/notes.md')
+
+    // Exploration already receives the whole listing and can read what it
+    // names, so a second paths-only section would be noise.
+    const explorer = stubExec([goodReply()])
+    await runFixture('violations', { scan: [agentScan({ exec: explorer, instructions: 'x' })] })
+    expect(explorer.requests[0]?.context).not.toContain('paths only, no contents')
   })
 
   test('a focused file edit changes the request — the cache key covers content', async () => {
@@ -725,6 +747,61 @@ describe('agentScan fails closed', () => {
     expect(downgraded?.id).toBe('agent-scan/unresolved-dependency:docs/notes.md->docs/assets/ghost.svg')
     expect(downgraded?.target).toEqual({ kind: 'module', id: 'docs/assets/ghost.svg' })
     expect(findingFor(result.findings, 'unresolved-import')?.severity).toBe('warning')
+  })
+
+  test('a dependency target naming a missing DIRECTORY downgrades the same way', async () => {
+    // Measured on supabase/greenfield@whole-repo: a general scan of the
+    // repository root read a compose volume mount and reported the target as
+    // { kind: 'directory' } for a path the stack creates at runtime. The same
+    // claim written as 'file' cost a warning; written as 'directory' it killed
+    // a batch that had nothing else wrong with it. The kind is the model's
+    // choice of words for one failed resolution, so both downgrade.
+    const exec = stubExec([
+      ok({
+        observations: [
+          {
+            kind: 'dependency',
+            subject: { kind: 'file', id: 'docs/notes.md' },
+            target: { kind: 'directory', id: 'docs/volumes/storage' },
+            evidence: [{ path: 'docs/notes.md', line: 1 }],
+          },
+        ],
+        examined: ['docs/notes.md'],
+      }),
+    ])
+
+    const result = await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'x' })],
+    })
+
+    expect(providerFailure(result.findings)).toBeUndefined()
+    const downgraded = result.observations.find((o) => o.kind === 'unresolved-dependency')
+    expect(downgraded?.target).toEqual({ kind: 'module', id: 'docs/volumes/storage' })
+    expect(findingFor(result.findings, 'unresolved-import')?.severity).toBe('warning')
+  })
+
+  test('a dependency target naming a real directory keeps its kind', async () => {
+    const exec = stubExec([
+      ok({
+        observations: [
+          {
+            kind: 'dependency',
+            subject: { kind: 'file', id: 'docs/notes.md' },
+            target: { kind: 'directory', id: 'src/core' },
+            evidence: [{ path: 'docs/notes.md', line: 1 }],
+          },
+        ],
+        examined: ['docs/notes.md'],
+      }),
+    ])
+
+    const result = await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'x' })],
+    })
+
+    expect(providerFailure(result.findings)).toBeUndefined()
+    const kept = result.observations.find((o) => o.kind === 'dependency')
+    expect(kept?.target).toEqual({ kind: 'directory', id: 'src/core' })
   })
 
   test('absolute and root-escaping paths fail the provider', async () => {

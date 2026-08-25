@@ -49,3 +49,29 @@ export default async function ddhGreenfield(exec: AgentExec, root: string): Prom
     resolve: [...base.resolve, agentResolve({ exec, instructions: RESOLVE_INSTRUCTIONS })],
   }
 }
+
+/**
+ * The same sources with NO mapping instructions: the shipped prompt alone.
+ *
+ * The base instructions do not just frame the domain, they contain the
+ * answer. "Including description-only elements that name the backing system a
+ * client package connects to" IS the slonik decision: `vendor.postgres`
+ * carries a description and no sources, and mapping slonik onto it is the one
+ * right answer out of six decisions. A sentence that describes the correct
+ * element in the abstract is a hint no real user would think to write, because
+ * a real user does not know yet which package is about to be ambiguous.
+ *
+ * Removing it leaves the shipped `PROMPT` to carry both halves on its own: map
+ * a client package onto the system it talks to, and abstain on `nanoid`, which
+ * no element covers. The base expectations are shared, so this row passing
+ * means the default prompt is enough here and the prose was decoration.
+ */
+export const angles = {
+  'bare-resolve': async (exec: AgentExec, root: string): Promise<PipelineConfig> => {
+    const config = await ddhGreenfield(exec, root)
+    return {
+      ...config,
+      resolve: [...config.resolve.filter((provider) => provider.id !== 'agent-resolve'), agentResolve({ exec })],
+    }
+  },
+}

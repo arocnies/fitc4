@@ -83,3 +83,60 @@ Three things this sweep produced, in ascending order of how much they were worth
 luna's one remaining divergence is exploration variance, not a regression: its exploratory scan emitted a reversed `alerts -> worker` edge alongside all eight required observations, the same extra haiku produced on 2026-08-18, on a fixture luna measured perfect on 2026-08-21. The deterministic rules rejected the edge downstream exactly as designed. Exploration remains the least constrained mode, where even a strong model sometimes reads a relationship backwards, and the advisory rules remain the reason that costs a scorecard row rather than a wrong gate.
 
 The rest of the sweep held under the changed prompts: the new junk-drawer trap was resisted by both models (stripe onto the payments gateway, the S3 abstention kept, all five `slonik` decisions onto PostgreSQL with the new steer live), the default-instruction python scan stayed clean, and `misnamed/draft` stayed 4/4 including the describe-to-review loop.
+
+### 2026-08-25: subtracting the carve-outs, and the listing the request never had
+
+A second run the same day, this one asking a question about the fixtures rather than about the models: which sentences of fixture prose is the product leaning on? Every `agentScan` fixture writes instructions and has to, since FitC4 cannot know that a `_SERVICE_ADDR` env var means a dependency. But some clauses were not domain facts. They were corrections to the product, and a correction that lives in config is a defect hidden in the one place no user will look, because a user writing a first config does not know which sentence they are missing.
+
+Four suspect clauses, one angle each, each subtracting exactly its clause through `harness/prose.ts`'s `without`, which throws if the clause is not there so a reworded base cannot silently turn an angle into a duplicate of the base run.
+
+| angle | sonnet | gpt-5.6-luna | verdict |
+|---|---|---|---|
+| `ddh/greenfield@bare-resolve` | 5/5, 1/1 | 5/5, 1/1 | decoration |
+| `supabase/greenfield@no-fragment-note` | 16/16, 12/12 | 16/16, 12/12 | decoration |
+| `boutique/greenfield@no-path-hint` | 25/27, 2 warnings | 25/27, 2 warnings | load-bearing |
+| `boutique/draft@no-exemption` | 11/12, 14/15 | scan died | load-bearing |
+
+Two were decoration, which is the reassuring half. `ddh`'s resolve prose said to map a package onto "description-only elements that name the backing system a client package connects to", which IS the `slonik` onto `vendor.postgres` answer stated in the abstract; no user writes that sentence, because a user does not know yet which package is about to be ambiguous. Removing it changed nothing on either model. Same for the clause telling supabase's scan that fragments are banned in evidence and `examined`: both models worked out unaided that a citation is a file rather than a region.
+
+The other two were real, and both models agreed on how. Asked for a stand-in Dockerfile under `src/<name>`, both independently wrote `src/cartservice/Dockerfile` for a file that lives at `src/cartservice/src/Dockerfile`. Those landed as dependency targets, the one position the guard forgives, so each run degraded to two lost edges and two `unresolved-import` warnings. In the draft variant the same class of guess lands as an observation SUBJECT, which throws, and luna's whole scan died on `src/redis-cart/Dockerfile`, a service the manifests deploy and no directory implements. Twenty-six observations discarded over one path.
+
+**A fix that failed, twice, and made things worse.** The obvious reading was that the model needed to be told it could decline. So the shipped prompt gained a sentence: omit a fact whose path you cannot determine, never invent one, and here is why (one omission costs one observation, one invented path costs the scan). Luna invented the path anyway. Moved out of `PROMPT` and into the context directly beneath the instructions, on the theory that a general caveat one call away loses to a specific "emit one observation per service", it still invented the path, and the base `boutique/draft` row regressed from 12/12 to 11/12: luna now dropped `shoppingassistantservice`, a service it had been reporting correctly. Zero benefit, one real loss, in the fail-open direction that the gate cannot see. Reverted whole.
+
+Worth recording as a negative result rather than a footnote, because the reasoning behind it was sound and wrong. Telling a model to hold back when it is unsure buys silence, and silence is the one outcome nothing downstream can flag.
+
+**The actual cause: a one-shot scan was asked to attest to paths and shown none.** Focused mode embedded the focused files' contents and told the model those excerpts were its entire view of the repository. It never listed what else existed. So "every path must exist" was an instruction the model had no means to follow, and the fixtures had been quietly paying for that with hard-coded exceptions: the cartservice correction, and the redis-cart exemption whose second half ("only services with a build directory under src/ have a stand-in file") was not a workaround at all but the criterion itself, unavailable to a model that cannot see `src/`.
+
+`composeFocusedContext` now adds an inventory: every file under `roots` whose contents no focus glob embedded, as paths only, after the excerpts so the excerpts keep budget priority and the inventory is what truncates. This is why `roots` and `focus` are separate options, and the split now has a statable meaning. `focus` chooses whose CONTENTS are embedded; `roots` chooses whose PATHS are known to exist. Boutique's roots widened to `['kubernetes-manifests', 'src']` and the request grew from 30.5KB to 38.1KB, no truncation, carrying all three facts the prose used to hard-code: `src/cartservice/src/Dockerfile` present, `src/cartservice/Dockerfile` absent, no `src/redis-cart` at all.
+
+Both carve-outs then left the config, and both fixtures went green on both models with nothing about cartservice or redis-cart in their prose.
+
+| row | sonnet | gpt-5.6-luna |
+|---|---|---|
+| `boutique/greenfield` | 27/27, 1/1, 15/15 | 27/27, 1/1, 15/15 |
+| `boutique/greenfield@no-inventory` | 25/27, 2 warnings | 25/27, 2 warnings |
+| `boutique/draft` | 12/12 elements, 15/15 edges | 12/12, 15/15 |
+| `boutique/draft@no-inventory` | scan died | scan died |
+
+The `no-inventory` angles are the control, narrowing `roots` back to the focused directory to restore the pre-inventory request shape, and they reproduce the old failures on both models. Note the draft angle died on different paths for different models, redis-cart for one and cartservice for the other, which is the point: the failure was never about one service. What no prompt wording achieved is visible in one detail of the fixed runs. Both models gave redis-cart no file observation while still including `shoppingassistantservice`, a distinction that requires knowing a directory is absent rather than merely unseen. A listing answers that. A sentence cannot.
+
+**Whether `agentScan` should default to the whole repository.** It already does (`roots ?? ['.']`), and `supabase/greenfield@whole-repo` measures what that buys: the working config plus a second `agentScan({ exec })` with nothing configured, exploring the real Supabase tree, where upstream ships eleven alternative compose files (caddy, envoy, kong, nginx, pg15, pg17, pgbouncer, rustfs, s3, logs, dev) each declaring its own `services:` block for a deployment variant this architecture does not describe. A natural over-interpretation trap with nothing planted.
+
+Sonnet produced 51 findings the model has no use for, and every one was a warning: 49 `unmapped-source` for infrastructure config the model never claimed, and 2 `unresolved-import` for paths leading out of the repository (a dev compose build context at `../apps/studio`, a container-internal `/etc/envoy/lds.yaml`). No errors. Not one invented edge between model elements. So over-interpretation in the sense that matters, fabricating a relationship that fails a gate on a correct model, did not happen; what a root-level scan costs is noise, and noise is the failure a human dismisses. The arithmetic behind most of it is unavoidable: the model claims compose fragments, so every file the scan reports is unowned and each is one warning.
+
+Cost is the real caveat, and it showed up on the other exec. Luna's whole-repo scan split the 74-file tree into four batches, and the first attempt lost batch four to the 600s scan budget, with the CLI also reporting a dropped models-manager stream, so slowness and transport are entangled there. It failed closed as designed, one `provider-failure` error, completed batches cached for the resume.
+
+**And the resume found a real gap, one ref kind wide.** On the rerun, batch two threw: `Agent scan reply named an invalid path in target: 'docker/volumes/storage' does not exist`. Luna had read a compose volume mount and reported `{ kind: 'directory', id: 'docker/volumes/storage' }`, a path the stack creates at runtime. The dependency-target downgrade, the documented carve-out that turns a missing target into an `unresolved-dependency` warning rather than a dead scan, only covered `kind: 'file'`. The identical claim written as a file would have cost one warning; written as a directory it cost a batch with nothing else wrong in it. That was an oversight rather than a policy, since a dependency pointing at something absent is a failed resolution whichever word the model chose, so the downgrade now covers both. Volume mounts are exactly the shape a root-level scan meets, so a whole-repo default is not usable without it.
+
+Because the offending reply was already cached, the fix was verified against the exact reply that broke it, for free. Both models then agreed on the shape of the answer:
+
+| exec · model | whole-repo findings | errors | invented edges |
+|---|---|---|---|
+| claude · sonnet | 51 warnings (49 `unmapped-source`, 2 `unresolved-import`) | 0 | none |
+| codex · gpt-5.6-luna | 72 warnings (53 `unmapped-source`, 19 `unresolved-import`) | 0 | none |
+
+Luna reported more, and the difference is almost entirely the volume mounts and container-internal paths its nineteen `unresolved-import` warnings name, every one of which used to be a candidate for killing the scan. Neither model produced a single error, and the `findingsMustNot` pins on `missing-relationship` and `relationship-direction` never fired on either. So the conclusion holds across both: pointing a scanner at a repository root buys noise, not corruption.
+
+**A pin corrected, and why it counts as a mistake.** The whole-repo angle first pinned a wildcard: any dependency from a general import scan of this tree is invented, since nothing here imports anything repository-local. That is false. A compose file's build contexts and volume mounts are real references, and a model reporting them is being accurate, not credulous. The pin was labelling defensible observations as fabrications, which is the same authoring error as the description rule widened earlier today, in the opposite direction. It now pins `missing-relationship` and `relationship-direction` under `findingsMustNot`, the outcomes that would corrupt a gate, and lets the warnings accumulate as the measured cost.
+
+Everything previously unmeasured came back clean live: `greenfield@bare-resolve`, `brownfield@default-agent`, `brownfield@deterministic`, `python@import-scan`, and `python@mixed`, the last being the first live confirmation of this branch's namesake claim, two scanners over one tree producing one finding carrying both citations. Stub sweep after all of it: 72 rows perfect, 26 of them angles.
