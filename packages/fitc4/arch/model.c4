@@ -63,10 +63,10 @@ model {
 
   // The one sanctioned reach into the agent tier: a type-only import of the
   // AgentExec shape (config.ts, erased at compile time) and the dynamic
-  // import behind `draft --describe` (cli.ts), which loads agent code only
-  // when the user explicitly asked for the describe pass. The default check
-  // path never crosses this edge at runtime.
-  fitc4.lib.core -> fitc4.lib.agent 'declares the agent exec type; loads the draft describer on --describe only'
+  // import behind the draft's describe pass (cli.ts), which loads agent code
+  // only when a declared agent or an explicit --describe asks for the pass.
+  // The default check path never crosses this edge at runtime.
+  fitc4.lib.core -> fitc4.lib.agent 'declares the agent exec type; loads the draft describer for the describe pass only'
 }
 
 views {

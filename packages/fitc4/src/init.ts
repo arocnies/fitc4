@@ -44,7 +44,7 @@ export type InitAgent = (typeof INIT_AGENTS)[number]
 export interface InitOptions {
   /**
    * Also declare this agent CLI as the config's `agent` exec, so
-   * `fitc4 draft --describe` works immediately, and compose the agent
+   * `fitc4 draft` describes each element immediately, and compose the agent
    * providers into the scaffolded phases. Everything else init does is
    * identical.
    */
@@ -197,8 +197,8 @@ ${scanSection}
     // description, one call per described element.
     agentSemanticReview({ exec }),
   ],
-  // Commands also use the exec directly: fitc4 draft --describe proposes each
-  // drafted element's description with it.
+  // Commands also use the exec directly: fitc4 draft proposes each drafted
+  // element's description with it (skip that with --no-describe).
   agent: exec,
 })
 `
@@ -379,7 +379,7 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
   if (options.agent !== undefined) {
     result.notes.push(
       `${CONFIG_FILENAME} declares the ${options.agent} CLI as the config's agent exec, ` +
-        `so fitc4 draft --describe works immediately, and composes the agent providers ` +
+        `so fitc4 draft describes each element immediately, and composes the agent providers ` +
         `into the gate. agentResolve is fail-closed: every fitc4 run calls your CLI and ` +
         `will fail in CI without a login. Each provider's cost is commented beside it; ` +
         `remove the ones your CI cannot carry`,

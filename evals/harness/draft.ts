@@ -145,8 +145,8 @@ interface DraftedEdge {
  *
  * This reads the exact line shapes `draft()`'s renderer emits (element
  * headers at their nesting indentation, their `sources` metadata, and the
- * relationship lines with their trailing dependency-count comments), so a
- * renderer change breaks the eval visibly instead of skewing the score.
+ * relationship lines with their dependency-count labels), so a renderer
+ * change breaks the eval visibly instead of skewing the score.
  * Nesting is recovered from indentation: an element two spaces deeper than
  * the last one is its child, and ids are the dotted paths the edges use.
  */
@@ -177,7 +177,7 @@ function parseDraft(text: string): { elements: DraftedElement[]; edges: DraftedE
       current.description = description[2]
       continue
     }
-    const edge = /^ {2}app\.([A-Za-z0-9_.]+) -> app\.([A-Za-z0-9_.]+)(?: \{ #[^}]+ \})? \/\//.exec(line)
+    const edge = /^ {2}app\.([A-Za-z0-9_.]+) -> app\.([A-Za-z0-9_.]+) (['"]).*\3(?: \{ #[^}]+ \})?$/.exec(line)
     if (edge !== null) {
       edges.push({ from: edge[1] ?? '', to: edge[2] ?? '' })
     }

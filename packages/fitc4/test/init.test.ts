@@ -214,7 +214,7 @@ describe('the scaffolded config', () => {
     // The agent path says what changed: the exec, draft --describe, and the
     // cost of the fail-closed provider it composed into the gate.
     expect(result.notes.join('\n')).toContain("config's agent exec")
-    expect(result.notes.join('\n')).toContain('fitc4 draft --describe')
+    expect(result.notes.join('\n')).toContain('fitc4 draft describes each element immediately')
     expect(result.notes.join('\n')).toContain('fail in CI without a login')
   })
 

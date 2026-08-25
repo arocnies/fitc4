@@ -405,7 +405,7 @@ async function describeElements(
       // was on and that nothing was written, then rethrown so the draft fails.
       throw new Error(
         `describe aborted at app.${element.path}: ${messageOf(error)}. ` +
-          `No model was written; fix that, or rerun the draft without --describe.`,
+          `No model was written; fix that, or rerun the draft with --no-describe.`,
       )
     }
     if (proposed !== undefined && proposed.trim() !== '') {
@@ -925,7 +925,7 @@ function render(
     }
     for (const edge of owned) {
       const tag = driftTag === undefined ? '' : ` { #${driftTag} }`
-      lines.push(`  app.${edge.from} -> app.${edge.to}${tag} // ${count(edge.count, 'dependency')}`)
+      lines.push(`  app.${edge.from} -> app.${edge.to} ${quoted(count(edge.count, 'dependency'))}${tag}`)
     }
   }
 
@@ -936,19 +936,54 @@ function render(
     lines.push('  // elements yet, so a drift tag would count as unused; they are plain')
     lines.push('  // declared edges to rewrite along with their stub elements.')
     for (const edge of boundary) {
-      lines.push(`  app.${edge.from} -> app.${edge.to} // ${count(edge.count, 'dependency')}`)
+      lines.push(`  app.${edge.from} -> app.${edge.to} ${quoted(count(edge.count, 'dependency'))}`)
     }
   }
 
   lines.push('}')
   lines.push('')
-  lines.push('views {')
-  lines.push('  view index of app {')
-  lines.push('    include *')
-  lines.push('  }')
-  lines.push('}')
+  lines.push(...renderViews(elements))
 
   return `${lines.join('\n')}\n`
+}
+
+/**
+ * The index view plus one drill-down view per element that contains elements.
+ *
+ * The index shows only the top-level components, so without scoped views
+ * everything nested is reachable only through the relationship browser. With
+ * them the landing page is a gallery, every container's card carries an
+ * open-view affordance, and scoping into a component is one click. Leaves get
+ * no view of their own: a view of a childless element would show one box.
+ *
+ * View names derive from the element path; a dot cannot appear in a view
+ * name, so dots flatten to underscores, and since element ids may themselves
+ * contain underscores two paths can flatten to the same name. The suffix loop
+ * keeps the result deterministic either way. The title keeps the dots: two
+ * containers far apart in the tree often share a local name, and the path is
+ * what tells them apart in the gallery.
+ */
+function renderViews(elements: DraftElement[]): string[] {
+  const lines = ['views {', '  view index of app {', '    include *', '  }']
+  const taken = new Set(['index'])
+  const walk = (scope: DraftElement[]): void => {
+    for (const element of scope) {
+      if (element.children.length > 0) {
+        let name = element.path.replace(/\./g, '_')
+        while (taken.has(name)) name = `${name}_`
+        taken.add(name)
+        lines.push('')
+        lines.push(`  view ${name} of app.${element.path} {`)
+        lines.push(`    title ${quoted(element.path)}`)
+        lines.push('    include *')
+        lines.push('  }')
+      }
+      walk(element.children)
+    }
+  }
+  walk(elements)
+  lines.push('}')
+  return lines
 }
 
 /**

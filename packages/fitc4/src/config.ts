@@ -82,12 +82,13 @@ export interface FitC4FileConfig {
   /** The validate phase: what judges the associations. This is the gate. */
   validate: NamedProvider<ValidateProvider>[]
   /**
-   * The agent exec commands like `draft --describe` run on: an `AgentExec`
+   * The agent exec commands like the draft's describe pass run on: an `AgentExec`
    * from `@arocnies/fitc4/agent` (`cached(claudeCli({ ... }))` and friends). Optional:
-   * declaring it costs nothing, since no call happens until a command asks
-   * for one. One place carries the model choice and billing surface, and the
-   * CLI can say precisely what is missing when a command needs an exec and
-   * the config has none.
+   * the gate never calls it just because it is declared, but `fitc4 draft`
+   * reads a declared exec as permission to describe each drafted element
+   * (`--no-describe` opts out). One place carries the model choice and
+   * billing surface, and the CLI can say precisely what is missing when a
+   * command needs an exec and the config has none.
    */
   agent?: AgentExec
 }

@@ -80,9 +80,12 @@ describe('draft', () => {
     expect(result.text).not.toContain(`sources 'src/**'`)
     // No external packages observed, so no stub element appears.
     expect(result.text).not.toContain('packages')
-    // The dependency count rides a trailing comment, correctly pluralized.
-    expect(result.text).toContain('app.interface -> app.core { #drift } // 1 dependency')
-    expect(result.text).toContain('app.legacy -> app.core { #drift } // 2 dependencies')
+    // The dependency count rides the relationship label, correctly pluralized.
+    expect(result.text).toContain("app.interface -> app.core '1 dependency' { #drift }")
+    expect(result.text).toContain("app.legacy -> app.core '2 dependencies' { #drift }")
+    // Three leaf elements contain nothing, so the index is the only view.
+    expect(result.text).toContain('view index of app {')
+    expect(result.text.match(/view /g)).toHaveLength(1)
 
     // The proof: the real pipeline on the drafted model is green, and every
     // observed crossing is a counted drift edge rather than an error.
@@ -138,7 +141,7 @@ describe('draft', () => {
 
     expect(result.text).not.toContain('#drift')
     expect(result.text).not.toContain('tag drift')
-    expect(result.text).toContain('app.legacy -> app.core // 2 dependencies')
+    expect(result.text).toContain("app.legacy -> app.core '2 dependencies'")
 
     const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
@@ -202,7 +205,7 @@ describe('draft', () => {
     // mangled while the title keeps the observed name.
     expect(result.text).toContain(`views_ = component 'views'`)
     expect(result.text).toContain(`sources 'src/views/**'`)
-    expect(result.text).toContain('app.views_ -> app.api { #drift } // 1 dependency')
+    expect(result.text).toContain("app.views_ -> app.api '1 dependency' { #drift }")
     // Builtins are not packages; only fastify is claimed.
     expect(result.text).toContain(`packages ['fastify']`)
     expect(result.packages).toBe(1)
@@ -265,8 +268,8 @@ describe('draft', () => {
 
     // Edges connect the deepest owning elements; the dependency inside the
     // collapsed reporting element is no crossing at all.
-    expect(result.text).toContain('app.billing.invoices -> app.billing.payments { #drift } // 1 dependency')
-    expect(result.text).toContain('app.billing.invoices -> app.reporting { #drift } // 1 dependency')
+    expect(result.text).toContain("app.billing.invoices -> app.billing.payments '1 dependency' { #drift }")
+    expect(result.text).toContain("app.billing.invoices -> app.reporting '1 dependency' { #drift }")
     expect(result.edges).toBe(2)
 
     const gate = await runPipeline(config)
@@ -304,8 +307,17 @@ describe('draft', () => {
     expect(result.text).toContain(`sources 'src/catalog/inventory/pricing/**'`)
     // The deep crossing is the drafted edge; the hub spokes are parent-child
     // and declare nothing.
-    expect(result.text).toContain('app.catalog.inventory.api -> app.catalog.inventory.pricing { #drift } // 1 dependency')
+    expect(result.text).toContain("app.catalog.inventory.api -> app.catalog.inventory.pricing '1 dependency' { #drift }")
     expect(result.edges).toBe(1)
+
+    // Each container gets a drill-down view named by its flattened path and
+    // titled by the dotted one; leaves like web get no one-box view.
+    expect(result.text).toContain('view index of app {')
+    expect(result.text).toContain('view catalog of app.catalog {')
+    expect(result.text).toContain('view catalog_inventory of app.catalog.inventory {')
+    expect(result.text).toContain("title 'catalog.inventory'")
+    expect(result.text).not.toContain('of app.catalog.web')
+    expect(result.text).not.toContain('of app.catalog.inventory.api')
 
     const gate = await runPipeline(config)
     expect(gate.modelErrors).toEqual([])
@@ -359,9 +371,9 @@ describe('draft', () => {
     expect(result.elements).toBe(5)
 
     expect(result.text).toContain(
-      'app.stack.compose_yml.web -> app.stack.compose_yml.api { #drift } // 1 dependency',
+      "app.stack.compose_yml.web -> app.stack.compose_yml.api '1 dependency' { #drift }",
     )
-    expect(result.text).toContain('app.tools -> app.stack { #drift } // 1 dependency')
+    expect(result.text).toContain("app.tools -> app.stack '1 dependency' { #drift }")
     expect(result.edges).toBe(2)
 
     const gate = await runPipeline(config)
@@ -390,8 +402,8 @@ describe('draft', () => {
 
     // Boundary edges stay untagged: the gate resolves nothing onto a
     // description-only element, so a drift tag would be born unused.
-    expect(result.text).toContain('app.api -> app.stripe // 2 dependencies')
-    expect(result.text).toContain('app.api -> app.redis_cart // 1 dependency')
+    expect(result.text).toContain("app.api -> app.stripe '2 dependencies'")
+    expect(result.text).toContain("app.api -> app.redis_cart '1 dependency'")
     expect(result.text).not.toContain('app.api -> app.stripe { #drift }')
     expect(result.edges).toBe(2)
 

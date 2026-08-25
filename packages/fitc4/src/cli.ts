@@ -27,8 +27,8 @@ Commands:
                    model is marked as a placeholder, so a later draft may
                    replace it; editing it makes it yours. With --agent,
                    the config also declares that agent CLI as its exec, so
-                   draft --describe works immediately, and composes the
-                   agent providers into the phases; each fitc4 run then
+                   draft describes each element immediately, and composes
+                   the agent providers into the phases; each fitc4 run then
                    calls your CLI, and the costs are commented in the file.
   draft            Run the configured scan providers and write a first-draft
                    model.c4 into the configured model directory. Elements
@@ -43,8 +43,9 @@ Commands:
                    Never overwrites an authored model: if a model file
                    exists, the draft goes to stdout and the reason to
                    stderr. The one exception is init's untouched placeholder,
-                   which a draft replaces. With --describe, the config's
-                   agent exec proposes each element's description.
+                   which a draft replaces. When the config declares an agent
+                   exec, it proposes each element's description too;
+                   --no-describe skips that pass.
 
 Options:
   --config <path>  Path to a fitc4 config (.ts, .mts, .js, or .mjs).
@@ -67,11 +68,17 @@ Options:
                    debt is not counted down.
   --describe       With draft: replace each eligible element's TODO
                    description with one or two sentences proposed by the
-                   config's agent exec from the files the element owns. A
-                   model that abstains leaves the TODO in place; an exec that
-                   cannot run at all (not logged in, missing CLI, timeout)
-                   aborts the draft and writes nothing. Skipped entirely when
-                   the draft would refuse to write.
+                   config's agent exec from the files the element owns. This
+                   is the default whenever the config declares an agent; the
+                   flag exists to make an agentless config fail loudly
+                   instead of drafting placeholders. A model that abstains
+                   leaves the TODO in place; an exec that cannot run at all
+                   (not logged in, missing CLI, timeout) aborts the draft and
+                   writes nothing. Skipped entirely when the draft would
+                   refuse to write.
+  --no-describe    With draft: skip the describe pass and keep the TODO
+                   placeholders, drafting deterministically with no agent
+                   calls even when the config declares an agent.
   --quiet          Suppress the progress narration. Narration goes to stderr,
                    so the report and --json output are unaffected either way.
   --version        Print the version.
@@ -105,7 +112,8 @@ interface Arguments {
   json: boolean
   noDrift: boolean
   driftTag: string | undefined
-  describe: boolean
+  /** `--describe` forces, `--no-describe` skips, absent means "if the config declares an agent". */
+  describe: boolean | undefined
   agent: InitAgent | undefined
   quiet: boolean
 }
@@ -119,6 +127,7 @@ const KNOWN_OPTIONS = [
   '--no-drift',
   '--drift-tag',
   '--describe',
+  '--no-describe',
   '--quiet',
 ]
 const KNOWN_COMMANDS = ['init', 'draft']
@@ -140,7 +149,7 @@ function parseArguments(argv: string[]): Arguments {
     json: false,
     noDrift: false,
     driftTag: undefined,
-    describe: false,
+    describe: undefined,
     agent: undefined,
     quiet: false,
   }
@@ -163,8 +172,12 @@ function parseArguments(argv: string[]): Arguments {
         throw new Error('--drift-tag requires a tag name, such as --drift-tag legacy-debt')
       }
       parsed.driftTag = value
-    } else if (argument === '--describe') {
-      parsed.describe = true
+    } else if (argument === '--describe' || argument === '--no-describe') {
+      const value = argument === '--describe'
+      if (parsed.describe === !value) {
+        throw new Error('--describe and --no-describe contradict each other; pass one')
+      }
+      parsed.describe = value
     } else if (argument === '--agent') {
       index += 1
       const value = argv[index]
@@ -210,8 +223,10 @@ function parseArguments(argv: string[]): Arguments {
   if (parsed.driftTag !== undefined && parsed.noDrift) {
     throw new Error('--drift-tag and --no-drift contradict each other; pass one')
   }
-  if (parsed.describe && parsed.command !== 'draft') {
-    throw new Error('--describe only applies to the draft command')
+  if (parsed.describe !== undefined && parsed.command !== 'draft') {
+    throw new Error(
+      `${parsed.describe ? '--describe' : '--no-describe'} only applies to the draft command`,
+    )
   }
   if (parsed.agent !== undefined && parsed.command !== 'init') {
     throw new Error('--agent only applies to the init command')
@@ -230,7 +245,7 @@ function unknownArgument(what: string, argument: string, known: string[]): strin
 
 /**
  * The next step differs by path, because the two paths arrive from different
- * places. `--agent` exists to make `draft --describe` work, so that is the
+ * places. `--agent` exists to make the described draft work, so that is the
  * step it names. The plain path still points at the model file first, but it
  * is also how a brownfield user arrives, so it names `draft` as the way to
  * get a first model out of code that already exists.
@@ -238,8 +253,8 @@ function unknownArgument(what: string, argument: string, known: string[]): strin
 function nextSteps(agent: InitAgent | undefined): string[] {
   if (agent !== undefined) {
     return [
-      `Next: npx fitc4 draft --describe writes a first model from your code, with each`,
-      `element's description proposed by your ${agent} CLI. Then run: npx fitc4`,
+      `Next: npx fitc4 draft writes a first model from your code, with each element's`,
+      `description proposed by your ${agent} CLI. Then run: npx fitc4`,
     ]
   }
   return [
@@ -277,8 +292,14 @@ async function runDraft(options: Arguments): Promise<void> {
   const configPath = options.configPath ?? findConfig(process.cwd())
   const config = await resolveConfig(configPath)
 
+  // Describing is the default whenever the config declares an agent: the
+  // describer is draft-time machinery, the draft is the one thing that writes
+  // the model, and a first draft with real descriptions is the point of
+  // declaring an agent at all. `--no-describe` keeps the pass off, and an
+  // explicit `--describe` against an agentless config still fails loudly
+  // rather than silently drafting placeholders.
   let describe: DraftDescribe | undefined
-  if (options.describe) {
+  if (options.describe ?? config.agent !== undefined) {
     if (config.agent === undefined) {
       throw new Error(
         `--describe needs an agent exec, and ${configPath} declares none. ` +
@@ -302,7 +323,7 @@ async function runDraft(options: Arguments): Promise<void> {
 
   // The human summary, which follows the model text wherever that goes.
   const summary: string[] = []
-  if (options.describe) {
+  if (describe !== undefined) {
     const kept =
       result.described < result.describeAttempted
         ? result.describeAttempted - result.described

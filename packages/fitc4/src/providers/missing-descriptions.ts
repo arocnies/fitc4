@@ -10,7 +10,7 @@
  * same way the drift line counts declared debt.
  *
  * Deterministic on purpose, and deliberately separate from the agent tier:
- * `draft --describe` proposes descriptions at draft time and
+ * the draft's describe pass proposes descriptions at draft time and
  * `agentSemanticReview` critiques existing ones, but only this rule says
  * which elements have none at all, with no model call and no exec configured.
  */

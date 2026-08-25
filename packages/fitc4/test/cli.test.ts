@@ -223,6 +223,57 @@ describe('draft --describe', () => {
     expect(stderr).toContain('fitc4: --describe only applies to the draft command')
   })
 
+  test('--no-describe without the draft command is an error', () => {
+    const { status, stderr } = runCli(['--no-describe'])
+
+    expect(status).toBe(1)
+    expect(stderr).toContain('fitc4: --no-describe only applies to the draft command')
+  })
+
+  test('--describe with --no-describe is a contradiction, in either order', () => {
+    expect(runCli(['draft', '--describe', '--no-describe']).stderr).toContain('contradict')
+    expect(runCli(['draft', '--no-describe', '--describe']).stderr).toContain('contradict')
+  })
+
+  // The flip: a declared agent is permission to describe, no flag needed.
+  test('a config with an agent exec describes by default', HEAVY, () => {
+    const root = fixturePath('drift')
+    const modelDir = path.join(tempDir(), 'arch')
+    const configPath = writeConfig(
+      root,
+      modelDir,
+      `  agent: { id: 'stub/model', run: async () => ` +
+        `({ ok: true, value: { description: 'Does fixture things.' }, raw: '' }) },\n`,
+    )
+
+    const { status, stdout, stderr } = runCli(['draft', '--config', configPath])
+
+    expect(status).toBe(0)
+    expect(stdout).toContain('described 3 of 3 eligible elements')
+    expect(stderr).toContain('describe: app.core...')
+    const model = fs.readFileSync(path.join(modelDir, 'model.c4'), 'utf8')
+    expect(model).toContain(`description 'Does fixture things.'`)
+  })
+
+  // Proven by an exec that throws on contact: skipping means never calling.
+  test('--no-describe drafts deterministically without touching the agent', HEAVY, () => {
+    const root = fixturePath('drift')
+    const modelDir = path.join(tempDir(), 'arch')
+    const configPath = writeConfig(
+      root,
+      modelDir,
+      `  agent: { id: 'stub/model', run: async () => { throw new Error('called anyway') } },\n`,
+    )
+
+    const { status, stdout, stderr } = runCli(['draft', '--no-describe', '--config', configPath])
+
+    expect(status).toBe(0)
+    expect(stdout).not.toContain('described')
+    expect(stderr).not.toContain('describe:')
+    const model = fs.readFileSync(path.join(modelDir, 'model.c4'), 'utf8')
+    expect(model).toContain('TODO: what is this component responsible for?')
+  })
+
   test('a config with no agent exec is an error naming the fix', HEAVY, () => {
     const { status, stderr } = runCli(['draft', '--describe', '--config', configFor('drift')])
 
@@ -311,7 +362,7 @@ describe('init --agent', () => {
     expect(stdout).toContain("config's agent exec")
     // The next step is the point of this path, and the caveat is stated here
     // too, not only inside the file.
-    expect(stdout).toContain('Next: npx fitc4 draft --describe')
+    expect(stdout).toContain('Next: npx fitc4 draft writes a first model')
     expect(stdout).toContain('fail in CI without a login')
     expect(fs.readFileSync(path.join(directory, 'fitc4.config.mts'), 'utf8')).toContain(
       `claudeCli({ model: 'sonnet' })`,
