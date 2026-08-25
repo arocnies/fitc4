@@ -33,9 +33,13 @@ import fs from 'node:fs'
 import { isBuiltin } from 'node:module'
 import path from 'node:path'
 
+import { pathMatcher } from '../globs.ts'
 import type { Evidence, NamedProvider, Observation, ScanContext, ScanProvider } from '../types.ts'
 
 export const PROVIDER_ID = 'import-scan'
+
+/** How the shared path grammar's errors name this provider's option. */
+const IGNORE_LABEL = 'Import scan ignore'
 
 /** Never source, at any depth. */
 const ALWAYS_SKIPPED = new Set(['node_modules', '__pycache__', 'venv', 'site-packages'])
@@ -66,17 +70,36 @@ export interface ImportScanOptions {
    * example code would otherwise pollute the observations.
    */
   roots?: string[]
+  /**
+   * Repository-relative paths and globs to leave out of the walk entirely:
+   * `*` within a path segment, `**` across segments, and a bare path covering
+   * itself and its subtree. The conventional skip list is already built in
+   * (`node_modules`, `__pycache__`, `venv`, `site-packages`, hidden
+   * directories, root-level build output). This is for what only the
+   * repository knows, and on a brownfield repository it is usually a second
+   * copy of the source: a `_scratch` tree, a vendored fork, a generated
+   * client. An ignored path leaves the file tree the resolver matches
+   * against, not just the report, so an import into one leaves the repository
+   * too: a package import becomes a claimable external module, a relative
+   * import an `unresolved-dependency`. Neither resolves against a file the
+   * config disowned.
+   */
+  ignore?: string[]
 }
 
 export function importScan(options: ImportScanOptions = {}): NamedProvider<ScanProvider> {
   const roots = options.roots ?? ['.']
+  const ignored =
+    options.ignore === undefined || options.ignore.length === 0
+      ? undefined
+      : pathMatcher(options.ignore, IGNORE_LABEL)
 
   const run: ScanProvider = async (context: ScanContext): Promise<Observation[]> => {
     if (roots.length === 0) {
       throw new Error('no scan roots configured; there is nothing under architecture control')
     }
 
-    const view = enumerate(context.repositoryRoot, roots)
+    const view = enumerate(context.repositoryRoot, roots, ignored)
     const observations: Observation[] = []
 
     for (const root of roots) {
@@ -236,7 +259,11 @@ function dependencyObservation(
 
 // --- enumeration ---
 
-function enumerate(repositoryRoot: string, roots: string[]): RepositoryView {
+function enumerate(
+  repositoryRoot: string,
+  roots: string[],
+  ignored: ((relative: string) => boolean) | undefined,
+): RepositoryView {
   const files = new Set<string>()
   const directories = new Set<string>()
 
@@ -244,6 +271,8 @@ function enumerate(repositoryRoot: string, roots: string[]): RepositoryView {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       if (entry.name.startsWith('.')) continue
       const absolute = path.join(directory, entry.name)
+      const relative = toPosix(path.relative(repositoryRoot, absolute))
+      if (ignored?.(relative) === true) continue
       if (entry.isDirectory()) {
         if (ALWAYS_SKIPPED.has(entry.name)) continue
         if (
@@ -252,7 +281,7 @@ function enumerate(repositoryRoot: string, roots: string[]): RepositoryView {
         ) {
           continue
         }
-        directories.add(toPosix(path.relative(repositoryRoot, absolute)))
+        directories.add(relative)
         walk(absolute)
         continue
       }
@@ -263,7 +292,7 @@ function enumerate(repositoryRoot: string, roots: string[]): RepositoryView {
       ) {
         continue
       }
-      files.add(toPosix(path.relative(repositoryRoot, absolute)))
+      files.add(relative)
     }
   }
 

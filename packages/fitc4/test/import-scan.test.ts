@@ -344,6 +344,76 @@ describe('coverage contracts', () => {
   })
 })
 
+describe('ignore', () => {
+  const scanIgnoring = (
+    repositoryRoot: string,
+    ignore: string[],
+    scanRoots?: string[],
+  ): Promise<Observation[]> =>
+    importScan(scanRoots === undefined ? { ignore } : { ignore, roots: scanRoots }).run({
+      repositoryRoot,
+    })
+
+  // The brownfield case this exists for: a second copy of the source living in
+  // the repository, which the built-in skip list cannot know about.
+  test('a bare path drops its whole subtree', async () => {
+    const repo = scratchRepo({
+      'src/app.py': 'import yaml\n',
+      '_scratch/copy/src/app.py': 'import yaml\n',
+    })
+    const observations = await scanIgnoring(repo, ['_scratch'])
+    expect(observations.filter((o) => o.kind === 'file').map((o) => o.subject?.id)).toEqual([
+      'src/app.py',
+    ])
+  })
+
+  test('a glob drops matching files wherever they sit', async () => {
+    const repo = scratchRepo({
+      'src/app.py': '',
+      'src/generated_client.py': '',
+      'src/deep/generated_client.py': '',
+    })
+    const observations = await scanIgnoring(repo, ['**/generated_*.py'])
+    expect(observations.filter((o) => o.kind === 'file').map((o) => o.subject?.id)).toEqual([
+      'src/app.py',
+    ])
+  })
+
+  // An ignored file is gone from the file tree the resolver matches against,
+  // not merely unreported, so an import into one resolves the way any import
+  // out of the scanned tree does: by each language's own rule. A Python
+  // package import becomes a claimable external module, which is the honest
+  // reading of a subtree the config disowned, while a relative import has
+  // nothing left to name and is unresolved.
+  test('an import into an ignored path leaves the repository', async () => {
+    const repo = scratchRepo({
+      'src/app.py': 'from generated.client import Client\n',
+      'src/generated/__init__.py': '',
+      'src/generated/client.py': '',
+      'src/app.js': "import { c } from './generated/client.js'\n",
+      'src/generated/client.js': '',
+    })
+
+    expect(edges(await scan(repo, ['src']))).toEqual([
+      'src/app.js -> file:src/generated/client.js',
+      'src/app.py -> file:src/generated/client.py',
+    ])
+    expect(edges(await scanIgnoring(repo, ['src/generated'], ['src']))).toEqual([
+      'src/app.js ->? module:./generated/client.js',
+      'src/app.py -> module:generated',
+    ])
+  })
+
+  test('an ignore that empties a root fails loudly', async () => {
+    const repo = scratchRepo({ 'src/app.py': '' })
+    await expect(scanIgnoring(repo, ['src'], ['src'])).rejects.toThrow(/contains no source/)
+  })
+
+  test('a pattern that names nothing is a config error', () => {
+    expect(() => importScan({ ignore: ['./'] })).toThrow(/matches nothing it could name/)
+  })
+})
+
 describe('isTestPath', () => {
   test.each([
     'src/thing.test.ts',

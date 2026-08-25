@@ -45,6 +45,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { pathMatcher } from '../globs.ts'
 import { count, elapsed } from '../report.ts'
 import type { Evidence, JsonObject, NamedProvider, Observation, Ref, ScanContext, ScanProvider } from '../types.ts'
 import { assemblePack, DEFAULT_PACK_BUDGET_BYTES, fencedExcerpt } from './context-pack.ts'
@@ -52,6 +53,9 @@ import { schemaMismatch, seconds, truncate } from './exec.ts'
 import type { AgentExec } from './exec.ts'
 
 export const PROVIDER_ID = 'agent-scan'
+
+/** How the shared path grammar's errors name this provider's option. */
+const FOCUS_LABEL = 'Agent scan focus'
 
 /**
  * The instructions `agentScan` runs with when the user writes none: the
@@ -250,7 +254,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
       covered = files.slice(0, maxFiles)
       dropped = Math.max(0, files.length - maxFiles)
     } else {
-      const matched = files.filter(focusMatcher(options.focus))
+      const matched = files.filter(pathMatcher(options.focus, FOCUS_LABEL))
       if (matched.length === 0) {
         throw new Error(
           `Agent scan focus [${options.focus.join(', ')}] matched no files under the scanned roots. ` +
@@ -601,59 +605,6 @@ function composeFocusedContext(
     DEFAULT_PACK_BUDGET_BYTES,
   )
   return pack.text
-}
-
-/**
- * Match focus patterns against listing paths: `*` within a path segment,
- * `**` across segments, and a bare path matching itself or its directory
- * subtree. Those are the same prefix semantics `sources` metadata uses, so a
- * focus reads like the rest of the model's path vocabulary. Deliberately no
- * glob dependency: this is the whole grammar.
- */
-function focusMatcher(patterns: string[]): (file: string) => boolean {
-  if (patterns.length === 0) {
-    throw new Error('Agent scan focus is empty; list at least one glob or path')
-  }
-
-  const tests = patterns.map((pattern) => {
-    const normalized = pattern.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '')
-    if (normalized === '') {
-      throw new Error(`Agent scan focus pattern '${pattern}' matches nothing it could name`)
-    }
-    if (!normalized.includes('*')) {
-      return (file: string) => file === normalized || file.startsWith(`${normalized}/`)
-    }
-    const regExp = globToRegExp(normalized)
-    return (file: string) => regExp.test(file)
-  })
-
-  return (file) => tests.some((test) => test(file))
-}
-
-function globToRegExp(glob: string): RegExp {
-  let pattern = ''
-  let index = 0
-  while (index < glob.length) {
-    if (glob.startsWith('**/', index)) {
-      pattern += '(?:[^/]+/)*'
-      index += 3
-      continue
-    }
-    if (glob.startsWith('**', index)) {
-      pattern += '.*'
-      index += 2
-      continue
-    }
-    const char = glob[index] ?? ''
-    if (char === '*') {
-      pattern += '[^/]*'
-      index += 1
-      continue
-    }
-    pattern += /[\\^$.*+?()[\]{}|]/.test(char) ? `\\${char}` : char
-    index += 1
-  }
-  return new RegExp(`^${pattern}$`)
 }
 
 /**

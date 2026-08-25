@@ -495,6 +495,47 @@ describe('identifier namespacing', () => {
   })
 })
 
+// Mixing a deterministic scanner with an agent scanner over the same tree is a
+// supported composition, so the overlap has to be harmless: the two providers
+// observe the same import twice, and the rules key findings by the elements
+// involved rather than by the observation, so one violation stays one finding
+// and the second scanner's citation joins the first one's evidence.
+describe('scan providers observing the same code', () => {
+  const alsoObserved: Observation[] = [
+    {
+      id: 'dependency:src/core/reverse.ts->src/interface/index.ts',
+      kind: 'dependency',
+      subject: { kind: 'file', id: 'src/core/reverse.ts' },
+      target: { kind: 'file', id: 'src/interface/index.ts' },
+      evidence: [{ path: 'src/core/reverse.ts', line: 1, detail: 'seen by the second scanner' }],
+      provider: 'mock-import-scan',
+    },
+  ]
+
+  test('report one merged finding rather than one finding each', async () => {
+    const result = await runFixture('violations', {
+      scan: [
+        typescriptImports({
+          tsconfig: path.join(fixturePath('violations'), 'tsconfig.json'),
+          roots: ['src'],
+        }),
+        { id: 'mock-import-scan', run: async () => alsoObserved },
+      ],
+    })
+
+    expect(result.findings.filter((finding) => finding.ruleId === 'provider-failure')).toEqual([])
+
+    const backwards = result.findings.filter(
+      (finding) => finding.ruleId === 'relationship-direction',
+    )
+    expect(backwards).toHaveLength(1)
+    expect(backwards[0]?.evidence?.map((item) => item.detail)).toContain(
+      'seen by the second scanner',
+    )
+    expect(exitCodeFor(result)).toBe(1)
+  })
+})
+
 describe('scan roots', () => {
   // The mirror image of unmatched ownership metadata: a wrong root reduces
   // coverage to nothing, and every violation disappears into a green build.
