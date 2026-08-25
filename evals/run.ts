@@ -19,6 +19,17 @@
  * model is scored against a reference restatement of the known architecture
  * (see `harness/draft.ts`).
  *
+ * A spec may also export `angles`, alternative WIRINGS of the same project,
+ * run as `<fixture>@<angle>`. The fixture's variants (greenfield, brownfield,
+ * draft) vary the code; an angle varies the config over one fixed code state,
+ * which is how the suite compares provider mixes: the deterministic scanner
+ * against the agent scan on identical ground truth, a config with no agent at
+ * all against the default one, the shipped prompt against fixture prose. An
+ * angle reads `expectations.<angle>.json` when that file exists and the base
+ * `expectations.json` when it does not, so an angle whose whole point is
+ * reaching the SAME outcome by other means asserts exactly that, with no
+ * second copy of the answer to keep in sync.
+ *
  * Stub mode doubles as a regression test of the harness and the pipeline
  * wiring: everything in it is deterministic, so anything short of a perfect
  * score means a fixture or the plumbing broke — never the agent — and the
@@ -73,6 +84,26 @@ type FixtureSpec = (exec: AgentExec, root: string) => PipelineConfig | Promise<P
 /** A draft fixture's spec composes the config `draft()` runs against instead. */
 type DraftFixtureSpec = (exec: AgentExec, root: string) => ResolvedConfig | Promise<ResolvedConfig>
 
+/** What a fixture's spec file exports. `angles` are alternative wirings. */
+interface SpecModule {
+  default: FixtureSpec & DraftFixtureSpec
+  angles?: Record<string, FixtureSpec & DraftFixtureSpec>
+  describe?: boolean
+  review?: boolean
+}
+
+/** One row-producing run: a fixture, optionally through one of its angles. */
+interface Job {
+  /** Scorecard label: `python` or `python@import-scan`. */
+  id: string
+  /** The fixture directory, shared by every angle (replies, manifest, sources). */
+  fixture: string
+  angle?: string
+  isDraft: boolean
+  spec: FixtureSpec & DraftFixtureSpec
+  module: SpecModule
+}
+
 const { values: flags } = parseArgs({
   options: {
     exec: { type: 'string', default: 'stub' },
@@ -98,23 +129,24 @@ const fixturesDir = path.join(evalsDir, 'fixtures')
  * fixtures one level down (`ddh/greenfield`, `boutique/draft`), which share
  * the parent's manifest, model, and patches.
  */
-function hasSpec(dir: string): boolean {
-  return (
-    fs.existsSync(path.join(dir, 'fitc4.eval.ts')) || fs.existsSync(path.join(dir, 'draft.eval.ts'))
-  )
+function specFile(dir: string): string | undefined {
+  for (const name of ['fitc4.eval.ts', 'draft.eval.ts']) {
+    if (fs.existsSync(path.join(dir, name))) return name
+  }
+  return undefined
 }
 
 function discoverFixtures(): string[] {
   const names: string[] = []
   for (const entry of fs.readdirSync(fixturesDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
-    if (hasSpec(path.join(fixturesDir, entry.name))) {
+    if (specFile(path.join(fixturesDir, entry.name)) !== undefined) {
       names.push(entry.name)
       continue
     }
     for (const variant of fs.readdirSync(path.join(fixturesDir, entry.name), { withFileTypes: true })) {
       if (!variant.isDirectory()) continue
-      if (hasSpec(path.join(fixturesDir, entry.name, variant.name))) {
+      if (specFile(path.join(fixturesDir, entry.name, variant.name)) !== undefined) {
         names.push(`${entry.name}/${variant.name}`)
       }
     }
@@ -122,19 +154,51 @@ function discoverFixtures(): string[] {
   return names
 }
 
-const discovered = discoverFixtures()
-  .sort(
-    (a, b) =>
-      (FIXTURE_ORDER.includes(a) ? FIXTURE_ORDER.indexOf(a) : FIXTURE_ORDER.length) -
-        (FIXTURE_ORDER.includes(b) ? FIXTURE_ORDER.indexOf(b) : FIXTURE_ORDER.length) ||
-      a.localeCompare(b),
-  )
+const orderOf = (name: string): number =>
+  FIXTURE_ORDER.includes(name) ? FIXTURE_ORDER.indexOf(name) : FIXTURE_ORDER.length
 
-const selected = flags.fixture === undefined ? discovered : flags.fixture
-for (const name of selected) {
-  if (!discovered.includes(name)) {
-    console.error(`unknown fixture '${name}'; available: ${discovered.join(', ')}`)
-    process.exit(2)
+const fixtures = discoverFixtures().sort(
+  (a, b) => orderOf(a) - orderOf(b) || a.localeCompare(b),
+)
+
+/**
+ * Expand each fixture into its base job plus one per declared angle.
+ *
+ * Importing a spec module has no side effects — every fixture does its
+ * checkout and assembly inside the exported function — so reading `angles`
+ * up front costs one import per fixture and keeps `--fixture` able to name an
+ * angle directly.
+ */
+const jobs: Job[] = []
+for (const fixture of fixtures) {
+  const root = path.join(fixturesDir, fixture)
+  const file = specFile(root)
+  if (file === undefined) continue
+  const module = (await import(pathToFileURL(path.join(root, file)).href)) as SpecModule
+  const isDraft = file === 'draft.eval.ts'
+  jobs.push({ id: fixture, fixture, isDraft, spec: module.default, module })
+  for (const [angle, spec] of Object.entries(module.angles ?? {})) {
+    jobs.push({ id: `${fixture}@${angle}`, fixture, angle, isDraft, spec, module })
+  }
+}
+
+/**
+ * `--fixture python` selects python and every angle of it, because comparing
+ * the angles is the point of having them; `--fixture python@mixed` names one.
+ */
+const selected =
+  flags.fixture === undefined
+    ? jobs
+    : jobs.filter((job) =>
+        (flags.fixture ?? []).some((name) => job.id === name || job.fixture === name),
+      )
+
+if (flags.fixture !== undefined) {
+  for (const name of flags.fixture) {
+    if (!jobs.some((job) => job.id === name || job.fixture === name)) {
+      console.error(`unknown fixture '${name}'; available: ${jobs.map((job) => job.id).join(', ')}`)
+      process.exit(2)
+    }
   }
 }
 
@@ -181,18 +245,35 @@ function readJson(file: string): unknown {
   return JSON.parse(fs.readFileSync(file, 'utf8'))
 }
 
+/**
+ * An angle's expectations, falling back to the fixture's own.
+ *
+ * The fallback is the useful case, not a shortcut: an angle that reaches the
+ * same outcome by different wiring (a deterministic scanner matching an agent
+ * scan, the shipped prompt matching fixture prose) states that by sharing the
+ * answer key rather than duplicating it.
+ */
+function expectationsFor(job: Job): unknown {
+  const root = path.join(fixturesDir, job.fixture)
+  if (job.angle !== undefined) {
+    const specific = path.join(root, `expectations.${job.angle}.json`)
+    if (fs.existsSync(specific)) return readJson(specific)
+  }
+  return readJson(path.join(root, 'expectations.json'))
+}
+
 const scores: FixtureScore[] = []
 const skipped: string[] = []
 
-for (const fixture of selected) {
-  const root = path.join(fixturesDir, fixture)
+for (const job of selected) {
+  const root = path.join(fixturesDir, job.fixture)
 
   // External fixtures never touch the network in a default run: with no
   // cached checkout they are skipped, and only naming one with --fixture is
   // permission to fetch (the fetch itself lives in the fixture's eval spec).
   const manifest = externalManifest(root)
   if (manifest !== undefined && !hasCheckout(evalsDir, manifest) && flags.fixture === undefined) {
-    skipped.push(fixture)
+    skipped.push(job.id)
     continue
   }
 
@@ -207,37 +288,29 @@ for (const fixture of selected) {
     // exports `review = true` additionally gates the drafted model it just
     // wrote against `agentSemanticReview`, closing the describe-to-review loop.
     // Everything else runs the pipeline exactly as before.
-    if (fs.existsSync(path.join(root, 'draft.eval.ts'))) {
-      const expectations = readJson(path.join(root, 'expectations.json')) as DraftExpectations
-      const specModule = (await import(pathToFileURL(path.join(root, 'draft.eval.ts')).href)) as {
-        default: DraftFixtureSpec
-        describe?: boolean
-        review?: boolean
-      }
-      const exec = execFor(fixture)
-      const config = await specModule.default(exec, root)
+    if (job.isDraft) {
+      const expectations = expectationsFor(job) as DraftExpectations
+      const exec = execFor(job.fixture)
+      const config = await job.spec(exec, root)
       const result = await draft(
         config,
-        specModule.describe === true
+        job.module.describe === true
           ? { describe: draftDescriber({ exec, repositoryRoot: config.repositoryRoot }) }
           : {},
       )
-      score = scoreDraft(fixture, expectations, result)
-      if (specModule.review === true) {
+      score = scoreDraft(job.id, expectations, result)
+      if (job.module.review === true) {
         score.providers.push(await scoreDescribeReview(config, exec, result))
         score.providers.sort((a, b) => a.provider.localeCompare(b.provider))
       }
     } else {
-      const expectations = readJson(path.join(root, 'expectations.json')) as Expectations
-      const specModule = (await import(pathToFileURL(path.join(root, 'fitc4.eval.ts')).href)) as {
-        default: FixtureSpec
-      }
-      const result = await runPipeline(await specModule.default(execFor(fixture), root))
-      score = scoreFixture(fixture, expectations, result)
+      const expectations = expectationsFor(job) as Expectations
+      const result = await runPipeline(await job.spec(execFor(job.fixture), root))
+      score = scoreFixture(job.id, expectations, result)
     }
   } catch (error) {
     score = {
-      fixture,
+      fixture: job.id,
       error: `fixture did not run: ${error instanceof Error ? error.message : String(error)}`,
       providers: [],
     }
@@ -250,7 +323,9 @@ console.log(renderScorecard(scores))
 console.log('')
 
 if (skipped.length > 0) {
-  const flagList = skipped.map((name) => `--fixture ${name}`).join(' ')
+  const flagList = [...new Set(skipped.map((name) => name.split('@')[0]))]
+    .map((name) => `--fixture ${name}`)
+    .join(' ')
   console.log(
     `note: external fixtures skipped, no cached checkout: ${skipped.join(', ')}. ` +
       `Fetch and run them with: npm run eval -- ${flagList}\n`,

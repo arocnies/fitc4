@@ -1,6 +1,8 @@
 [
   {
-    "when": { "promptIncludes": "name the id of the existing model element that should own it" },
+    "when": {
+      "promptIncludes": "name the id of the existing model element that should own it"
+    },
     "reply": {
       "files": [
         {
@@ -12,7 +14,9 @@
     }
   },
   {
-    "when": { "promptIncludes": "Element mono.core declares" },
+    "when": {
+      "promptIncludes": "Element mono.core declares"
+    },
     "reply": {
       "matches": false,
       "issues": [
@@ -21,10 +25,18 @@
     }
   },
   {
-    "when": { "promptIncludes": "Element mono.ui declares" },
+    "when": {
+      "promptIncludes": "Element mono.ui declares"
+    },
     "reply": {
       "matches": true,
       "issues": []
     }
+  },
+  {
+    "when": {
+      "promptIncludes": "Map each candidate decision"
+    },
+    "reply": []
   }
 ]

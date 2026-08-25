@@ -35,3 +35,24 @@ export default async function greenfield(exec: AgentExec, root: string): Promise
     ],
   }
 }
+
+/**
+ * The same fixture with NO mapping instructions: the shipped prompt alone.
+ *
+ * This angle exists because the base wiring is generous. Its instructions say
+ * to map each package onto the managed service that implements it and to
+ * leave a package alone when more than one element could own it, which is the
+ * stripe mapping and the S3 abstention stated in prose. A user who writes no
+ * instructions gets only `PROMPT`, whose driver-and-client sentence and
+ * confidence rule have to carry both answers by themselves, over a catalog
+ * that includes a junk drawer built to attract the wrong one.
+ *
+ * It shares the base expectations deliberately: same required outcome, less
+ * help. A divergence here and a pass there localises the credit to the prose.
+ */
+export const angles = {
+  'bare-resolve': async (exec: AgentExec, root: string): Promise<PipelineConfig> => {
+    const base = await resolveConfig(path.join(root, 'fitc4.config.mts'))
+    return { ...base, resolve: [...base.resolve, agentResolve({ exec })] }
+  },
+}

@@ -8,6 +8,7 @@ Nothing here runs in CI or in any package's test suite, ever. You invoke the har
 npm run eval                              # stub mode (default): free, deterministic, exact
 npm run eval -- --fixture greenfield      # one fixture
 npm run eval -- --fixture ddh/greenfield  # an external fixture; fetches its pinned repo if needed
+npm run eval -- --fixture python@mixed    # one angle: the same fixture, wired differently
 npm run eval -- --exec claude             # live mode, read the cost note below first
 npm run eval -- --exec codex              # live mode via the Codex CLI instead
 ```
@@ -18,13 +19,32 @@ Each directory under [`fixtures/`](fixtures/) is a self-contained project: a Lik
 
 - **`fitc4.eval.ts`** composes the pipeline as a function of the exec, so stub and live mode run through identical wiring.
 - **`replies.json`** is the *recorded ideal agent*: the reply a perfect agent would give to each request, matched by content rather than call order.
-- **`expectations.json`** is what a perfect run produces. `findings` is the complete finding set of that run; `associations`/`observations` `must` and `mustNot` entries pin agent behavior that never surfaces as a finding, such as the mapping `agentResolve` must make and the abstention it must keep.
+- **`expectations.json`** is what a perfect run produces (an angle may override it with `expectations.<angle>.json`). `findings` is the complete finding set of that run; `associations`/`observations` `must` and `mustNot` entries pin agent behavior that never surfaces as a finding, such as the mapping `agentResolve` must make and the abstention it must keep.
 
 ## External fixtures, fetched on demand
 
 An external fixture pins a real upstream repository instead of vendoring one. Its directory holds only what we author (an `external.json` manifest with the repository URL and a commit SHA, the LikeC4 model, the config, the eval files, and any patches), plus variant subdirectories such as `ddh/greenfield` and `ddh/brownfield` that share the fetch. The harness clones the pin into `evals/.cache/repos/` with `--filter=blob:none`, verifies `git rev-parse HEAD` against the manifest on every use, and assembles a fresh working directory under `evals/.cache/work/` per run: pinned sources, our overlay on top, patches applied for the brownfield variant. A manifest may add `sparse` paths, turning the clone into a sparse checkout of just those directories, so a monorepo pin costs only the fixture's own slice. It never runs `npm install` in the clone; external package imports stay package claims and resolve candidates, which is the point.
 
 A plain `npm run eval` never touches the network. When the cached checkout is absent, external fixtures are skipped with a note naming the command that fetches them; naming one with `--fixture` is permission to fetch. Once the cache exists they run and gate exactly like the checked-in fixtures.
+
+## Angles: the same fixture, wired differently
+
+A fixture's variants (`greenfield`, `brownfield`, `draft`) vary the CODE. An **angle** varies the CONFIG over one fixed code state, and runs as `<fixture>@<angle>`:
+
+```bash
+npm run eval -- --fixture python              # python and every angle of it
+npm run eval -- --fixture python@import-scan   # just the one
+```
+
+A spec declares them by exporting `angles`, a record of name to spec function, alongside its default export. An angle reads `expectations.<angle>.json` when that file exists and the fixture's own `expectations.json` when it does not, which makes the shared case the useful one: an angle whose entire point is reaching the SAME outcome by other means asserts exactly that, with no second copy of the answer key to keep in sync.
+
+Angles exist because the suite could otherwise only answer "do the agents get the right answer", never "does this provider mix earn its cost" or "does the shipped default work without our prose". Those are the questions an adopter actually asks, and they are answered by running one project through several wirings and reading the rows next to each other.
+
+- **`brownfield@deterministic`** is the free baseline, the config `init` scaffolds with no `--agent`: no agent calls at all, in any mode. It pins the five deterministic findings as the complete set, so the diff against the base row is exactly what the two advisory providers buy. What disappears is judgment, not detection: the unowned file is still reported, just with no suggestion of where it belongs, and a description that contradicts its own code passes unremarked.
+- **`brownfield@default-agent`** is the other end, the full provider mix `init --agent` writes, and the only place in the suite where all four agent providers run in one pipeline, which is the configuration most users will actually have. It also asks `agentResolve` a question the base wiring never does: `mono.core` imports `node:fs`, no element stands for the Node standard library, and the only right answer is to leave it unmapped. That is the abstention case with no junk drawer to hide in.
+- **`python@import-scan`** swaps the agent for `importScan`, the deterministic multi-language crawler `init` scaffolds for any repository holding source it reads. Same roots as the agent scan, so the scanner is the only variable, and everything downstream should be identical at zero agent cost. Its own expectations exist only because the two attest differently: `agentScan` reports a `scan-root` per file it read, `importScan` one for the root it walked plus a `file` per file found. The standard-library silence is pinned here too, so the crawler has to be as quiet about `json`, `typing`, and `pathlib` as the instructions tell the agent to be.
+- **`python@mixed`** runs both scanners over one tree, the composition the docs recommend when a parser reads the import backbone but not the other domains. What it pins is that the overlap is harmless: observations are namespaced per provider, so the same import arrives twice, while findings are keyed by the elements involved, so the planted violation stays ONE error carrying both scanners' citations.
+- **`greenfield@bare-resolve`** drops the fixture's mapping instructions and runs the shipped prompt alone. The base instructions are generous, telling the model to map a package onto the managed service that implements it and to leave ambiguous ones alone, which is both answers in prose. This angle makes the default prompt carry them unaided, over a catalog holding a junk drawer built to attract the wrong one. It shares the base expectations: same required outcome, less help.
 
 ## The two exec modes
 

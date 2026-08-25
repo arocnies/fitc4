@@ -18,7 +18,7 @@
 
 import path from 'node:path'
 
-import { architectureRules, sourceRoot, type PipelineConfig } from '@arocnies/fitc4'
+import { architectureRules, importScan, sourceRoot, type PipelineConfig } from '@arocnies/fitc4'
 import { agentScan, type AgentExec } from '@arocnies/fitc4/agent'
 
 export default function python(exec: AgentExec, root: string): PipelineConfig {
@@ -31,4 +31,46 @@ export default function python(exec: AgentExec, root: string): PipelineConfig {
     resolve: [sourceRoot()],
     validate: [architectureRules()],
   }
+}
+
+/**
+ * Two more wirings over the same Python project, because "which scanner" is
+ * the first real decision `fitc4 init` makes for a non-TypeScript repository
+ * and the suite had no measurement of the answer.
+ *
+ * `import-scan` swaps the agent for `importScan`, the deterministic
+ * multi-language crawler `init` scaffolds whenever a repository holds source
+ * in a language it reads (Python among them). Same roots as the agent scan,
+ * so the scanner is the only variable. It has its own expectations because
+ * the two attest differently: `agentScan` reports a `scan-root` per file it
+ * read, `importScan` reports one for the root it walked plus a `file` per
+ * file found. Everything downstream should be identical, planted violation
+ * included, at zero agent cost, and the standard-library silence is pinned
+ * here too: the deterministic crawler must be as quiet about `json`,
+ * `typing`, and `pathlib` as the instructions tell the agent to be.
+ *
+ * `mixed` runs both scanners over the same tree, the composition the docs
+ * recommend for a repository whose import backbone a parser can read but
+ * whose other domains it cannot. What it pins is that the overlap is
+ * harmless: observations are namespaced per provider, so the same import
+ * arrives twice, while findings are keyed by the elements involved, so the
+ * planted violation is still ONE error carrying both scanners' citations. A
+ * config that mixes scanners must not double-report.
+ */
+export const angles = {
+  'import-scan': (_exec: AgentExec, root: string): PipelineConfig => ({
+    repositoryRoot: root,
+    modelDir: path.join(root, 'arch'),
+    scan: [importScan({ roots: ['src'] })],
+    resolve: [sourceRoot()],
+    validate: [architectureRules()],
+  }),
+
+  mixed: (exec: AgentExec, root: string): PipelineConfig => ({
+    repositoryRoot: root,
+    modelDir: path.join(root, 'arch'),
+    scan: [importScan({ roots: ['src'] }), agentScan({ exec, roots: ['src'] })],
+    resolve: [sourceRoot()],
+    validate: [architectureRules()],
+  }),
 }
