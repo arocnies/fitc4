@@ -372,7 +372,7 @@ describe('agentScan batching', () => {
 
   const FIVE = ['a.py', 'b.py', 'c.py', 'd.py', 'e.py']
 
-  test('a listing beyond batchFiles splits into consecutive calls and the replies merge', async () => {
+  test('a listing beyond batchFiles splits into batched calls and the replies merge', async () => {
     const repo = scratchRepo(FIVE)
     const exec = stubExec([fileReply('a.py'), fileReply('c.py'), fileReply('e.py')])
     const messages: string[] = []
@@ -382,7 +382,7 @@ describe('agentScan batching', () => {
       progress: (message) => void messages.push(message),
     })
 
-    // Three deterministic slices of the sorted listing, one request each.
+    // Three deterministic batches of the sorted listing, one request each.
     expect(exec.requests).toHaveLength(3)
     expect(exec.requests[0]?.context).toContain('batch 1 of 3')
     expect(exec.requests[0]?.context).toContain('- a.py')
@@ -453,6 +453,146 @@ describe('agentScan batching', () => {
     expect(exec.requests[1]?.context).toContain('1 more files exist')
   })
 
+
+  test('the partition keeps directories whole and packs siblings', async () => {
+    const repo = scratchRepo([
+      'api/handlers.py',
+      'api/routes.py',
+      'db/models.py',
+      'db/queries.py',
+      'web/pages.py',
+      'web/views.py',
+    ])
+    const exec = stubExec([fileReply('api/handlers.py'), fileReply('web/pages.py')])
+    const messages: string[] = []
+
+    await agentScan({ exec, batchFiles: 4 }).run({
+      repositoryRoot: repo,
+      progress: (message) => void messages.push(message),
+    })
+
+    // Two sibling directories fill batch 1; web/ arrives intact as batch 2,
+    // never split across a positional boundary.
+    expect(exec.requests).toHaveLength(2)
+    expect(exec.requests[0]?.context).toContain('- api/handlers.py')
+    expect(exec.requests[0]?.context).toContain('- db/queries.py')
+    expect(exec.requests[0]?.context).not.toContain('- web/')
+    expect(exec.requests[1]?.context).toContain('- web/pages.py')
+    expect(exec.requests[1]?.context).toContain('- web/views.py')
+    // The narration names the area a batch covers.
+    expect(messages).toContainEqual('batch 2 of 2: exploring web with stub/model, 2 files listed')
+  })
+
+  test('an oversized directory splits by its direct files; a subtree that fits rides whole', async () => {
+    const repo = scratchRepo([
+      'pkg/a.py',
+      'pkg/b.py',
+      'pkg/c.py',
+      'pkg/d.py',
+      'pkg/sub/x.py',
+      'pkg/sub/y.py',
+    ])
+    const exec = stubExec([fileReply('pkg/a.py'), fileReply('pkg/d.py')])
+
+    await agentScan({ exec, batchFiles: 3 }).run({ repositoryRoot: repo })
+
+    expect(exec.requests).toHaveLength(2)
+    expect(exec.requests[0]?.context).toContain('- pkg/a.py')
+    expect(exec.requests[0]?.context).toContain('- pkg/c.py')
+    // The remainder of pkg coalesces with the whole of pkg/sub.
+    expect(exec.requests[1]?.context).toContain('- pkg/d.py')
+    expect(exec.requests[1]?.context).toContain('- pkg/sub/x.py')
+    expect(exec.requests[1]?.context).toContain('- pkg/sub/y.py')
+  })
+
+  test('batches run concurrently by default', async () => {
+    const repo = scratchRepo(FIVE)
+    let arrived = 0
+    let releaseAll!: () => void
+    const everyoneHere = new Promise<void>((resolve) => (releaseAll = resolve))
+    const exec: AgentExec = {
+      id: 'stub/pool',
+      async run(request: AgentRequest): Promise<AgentReply> {
+        arrived += 1
+        if (arrived === 3) releaseAll()
+        // Every reply is held until all three requests have arrived: a
+        // sequential dispatch would deadlock here, so completing at all is
+        // the concurrency assertion.
+        await everyoneHere
+        const file = /^- (.+)$/m.exec(request.context ?? '')?.[1] ?? ''
+        return ok({ observations: [], examined: [file] })
+      },
+    }
+
+    const observations = await agentScan({ exec, batchFiles: 2 }).run({ repositoryRoot: repo })
+
+    expect(observationIds(observations)).toEqual(['scan-root:a.py', 'scan-root:c.py', 'scan-root:e.py'])
+  }, 10_000)
+
+  test('concurrency: 1 keeps the scan strictly sequential', async () => {
+    const repo = scratchRepo(FIVE)
+    let active = 0
+    let peak = 0
+    const exec: AgentExec = {
+      id: 'stub/serial',
+      async run(request: AgentRequest): Promise<AgentReply> {
+        active += 1
+        peak = Math.max(peak, active)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        active -= 1
+        const file = /^- (.+)$/m.exec(request.context ?? '')?.[1] ?? ''
+        return ok({ observations: [], examined: [file] })
+      },
+    }
+
+    await agentScan({ exec, batchFiles: 2, concurrency: 1 }).run({ repositoryRoot: repo })
+
+    expect(peak).toBe(1)
+  })
+
+  test('a failure stops the pool from taking new batches; in-flight siblings finish', async () => {
+    const repo = scratchRepo([...'abcdefghijkl'].map((letter) => `${letter}.py`))
+    const exec = stubExec([{ ok: false, error: 'rate limited' }])
+
+    await expect(
+      agentScan({ exec, batchFiles: 2, concurrency: 2 }).run({ repositoryRoot: repo }),
+    ).rejects.toThrow(/on batch \d+ of 6: rate limited.*cached\(\)/)
+
+    // Two workers had two batches in flight; the other four never launched.
+    expect(exec.requests.length).toBeLessThanOrEqual(3)
+  })
+
+  test('replies merge in batch order even when completion is out of order', async () => {
+    const repo = scratchRepo(FIVE)
+    const claim = {
+      kind: 'dependency',
+      subject: { kind: 'file', id: 'a.py' },
+      target: { kind: 'file', id: 'b.py' },
+    }
+    let releaseFirst!: () => void
+    const firstGate = new Promise<void>((resolve) => (releaseFirst = resolve))
+    const exec: AgentExec = {
+      id: 'stub/shuffled',
+      async run(request: AgentRequest): Promise<AgentReply> {
+        const listed = /^- (.+)$/m.exec(request.context ?? '')?.[1] ?? ''
+        if (listed === 'a.py') {
+          await firstGate
+          return ok({ observations: [claim, claim], examined: ['a.py'] })
+        }
+        if (listed === 'e.py') releaseFirst()
+        return ok({ observations: listed === 'c.py' ? [claim] : [], examined: [listed] })
+      },
+    }
+
+    const observations = await agentScan({ exec, batchFiles: 2 }).run({ repositoryRoot: repo })
+
+    // Batch 1 finished last, yet its two claims kept the natural key and the
+    // ordinal, and batch 2's repeat merged away: the same output a sequential
+    // run produces.
+    const ids = observationIds(observations).filter((id) => id.includes('a.py->b.py'))
+    expect(ids).toEqual(['dependency:a.py->b.py', 'dependency:a.py->b.py#1'])
+  }, 10_000)
+
   test('focused excerpts batch the same way, one-shot per slice', async () => {
     const repo = scratchRepo(FIVE)
     const exec = stubExec([fileReply('a.py'), fileReply('c.py'), fileReply('e.py')])
@@ -516,11 +656,12 @@ describe('agentScan fails closed', () => {
         observations: [{ kind: 'file', subject: { kind: 'file', id: 'src/ghost.ts' } }],
         examined: ['docs/notes.md'],
       }),
-      // In a target ref.
+      // In a target ref of a kind with no downgrade shape (a dependency's
+      // missing file target downgrades instead; see the test below).
       ok({
         observations: [
           {
-            kind: 'dependency',
+            kind: 'doc-link',
             subject: { kind: 'file', id: 'docs/notes.md' },
             target: { kind: 'file', id: 'src/ghost.ts' },
           },
@@ -551,6 +692,39 @@ describe('agentScan fails closed', () => {
       expect(failure?.description).toContain('does not exist')
       expect(result.observations).toEqual([])
     }
+  })
+
+  test("a dependency target that names no real file downgrades to unresolved, not a dead scan", async () => {
+    // Measured on a live run: the model wrote docs/assets/... for
+    // docs/docs/assets/..., one dropped path segment, and fail-closed would
+    // have discarded every completed batch over it. A missing dependency
+    // target is a failed resolution with a reply shape of its own, so it
+    // converts to 'unresolved-dependency' and surfaces as the
+    // unresolved-import warning. Subjects, evidence, and attestations keep
+    // failing the scan: those say what was covered.
+    const exec = stubExec([
+      ok({
+        observations: [
+          {
+            kind: 'dependency',
+            subject: { kind: 'file', id: 'docs/notes.md' },
+            target: { kind: 'file', id: 'docs/assets/ghost.svg' },
+            evidence: [{ path: 'docs/notes.md', line: 1 }],
+          },
+        ],
+        examined: ['docs/notes.md'],
+      }),
+    ])
+
+    const result = await runFixture('violations', {
+      scan: [agentScan({ exec, instructions: 'x' })],
+    })
+
+    expect(providerFailure(result.findings)).toBeUndefined()
+    const downgraded = result.observations.find((o) => o.kind === 'unresolved-dependency')
+    expect(downgraded?.id).toBe('agent-scan/unresolved-dependency:docs/notes.md->docs/assets/ghost.svg')
+    expect(downgraded?.target).toEqual({ kind: 'module', id: 'docs/assets/ghost.svg' })
+    expect(findingFor(result.findings, 'unresolved-import')?.severity).toBe('warning')
   })
 
   test('absolute and root-escaping paths fail the provider', async () => {

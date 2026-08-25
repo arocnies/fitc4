@@ -11,12 +11,18 @@
  * the instructions plus a bounded file listing, so it is deterministic and
  * `cached()` replays a rerun with unchanged inputs byte for byte.
  *
- * A listing larger than `batchFiles` splits into consecutive batches, one
- * call each, because a reply that must carry a whole repository dies at any
- * timeout. The batches are deterministic slices of the sorted listing, so
- * with `cached()` every completed batch is recorded as it finishes: progress
- * lands incrementally, and a failed or interrupted scan resumes at the first
- * unanswered batch instead of starting over.
+ * A listing larger than `batchFiles` splits into batches, one call each,
+ * because a reply that must carry a whole repository dies at any timeout.
+ * The partition follows the directory tree: a directory whose subtree fits
+ * in one batch stays whole, sibling directories pack together, and only a
+ * directory too large for any batch splits, so each call covers one coherent
+ * area instead of an alphabetical shard straddling modules. Batches run
+ * `concurrency` at a time; they are disjoint by construction and each call
+ * is its own session, so concurrency buys wall clock and changes nothing
+ * else. The partition is a pure function of the sorted listing, so with
+ * `cached()` every completed batch is recorded as it finishes: progress
+ * lands incrementally, and a failed or interrupted scan resumes with the
+ * finished batches replaying from the cache.
  *
  * With `focus`, the provider prefills instead of exploring: the files the
  * globs match are embedded as code-first excerpts and the request drops
@@ -33,7 +39,11 @@
  * coverage the rules judge, so an absent scanner must never look like a clean
  * scan. Any exec failure, off-schema reply, hallucinated path, or empty
  * `examined` attestation therefore THROWS, which the pipeline reports as one
- * `provider-failure` error finding attributed to this provider.
+ * `provider-failure` error finding attributed to this provider. The one
+ * carve-out is a dependency's `file` target that names no real file: that is
+ * a failed resolution, not a coverage lie, so it downgrades to an
+ * 'unresolved-dependency' the gate reports as a warning instead of costing
+ * every completed batch.
  *
  * Coverage attestation: the reply's required `examined` array names the files
  * the model actually read, and each becomes a standard `scan-root`
@@ -132,23 +142,34 @@ export interface AgentScanOptions {
    */
   timeoutMs?: number
   /**
-   * Files covered per call. A listing larger than this splits into
-   * consecutive batches, one call each, because one reply cannot honestly
-   * carry a whole repository: the reply grows with every file covered, and a
-   * single call was measured dying on real repositories at any timeout. Each
-   * batch is a deterministic request, so with `cached()` every completed
-   * batch is recorded as it finishes and an interrupted scan resumes where it
-   * stopped instead of starting over. Progress narrates per batch.
+   * Most files covered per call. A listing larger than this splits into
+   * batches, one call each, because one reply cannot honestly carry a whole
+   * repository: the reply grows with every file covered, and a single call
+   * was measured dying on real repositories at any timeout. The partition
+   * follows the directory tree (see `partitionListing`), so each call covers
+   * one coherent area, and each batch is a deterministic request, so with
+   * `cached()` every completed batch is recorded as it finishes and an
+   * interrupted scan resumes where it stopped instead of starting over.
+   * Progress narrates per batch.
    */
   batchFiles?: number
+  /**
+   * Batches in flight at once. Default: 4. The batches are disjoint areas by
+   * construction and every call is its own session, so a concurrent run
+   * produces exactly the observations a sequential one does; concurrency
+   * only buys wall clock. Set 1 for a strictly sequential scan, for example
+   * when the CLI account's rate limits push back.
+   */
+  concurrency?: number
 }
 
 const DEFAULT_MAX_FILES = 300
 const DEFAULT_EXCERPT_CHARS = 4_000
 const DEFAULT_SCAN_TIMEOUT_MS = 600_000
 const DEFAULT_BATCH_FILES = 25
+const DEFAULT_CONCURRENCY = 4
 
-/** Cadence of the "still waiting" narration during the one long call. */
+/** Cadence of the "still waiting" narration during the long calls. */
 const PROGRESS_TICK_MS = 30_000
 
 /** Never listed, at any depth. */
@@ -240,14 +261,18 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
     if (batchFiles < 1) {
       throw new Error(`agentScan batchFiles must be at least 1, got ${batchFiles}`)
     }
+    const concurrencyOption = options.concurrency ?? DEFAULT_CONCURRENCY
+    if (concurrencyOption < 1) {
+      throw new Error(`agentScan concurrency must be at least 1, got ${concurrencyOption}`)
+    }
     const files = enumerateFiles(context.repositoryRoot, roots)
 
     // The files the scan covers: the whole listing, or what the focus globs
     // match, capped by maxFiles either way (the cap is announced, never
-    // silent). These chunk into batches of `batchFiles`, one call each: the
-    // requests are deterministic slices of a sorted listing, so `cached()`
-    // records each completed batch and a rerun resumes at the first
-    // unanswered one.
+    // silent). These partition into batches along the directory tree, one
+    // call each, `concurrency` at a time: the partition is a pure function of
+    // the sorted listing, so `cached()` records each completed batch and a
+    // rerun resumes at the first unanswered one.
     let covered: string[]
     let dropped: number
     if (options.focus === undefined) {
@@ -265,16 +290,20 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
       dropped = matched.length - covered.length
     }
 
-    const batches: string[][] = []
-    for (let start = 0; start < covered.length; start += batchFiles) {
-      batches.push(covered.slice(start, start + batchFiles))
-    }
+    const batches = partitionListing(covered, batchFiles)
+    const concurrency = Math.min(concurrencyOption, batches.length)
 
     const guard = pathGuard(context.repositoryRoot)
-    const examined = new Set<string>()
-    const replies: ReplyObservation[][] = []
+    const replies: ReplyObservation[][] = new Array<ReplyObservation[]>(batches.length)
+    const attestations: string[][] = new Array<string[]>(batches.length)
 
-    for (const [index, batch] of batches.entries()) {
+    // One in-flight registry feeding one ticker for the whole pool: a ticker
+    // per call at concurrency 4 would narrate four interleaved waiting lines
+    // every tick, noise exactly when someone is watching a long scan.
+    const inFlight = new Map<number, number>()
+
+    const runBatch = async (index: number): Promise<void> => {
+      const batch = batches[index] ?? []
       // With a single batch the request is byte-identical to the unbatched
       // form, so recorded caches and pinned contexts stay valid.
       const batchInfo = batches.length === 1 ? undefined : { index: index + 1, total: batches.length }
@@ -312,29 +341,20 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
             }
 
       // Announce the call before it starts: agent calls are the slow part of
-      // a run, and which shape (and roughly how much) is being sent says why.
+      // a run, and which area (and roughly how much) is being sent says why.
       const prefix = batchInfo === undefined ? '' : `batch ${batchInfo.index} of ${batchInfo.total}: `
       context.progress?.(
         options.focus === undefined
-          ? `${prefix}exploring the repository with ${options.exec.id}, ${count(batch.length, 'file')} listed`
+          ? `${prefix}exploring ${batchArea(batch)} with ${options.exec.id}, ${count(batch.length, 'file')} listed`
           : `${prefix}asking ${options.exec.id} one-shot, about ${roughKilobytes(request.context)} of instructions and excerpts`,
       )
 
-      // Each call is minutes long on a real repository, with nothing on the
-      // wire until the CLI finishes. A quiet line on a fixed cadence keeps
-      // that wait distinguishable from a hang, and names the budget so a
-      // reader knows when the hard stop comes.
-      const started = Date.now()
-      const ticker = setInterval(() => {
-        context.progress?.(`still waiting on ${options.exec.id}, ${elapsed(started)} of the ${seconds(timeoutMs)} budget`)
-      }, PROGRESS_TICK_MS)
-      ticker.unref?.()
-
+      inFlight.set(index, Date.now())
       let reply
       try {
         reply = await options.exec.run(request)
       } finally {
-        clearInterval(ticker)
+        inFlight.delete(index)
       }
 
       if (!reply.ok) {
@@ -365,12 +385,63 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
       // unanchored claims, and a batch that read nothing scanned nothing.
       const attested = parsed.examined.map((entry) => guard(entry, 'examined'))
       if (attested.length === 0) {
+        const where = batchInfo === undefined ? '' : ` on batch ${batchInfo.index} of ${batchInfo.total}`
         throw new Error(
-          `Agent scan (${options.exec.id}) attested to examining no files. An absent scan must not look like a clean one`,
+          `Agent scan (${options.exec.id}) attested to examining no files${where}. An absent scan must not look like a clean one`,
         )
       }
-      for (const entry of attested) examined.add(entry)
-      replies.push(parsed.observations)
+      attestations[index] = attested
+      replies[index] = parsed.observations
+    }
+
+    // Each call is minutes long on a real repository, with nothing on the
+    // wire until the CLI finishes. A quiet line on a fixed cadence keeps that
+    // wait distinguishable from a hang, and names the budget so a reader
+    // knows when the hard stop comes.
+    const ticker = setInterval(() => {
+      if (inFlight.size === 0) return
+      const budget = `${elapsed(Math.min(...inFlight.values()))} of the ${seconds(timeoutMs)} budget`
+      if (batches.length === 1) {
+        context.progress?.(`still waiting on ${options.exec.id}, ${budget}`)
+        return
+      }
+      const positions = [...inFlight.keys()].sort((a, b) => a - b).map((position) => position + 1)
+      const named = positions.length === 1 ? `batch ${positions[0]}` : `batches ${positions.join(', ')}`
+      context.progress?.(
+        `still waiting on ${options.exec.id}, ${named} of ${batches.length} in flight, ${budget}`,
+      )
+    }, PROGRESS_TICK_MS)
+    ticker.unref?.()
+
+    // A fixed pool over the batch list. On a failure the pool stops taking
+    // new batches but lets in-flight siblings finish, so their replies land
+    // in the cache and a rerun resumes further along; then the failure fails
+    // the provider whole, fail-closed as ever.
+    let failure: unknown
+    let nextIndex = 0
+    try {
+      await Promise.all(
+        Array.from({ length: concurrency }, async () => {
+          while (failure === undefined) {
+            const index = nextIndex
+            nextIndex += 1
+            if (index >= batches.length) return
+            try {
+              await runBatch(index)
+            } catch (error) {
+              failure ??= error
+            }
+          }
+        }),
+      )
+    } finally {
+      clearInterval(ticker)
+    }
+    if (failure !== undefined) throw failure
+
+    const examined = new Set<string>()
+    for (const attested of attestations) {
+      for (const entry of attested ?? []) examined.add(entry)
     }
 
     const observations: Observation[] = []
@@ -392,12 +463,24 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
     // Within one reply, two identical claims are two facts and stay distinct
     // by ordinal. Across batches, an identical claim is overlap: a model that
     // read a neighboring file for context re-reported it, and the repeat
-    // must not double the observation.
+    // must not double the observation. The merge walks batch order, never
+    // completion order, so a concurrent run's output is identical to a
+    // sequential one's.
     const reportedEarlier = new Set<string>()
-    for (const batchEntries of replies) {
+    for (const [batchIndex, batchEntries] of replies.entries()) {
       const reportedHere = new Set<string>()
       for (const entry of batchEntries) {
-        const converted = toObservation(entry, guard, usedIds, reportedEarlier, options.exec.id, providerId)
+        let converted: Observation | undefined
+        try {
+          converted = toObservation(entry, guard, usedIds, reportedEarlier, options.exec.id, providerId)
+        } catch (error) {
+          // Conversion failures happen after the pool, so without this the
+          // error would not say which batch's reply carried the bad claim.
+          if (batches.length > 1 && error instanceof Error) {
+            error.message = `${error.message} (batch ${batchIndex + 1} of ${batches.length})`
+          }
+          throw error
+        }
         if (converted === undefined) continue
         reportedHere.add(naturalKeyOf(converted))
         observations.push(converted)
@@ -441,7 +524,22 @@ function toObservation(
   }
 
   const subject = guardedRef(entry.subject, guard, 'subject')
-  const target = entry.target === undefined ? undefined : guardedRef(entry.target, guard, 'target')
+
+  // A dependency target that is well-formed but names no real file is a
+  // failed resolution, not a coverage lie, and the reply contract has a shape
+  // for exactly that: the claim downgrades to 'unresolved-dependency' with
+  // the path as a module specifier, which the unresolved-import rule surfaces
+  // as a warning. Failing the scan here would throw away every batch over one
+  // dropped path segment (measured: a model wrote docs/assets/... for
+  // docs/docs/assets/...). Subjects, evidence, and attestations stay
+  // fail-closed: those are the claims that say what was covered.
+  let kind = entry.kind
+  let target = entry.target === undefined ? undefined : guardedTarget(entry, guard)
+  if (entry.kind === 'dependency' && entry.target?.kind === 'file' && target === undefined) {
+    kind = 'unresolved-dependency'
+    target = { kind: 'module', id: entry.target.id }
+  }
+
   const evidence = entry.evidence?.map(
     (item): Evidence => ({
       path: guard(item.path, 'evidence'),
@@ -451,7 +549,7 @@ function toObservation(
 
   // Natural-key ids per the ids convention; an ordinal keeps two identical
   // claims distinct instead of tripping the pipeline's duplicate-id check.
-  const naturalKey = `${entry.kind}:${subject.id}${target === undefined ? '' : `->${target.id}`}`
+  const naturalKey = `${kind}:${subject.id}${target === undefined ? '' : `->${target.id}`}`
   if (reportedEarlier.has(naturalKey)) return undefined
   let id = naturalKey
   for (let ordinal = 1; usedIds.has(id); ordinal += 1) {
@@ -461,7 +559,7 @@ function toObservation(
 
   return {
     id,
-    kind: entry.kind,
+    kind,
     ...(entry.description === undefined ? {} : { description: entry.description }),
     subject,
     ...(target === undefined ? {} : { target }),
@@ -487,6 +585,20 @@ function naturalKeyOf(observation: Observation): string {
  * path; the fragment rides along as an opaque locator for ownership
  * resolution, not a filesystem claim.
  */
+/**
+ * Guard an observation's target: like `guardedRef`, except a dependency's
+ * plain `file` target that does not exist returns undefined for the caller to
+ * downgrade instead of throwing. Every other shape keeps the throwing guard.
+ */
+function guardedTarget(entry: ReplyObservation, guard: PathGuard): Ref | undefined {
+  const target = entry.target as { kind: string; id: string }
+  if (entry.kind === 'dependency' && target.kind === 'file' && !target.id.includes('#')) {
+    const checked = guard.probe(target.id, 'target')
+    return checked.exists ? { kind: 'file', id: checked.path } : undefined
+  }
+  return guardedRef(target, guard, 'target')
+}
+
 function guardedRef(ref: { kind: string; id: string }, guard: PathGuard, where: string): Ref {
   if (ref.kind === 'file' || ref.kind === 'directory') {
     const hash = ref.kind === 'file' ? ref.id.indexOf('#') : -1
@@ -498,19 +610,25 @@ function guardedRef(ref: { kind: string; id: string }, guard: PathGuard, where: 
   return { kind: ref.kind, id: ref.id }
 }
 
-type PathGuard = (candidate: string, where: string) => string
+interface PathGuard {
+  (candidate: string, where: string): string
+  /** The same normalization and escape checks, reporting existence instead of throwing on it. */
+  probe(candidate: string, where: string): { path: string; exists: boolean }
+}
 
 /**
  * The hallucination guard: normalize a model-reported path and verify it is
  * repository-relative, does not escape the repository root, and exists on
  * disk. Anything else throws. A path that fails the guard is a claim about
  * code that is not there, and dropping it silently would let the rest of the
- * reply pass as trustworthy.
+ * reply pass as trustworthy. `probe` runs the same normalization and escape
+ * checks but reports existence instead of throwing on it, for the one caller
+ * that downgrades a missing dependency target rather than failing the scan.
  */
 function pathGuard(repositoryRoot: string): PathGuard {
   const root = path.resolve(repositoryRoot)
 
-  return (candidate, where) => {
+  const probe = (candidate: string, where: string): { path: string; exists: boolean } => {
     const reject = (reason: string): never => {
       throw new Error(`Agent scan reply named an invalid path in ${where}: '${truncate(candidate, 120)}' ${reason}`)
     }
@@ -525,10 +643,21 @@ function pathGuard(repositoryRoot: string): PathGuard {
     if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
       reject('escapes the repository root')
     }
-    if (!fs.existsSync(absolute)) reject('does not exist in the repository')
 
-    return toPosix(relative)
+    return { path: toPosix(relative), exists: fs.existsSync(absolute) }
   }
+
+  const guard = ((candidate: string, where: string): string => {
+    const checked = probe(candidate, where)
+    if (!checked.exists) {
+      throw new Error(
+        `Agent scan reply named an invalid path in ${where}: '${truncate(candidate, 120)}' does not exist in the repository`,
+      )
+    }
+    return checked.path
+  }) as PathGuard
+  guard.probe = probe
+  return guard
 }
 
 interface BatchInfo {
@@ -537,6 +666,95 @@ interface BatchInfo {
 }
 
 /** The batch framing lines, absent entirely for a single-batch scan. */
+/**
+ * Partition the covered listing into batches of at most `batchFiles`, along
+ * the directory tree rather than by position. A directory whose subtree fits
+ * in one batch stays whole, sibling directories pack together up to the cap,
+ * and only a directory too large for any batch splits. Each call then covers
+ * one coherent area: its observations do not straddle modules, and concurrent
+ * batches explore disjoint corners of the repository instead of crawling the
+ * same folder from two sessions at once. A pure function of the sorted
+ * listing, so reruns compose with `cached()`; a listing that fits in one
+ * batch stays exactly the sorted listing, byte-identical to the unbatched
+ * request.
+ */
+function partitionListing(files: string[], batchFiles: number): string[][] {
+  if (files.length <= batchFiles) return [files]
+
+  interface Node {
+    files: string[]
+    children: Map<string, Node>
+    total: number
+  }
+  const root: Node = { files: [], children: new Map(), total: files.length }
+  for (const file of files) {
+    let node = root
+    const segments = file.split('/')
+    for (const segment of segments.slice(0, -1)) {
+      let child = node.children.get(segment)
+      if (child === undefined) {
+        child = { files: [], children: new Map(), total: 0 }
+        node.children.set(segment, child)
+      }
+      node = child
+      node.total += 1
+    }
+    node.files.push(file)
+  }
+
+  // Indivisible units first: whole subtrees that fit, and chunks of the
+  // direct files of directories that do not.
+  const units: string[][] = []
+  const collect = (node: Node): string[] => [
+    ...node.files,
+    ...[...node.children.keys()].sort().flatMap((name) => collect(node.children.get(name) as Node)),
+  ]
+  const walk = (node: Node): void => {
+    if (node.total <= batchFiles) {
+      units.push(collect(node))
+      return
+    }
+    for (let start = 0; start < node.files.length; start += batchFiles) {
+      units.push(node.files.slice(start, start + batchFiles))
+    }
+    for (const name of [...node.children.keys()].sort()) walk(node.children.get(name) as Node)
+  }
+  walk(root)
+
+  // Then neighboring units coalesce, so a run of small sibling directories
+  // costs one call, not one call each.
+  const batches: string[][] = []
+  let current: string[] = []
+  for (const unit of units) {
+    if (current.length > 0 && current.length + unit.length > batchFiles) {
+      batches.push(current)
+      current = []
+    }
+    current = current.concat(unit)
+  }
+  if (current.length > 0) batches.push(current)
+  return batches
+}
+
+/**
+ * What a batch covers, for the narration: the deepest directory common to
+ * every file in it, or the whole repository when they share none.
+ */
+function batchArea(batch: string[]): string {
+  let prefix: string[] | undefined
+  for (const file of batch) {
+    const directory = file.split('/').slice(0, -1)
+    if (prefix === undefined) {
+      prefix = directory
+      continue
+    }
+    let shared = 0
+    while (shared < prefix.length && prefix[shared] === directory[shared]) shared += 1
+    prefix = prefix.slice(0, shared)
+  }
+  return prefix === undefined || prefix.length === 0 ? 'the repository' : prefix.join('/')
+}
+
 function batchHeading(batchInfo: BatchInfo | undefined): string {
   return batchInfo === undefined ? '' : `, batch ${batchInfo.index} of ${batchInfo.total}`
 }
@@ -544,9 +762,10 @@ function batchHeading(batchInfo: BatchInfo | undefined): string {
 function batchNote(batchInfo: BatchInfo | undefined): string {
   if (batchInfo === undefined) return ''
   return (
-    '\n\nNOTE: this is one batch of a larger scan. Carry out the scan instructions against the ' +
-    'files listed above; the other batches cover the rest, so do not report observations about ' +
-    'files outside this listing unless the scan instructions specifically name them.'
+    '\n\nNOTE: this is one batch of a larger scan; parallel batches cover the rest of the ' +
+    'repository. Read any file you need to understand the ones listed above, but do not report ' +
+    'observations about files outside this listing unless the scan instructions specifically ' +
+    'name them.'
   )
 }
 
