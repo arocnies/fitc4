@@ -114,6 +114,10 @@ const PROMPT =
   'context, each at most once, and only element ids from the element catalog. Map a candidate ' +
   'only when the catalog clearly contains the thing the dependency points at; omit any candidate ' +
   'you are not confident about — an omitted candidate simply stays unmapped. ' +
+  'A package that is a client, driver, SDK, or protocol library for an external system belongs to ' +
+  'the element standing for that system, because importing the client is how this code talks to ' +
+  'it; map it there rather than onto a general library or external-package bucket, which is only ' +
+  'for packages no element in the catalog stands for. ' +
   'Keep each reason to one sentence.'
 
 export function agentResolve(options: AgentResolveOptions): NamedProvider<ResolveProvider> {

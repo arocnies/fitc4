@@ -166,6 +166,12 @@ describe('agentResolve end to end', () => {
     expect(request?.context).not.toContain('->./util.js')
     expect(request?.context).not.toContain('=>./util.js')
     expect(request?.context).not.toContain('truncated')
+    // Measured on a real repository: without this steer the model mapped
+    // psycopg, sqlalchemy, alembic, and prometheus_client onto the draft's
+    // catch-all package element instead of the PostgreSQL and Prometheus
+    // elements whose descriptions name them, which is the whole use case.
+    expect(request?.prompt).toContain('client, driver, SDK, or protocol library')
+    expect(request?.prompt).toContain('rather than onto a general library or external-package bucket')
   })
 
   test('a claimed package is never a candidate — source-root already maps it deterministically', async () => {

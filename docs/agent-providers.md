@@ -162,6 +162,8 @@ Same discipline as `agentScan`, same rationale stated the other way around: a re
 - the reply names a `candidateId` it was never given: a reply naming ids it never saw is untrustworthy in full, not per entry, and must not be salvaged by dropping the bad rows;
 - the reply names an `elementId` that does not exist in the model, or maps one decision twice.
 
+The default prompt steers one case explicitly: a package that is a client, driver, SDK, or protocol library for an external system maps onto the element standing for that system, not onto a general library bucket. That is the provider's headline use case (`psycopg` is how the code talks to PostgreSQL), and measured on a real repository the model went the other way without the steer, mapping every driver onto the draft's catch-all package element and quietly undoing the split the user had just made.
+
 Accepted mappings carry provenance in each fanned-out association's `data` (`{ agent, candidateId, reason? }`). The association's own fields fill the standard envelope: `source`, `target`, `relationship`, `status`. Every validator therefore works against the contract without knowing an agent was involved. The prefilled context (catalog + decisions) is deterministic, so `cached()` composes unchanged. Like `agentScan`, the `id` option suffixes the provider id (`agent-resolve:<id>`) so multiple instances with different instructions coexist.
 
 ## Drafting descriptions: `draftDescriber` and `fitc4 draft --describe`
