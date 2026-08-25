@@ -69,8 +69,8 @@ The release measurement for 0.1.2, run after this branch changed the resolve pro
 
 | exec · model | rows perfect | divergences |
 |---|---|---|
-| claude · sonnet | 48/48 | none, after the parser fix below |
-| codex · gpt-5.6-luna | 47/48 | one, a reversed exploration edge |
+| claude · sonnet | 46/46 | none, after the parser fix below |
+| codex · gpt-5.6-luna | 45/46 | one, a reversed exploration edge |
 
 Three things this sweep produced, in ascending order of how much they were worth.
 
