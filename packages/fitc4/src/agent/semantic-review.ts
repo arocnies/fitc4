@@ -77,6 +77,15 @@ const REPLY_SCHEMA: JsonObject = {
 
 const ISSUE_LIMIT = 5
 
+/**
+ * Reviews run through a small worker pool, the same shape as agentScan's
+ * batches and the draft describer's elements: each element's judgment is
+ * independent, findings land in per-element slots merged in element order, so
+ * completion order never changes the report. This loop is the gate's slowest
+ * stretch on a described model; ten sequential judgments cost ten round trips.
+ */
+const REVIEW_CONCURRENCY = 4
+
 export function agentSemanticReview(options: SemanticReviewOptions): NamedProvider<ValidateProvider> {
   const severity = options.severity ?? 'warning'
   const maxElements = options.maxElements ?? 10
@@ -97,7 +106,15 @@ export function agentSemanticReview(options: SemanticReviewOptions): NamedProvid
 
     const graph = buildGraph(context.model, context.observations, context.associations)
 
-    for (const [index, element] of reviewed.entries()) {
+    // Per-element finding slots, merged in element order below, so a pooled
+    // run reports byte-identically to a sequential one.
+    const perElement: Finding[][] = new Array<Finding[]>(reviewed.length)
+    let unavailable = false
+
+    const reviewOne = async (index: number, element: ReviewableElement): Promise<void> => {
+      const slot: Finding[] = []
+      perElement[index] = slot
+
       const excerpted = element.files.slice(0, maxFilesPerElement)
       const pack = assemblePack(
         [
@@ -117,11 +134,11 @@ export function agentSemanticReview(options: SemanticReviewOptions): NamedProvid
       // the file cap or the byte budget, is a finding, not a silent thinning
       // of the judge's evidence. Escalates to error when this provider gates.
       for (const drop of pack.dropped) {
-        findings.push(agentTruncated(PROVIDER_ID, drop.count, drop.what, severity))
+        slot.push(agentTruncated(PROVIDER_ID, drop.count, drop.what, severity))
       }
 
-      // One line per call: this loop is the run's slowest stretch, and a
-      // count makes the wait finite instead of open-ended.
+      // One line per call: a count makes the wait finite instead of
+      // open-ended.
       context.progress?.(
         `judging ${element.id} against its description with ${options.exec.id} (${index + 1} of ${reviewed.length})`,
       )
@@ -139,18 +156,24 @@ export function agentSemanticReview(options: SemanticReviewOptions): NamedProvid
       })
 
       if (!reply.ok) {
-        findings.push(agentUnavailable(PROVIDER_ID, options.exec.id, reply.error, severity))
-        break
+        // One agent-unavailable for the run, not one per in-flight call: the
+        // first failure stops the pool from scheduling more, and a second
+        // in-flight failure is the same dead CLI already reported.
+        if (!unavailable) {
+          unavailable = true
+          slot.push(agentUnavailable(PROVIDER_ID, options.exec.id, reply.error, severity))
+        }
+        return
       }
 
       const verdict = reply.value as { matches?: unknown; issues?: unknown }
-      if (verdict?.matches !== false) continue
+      if (verdict?.matches !== false) return
 
       const issues = (Array.isArray(verdict.issues) ? verdict.issues : [])
         .filter((issue): issue is string => typeof issue === 'string')
         .slice(0, ISSUE_LIMIT)
 
-      findings.push({
+      slot.push({
         id: findingId(PROVIDER_ID, 'description-drift', element.id),
         ruleId: 'description-drift',
         severity,
@@ -164,6 +187,22 @@ export function agentSemanticReview(options: SemanticReviewOptions): NamedProvid
       })
     }
 
+    let nextIndex = 0
+    await Promise.all(
+      Array.from({ length: Math.min(REVIEW_CONCURRENCY, reviewed.length) }, async () => {
+        while (!unavailable) {
+          const index = nextIndex
+          nextIndex += 1
+          const element = reviewed[index]
+          if (element === undefined) return
+          await reviewOne(index, element)
+        }
+      }),
+    )
+
+    for (const slot of perElement) {
+      if (slot !== undefined) findings.push(...slot)
+    }
     return findings
   }
 

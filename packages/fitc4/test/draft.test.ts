@@ -525,8 +525,14 @@ describe('draft', () => {
 
     // The transport-failure contract: a callback that cannot run is not a
     // callback that declined, so the draft fails and leaves nothing behind.
-    test('a thrown callback aborts on the first element and writes nothing', HEAVY, async () => {
-      const config = describeConfig()
+    test('a thrown callback aborts the pass and writes nothing', HEAVY, async () => {
+      // Six eligible elements against a pool of four: the pool has started
+      // its width when the first failure lands, and the failure stops the
+      // rest from ever being offered. Six pointless waits collapse to four,
+      // the pool's worth, not one per element.
+      const config = stubConfig(
+        ['a', 'b', 'c', 'd', 'e', 'f'].map((name) => file(`src/${name}/index.ts`)),
+      )
       const offered: string[] = []
 
       await expect(
@@ -536,11 +542,9 @@ describe('draft', () => {
             throw new Error('claude-cli/sonnet could not run: not logged in')
           },
         }),
-      ).rejects.toThrow(/describe aborted at app\.billing.*not logged in.*No model was written/s)
+      ).rejects.toThrow(/describe aborted at app\..*not logged in.*No model was written/s)
 
-      // One call, not one per element: N more calls against a dead CLI are N
-      // more pointless waits.
-      expect(offered).toHaveLength(1)
+      expect(offered).toHaveLength(4)
       expect(fs.readdirSync(config.modelDir)).toEqual([])
     })
 

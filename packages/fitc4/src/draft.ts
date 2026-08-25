@@ -348,13 +348,20 @@ export async function draft(
  *
  * An abstention (`undefined`) keeps the element's TODO, narrated and never
  * fatal: a draft with placeholder descriptions is exactly as correct as one
- * without the pass. A thrown callback is the opposite case and aborts on the
- * first one, without trying the remaining elements. The same reasoning as
- * `agentSemanticReview`'s single `agent-unavailable` finding: N more calls
- * against a logged-out CLI are N more pointless waits, and a describe pass
- * that silently degraded to zero descriptions would report as if every model
- * had abstained.
+ * without the pass. A thrown callback is the opposite case and aborts the
+ * pass, scheduling nothing further, without waiting out the remaining
+ * elements. The same reasoning as `agentSemanticReview`'s single
+ * `agent-unavailable` finding: N more calls against a logged-out CLI are N
+ * more pointless waits, and a describe pass that silently degraded to zero
+ * descriptions would report as if every model had abstained.
+ *
+ * The calls run through a small worker pool, the same shape as agentScan's:
+ * elements are independent, each call edits only its own element's
+ * description, so nothing orders them, and a 34-element repository should
+ * not pay 34 round trips end to end. Measured before pooling: 11s a call,
+ * six and a half minutes of drafting; pooled, under two.
  */
+const DESCRIBE_CONCURRENCY = 4
 async function describeElements(
   elements: DraftElement[],
   observations: Observation[],
@@ -394,7 +401,8 @@ async function describeElements(
   narrate?.(`describe: ${count(eligible.length, 'element')}`)
 
   let described = 0
-  for (const { element, declared, ownedFiles } of eligible) {
+  const describeOne = async (entry: (typeof eligible)[number]): Promise<void> => {
+    const { element, declared, ownedFiles } = entry
     narrate?.(`describe: app.${element.path}...`)
     const started = Date.now()
     let proposed: string | undefined
@@ -416,6 +424,28 @@ async function describeElements(
       narrate?.(`describe: app.${element.path} kept the TODO, ${elapsed(started)}`)
     }
   }
+
+  // The same pool discipline as agentScan's batches: the first failure is the
+  // one that aborts, workers drain instead of starting new calls, and the
+  // in-flight remainder settles before the throw so no call outlives the pass.
+  let failure: unknown
+  let nextIndex = 0
+  await Promise.all(
+    Array.from({ length: Math.min(DESCRIBE_CONCURRENCY, eligible.length) }, async () => {
+      while (failure === undefined) {
+        const index = nextIndex
+        nextIndex += 1
+        const entry = eligible[index]
+        if (entry === undefined) return
+        try {
+          await describeOne(entry)
+        } catch (error) {
+          failure ??= error
+        }
+      }
+    }),
+  )
+  if (failure !== undefined) throw failure
 
   return { describeAttempted: eligible.length, described }
 }

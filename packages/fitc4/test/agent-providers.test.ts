@@ -319,14 +319,16 @@ describe('agentSemanticReview', () => {
     expect(result.findings).toEqual([])
   })
 
-  // The fixture has two described elements on purpose: without the second,
-  // this passes even if the provider keeps calling a dead CLI per element.
-  test('the first exec failure stops the run with one finding', async () => {
+  // The fixture has two described elements on purpose: the pool starts both,
+  // both hit the dead CLI, and the run still reports one agent-unavailable,
+  // not one per in-flight call. Scheduling stopping at the first failure is
+  // pinned by the draft describer's abort test on the same pool pattern.
+  test('exec failure yields one agent-unavailable finding, not one per call', async () => {
     const exec = stubExec([{ ok: false, error: 'CLI missing' }])
 
     const result = await runFixture('described', { validate: [agentSemanticReview({ exec })] })
 
-    expect(exec.requests).toHaveLength(1)
+    expect(exec.requests).toHaveLength(2)
     expect(result.findings).toHaveLength(1)
     expect(ruleIds(result.findings)).toEqual(['agent-unavailable'])
     expect(findingFor(result.findings, 'agent-unavailable')?.severity).toBe('warning')
