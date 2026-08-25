@@ -82,6 +82,13 @@ export function composeInput(request: AgentRequest): string {
  * Models fence and preface JSON no matter how firmly they are told not to, so
  * this strips a fence and, failing that, parses the outermost bracketed span.
  * `undefined` means no JSON was found, which is distinct from a parsed `null`.
+ *
+ * A last attempt escapes raw control characters inside string spans, for the
+ * same reason the fence strip exists: a model writing a long description
+ * across two lines emits a literal newline inside a JSON string, which is
+ * invalid JSON carrying a completely unambiguous value. Measured live: one
+ * such reply aborted a 35-element draft. Tolerating it is not laxness about
+ * conformance, which `schemaMismatch` still enforces on whatever parses.
  */
 export function extractJson(text: string): JsonValue | undefined {
   const unfenced = text
@@ -89,20 +96,96 @@ export function extractJson(text: string): JsonValue | undefined {
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/, '')
 
-  try {
-    return JSON.parse(unfenced) as JsonValue
-  } catch {
-    const start = unfenced.search(/[[{]/)
-    const end = Math.max(unfenced.lastIndexOf('}'), unfenced.lastIndexOf(']'))
-    if (start >= 0 && end > start) {
+  const candidates = [unfenced]
+  const start = unfenced.search(/[[{]/)
+  const end = Math.max(unfenced.lastIndexOf('}'), unfenced.lastIndexOf(']'))
+  if (start >= 0 && end > start) candidates.push(unfenced.slice(start, end + 1))
+
+  for (const candidate of candidates) {
+    for (const attempt of [candidate, escapeControlsInStrings(candidate)]) {
       try {
-        return JSON.parse(unfenced.slice(start, end + 1)) as JsonValue
+        return JSON.parse(attempt) as JsonValue
       } catch {
-        return undefined
+        // Try the next shape.
       }
     }
-    return undefined
   }
+  return undefined
+}
+
+/**
+ * Escape raw control characters that appear inside JSON string spans.
+ *
+ * Walks the text tracking whether it sits inside a string and whether the
+ * previous character was an escape, so only unescaped control characters
+ * within a string are rewritten. Text outside strings is untouched, which
+ * keeps the structure exactly as the model wrote it: this repairs a value,
+ * never a shape.
+ */
+function escapeControlsInStrings(text: string): string {
+  const ESCAPES: Record<string, string> = {
+    '\n': '\\n',
+    '\r': '\\r',
+    '\t': '\\t',
+    '\b': '\\b',
+    '\f': '\\f',
+  }
+  let out = ''
+  let inString = false
+  let escaped = false
+  for (const character of text) {
+    if (escaped) {
+      out += character
+      escaped = false
+      continue
+    }
+    if (character === '\\' && inString) {
+      out += character
+      escaped = true
+      continue
+    }
+    if (character === '"') {
+      inString = !inString
+      out += character
+      continue
+    }
+    if (inString && character < ' ') {
+      out += ESCAPES[character] ?? `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`
+      continue
+    }
+    out += character
+  }
+  return out
+}
+
+/**
+ * Whether a reply looks cut off rather than merely malformed.
+ *
+ * Both arrive as "not the requested JSON", and the excerpt in that message is
+ * capped, so without this the two read identically to whoever is debugging a
+ * failed run. An unterminated string or an unclosed bracket means the reply
+ * ended early, which is a different problem with a different fix (a smaller
+ * request, a longer budget) than a model that formatted its answer badly.
+ */
+export function looksTruncated(text: string): boolean {
+  let inString = false
+  let escaped = false
+  let depth = 0
+  for (const character of text) {
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (inString) {
+      if (character === '\\') escaped = true
+      else if (character === '"') inString = false
+      continue
+    }
+    if (character === '"') inString = true
+    else if (character === '{' || character === '[') depth += 1
+    else if (character === '}' || character === ']') depth -= 1
+  }
+  return inString || depth > 0
 }
 
 /** Turn a CLI's reply text into an `AgentReply`, honouring the requested schema. */
@@ -111,7 +194,10 @@ export function finishReply(request: AgentRequest, text: string): AgentReply {
 
   const value = extractJson(text)
   if (value === undefined) {
-    return { ok: false, error: `reply was not the requested JSON: ${truncate(text, 200)}` }
+    const why = looksTruncated(text.trim())
+      ? 'reply ended mid-value, so it was cut off rather than merely malformed'
+      : 'reply was not the requested JSON'
+    return { ok: false, error: `${why}: ${truncate(text, 200)}` }
   }
 
   // Parsing is not conforming. A reply that is JSON but not the requested

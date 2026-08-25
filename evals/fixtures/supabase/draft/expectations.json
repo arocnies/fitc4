@@ -31,7 +31,10 @@
     "elements": [
       {
         "title": "docker-compose.yml",
-        "describeMust": ["stack|deployable|self-host|platform", "postgres|database"],
+        "describeMust": [
+          "stack|deployable|self-host|platform",
+          "postgres|database|persistent|persistence|data storage"
+        ],
         "describeMustNot": ["imgproxy"]
       }
     ]

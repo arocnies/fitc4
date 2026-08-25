@@ -22,6 +22,7 @@ import {
   extractJson,
   FAILURE_EXCERPT_LIMIT,
   finishReply,
+  looksTruncated,
   runCliProcess,
   schemaMismatch,
   tailExcerpt,
@@ -245,7 +246,12 @@ export function codexCli(options: CodexCliOptions = {}): AgentExec {
         // withoutNullOptionals) before the reply meets the original schema.
         let value = extractJson(reply)
         if (value === undefined) {
-          return { ok: false, error: `reply was not the requested JSON: ${truncate(reply, 200)}` }
+          // A half-written reply file is this adapter's own truncation case,
+          // so it gets the same distinction the shared path makes.
+          const why = looksTruncated(reply.trim())
+            ? 'reply ended mid-value, so it was cut off rather than merely malformed'
+            : 'reply was not the requested JSON'
+          return { ok: false, error: `${why}: ${truncate(reply, 200)}` }
         }
         if (enveloped) {
           if (value === null || typeof value !== 'object' || Array.isArray(value)) {

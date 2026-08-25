@@ -647,6 +647,55 @@ describe('extractJson', () => {
     expect(extractJson('Sure! Here it is: {"a": {"b": 2}} — hope that helps')).toEqual({ a: { b: 2 } })
     expect(extractJson('no json here')).toBeUndefined()
   })
+
+  // Measured live on a sonnet draft: a description written across two lines
+  // put a literal newline inside the JSON string, which is invalid JSON
+  // carrying an entirely unambiguous value, and it aborted a 35-element
+  // draft. Tab and carriage return travel the same way.
+  test('a raw control character inside a string is repaired, not refused', () => {
+    expect(extractJson('{"description":"Line one\nline two."}')).toEqual({
+      description: 'Line one\nline two.',
+    })
+    expect(extractJson('{"a":"x\ty\rz"}')).toEqual({ a: 'x\ty\rz' })
+    // An already-escaped newline is untouched, so a well-formed reply parses
+    // exactly as before rather than through the repair path.
+    expect(extractJson('{"a":"one\\ntwo"}')).toEqual({ a: 'one\ntwo' })
+    // The repair reads string state honestly: a brace inside a string is
+    // content, and the control character after it is still inside that string.
+    expect(extractJson('{"a":"{ not a brace\nstill inside"}')).toEqual({
+      a: '{ not a brace\nstill inside',
+    })
+  })
+
+  test('a reply cut off mid-value stays a refusal', () => {
+    expect(extractJson('{"description":"This container provisions and orch')).toBeUndefined()
+  })
+})
+
+// A truncated reply and a badly formatted one both arrive as unparseable, and
+// the excerpt in the error is capped, so the message has to distinguish them:
+// they have different fixes, and conflating them sent a real debugging session
+// chasing the wrong cause.
+describe('unparseable reply diagnostics', () => {
+  const schema = { type: 'object', required: ['description'], properties: { description: { type: 'string' } } }
+
+  test('a cut-off reply says it ended mid-value', () => {
+    const reply = finishReply({ prompt: 'describe', schema }, '{"description":"half a sent')
+
+    expect(reply.ok).toBe(false)
+    if (reply.ok) return
+    expect(reply.error).toContain('ended mid-value')
+    expect(reply.error).toContain('cut off')
+  })
+
+  test('a complete reply that is simply not JSON says only that', () => {
+    const reply = finishReply({ prompt: 'describe', schema }, 'I cannot determine that.')
+
+    expect(reply.ok).toBe(false)
+    if (reply.ok) return
+    expect(reply.error).toContain('was not the requested JSON')
+    expect(reply.error).not.toContain('ended mid-value')
+  })
 })
 
 // Parsing is not conforming: a reply that is JSON but not the requested shape
