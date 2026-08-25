@@ -34,6 +34,10 @@ model {
       archive = component 'Order archive' {
         description 'Object-storage bucket holding cold order documents'
       }
+
+      vendor = component 'External packages' {
+        description 'Third-party npm libraries the app depends on'
+      }
     }
   }
 

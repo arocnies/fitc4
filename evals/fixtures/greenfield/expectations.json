@@ -4,8 +4,13 @@
       "provider": "architecture-rules",
       "ruleId": "unobserved-elements",
       "severity": "info",
-      "related": ["shop.external.archive", "shop.external.payments", "shop.external.storage"],
-      "label": "the three description-only externals are reported as unobserved"
+      "related": [
+        "shop.external.archive",
+        "shop.external.payments",
+        "shop.external.storage",
+        "shop.external.vendor"
+      ],
+      "label": "the four description-only externals are reported as unobserved"
     }
   ],
   "associations": {
@@ -24,6 +29,12 @@
         "provider": "agent-resolve",
         "candidateId": "shop.app.core=>@aws-sdk/client-s3",
         "label": "the ambiguous object-storage package was mapped instead of left unmapped"
+      },
+      {
+        "provider": "agent-resolve",
+        "candidateId": "shop.app.core=>stripe",
+        "target": "shop.external.vendor",
+        "label": "the payments SDK was dumped on the external-packages bucket instead of the system it talks to"
       }
     ]
   }

@@ -29,7 +29,11 @@
   ],
   "expectedExtras": {
     "elements": [
-      { "title": "docker-compose.yml" }
+      {
+        "title": "docker-compose.yml",
+        "describeMust": ["stack|deployable|self-host", "postgres|database"],
+        "describeMustNot": ["imgproxy"]
+      }
     ]
   }
 }

@@ -21,7 +21,11 @@
  * `describeMust` / `describeMustNot` substrings, which turns
  * `draft-descriptions` from a presence check into one that can fail on
  * content: the description must name the real responsibility and must not
- * echo a misleading name. See `describeViolations`.
+ * echo a misleading name. See `describeViolations`. A pinned extra element
+ * takes the same rules, because that is where a drafted pure container
+ * lives: the describe pass synthesizes its description from its children,
+ * and without rules on the pin that description would replay through stub
+ * mode without ever being judged.
  *
  * The result is two scorecard rows in the harness's usual vocabulary:
  * `draft-elements` (which known elements the draft produced) and
@@ -87,6 +91,16 @@ export interface DraftPinnedExtraElement {
   title: string
   /** The drafted `sources` value, when the drafted element declares one. */
   sources?: string
+  /**
+   * Description rules, same semantics as `DraftExpectedElement`'s. A pinned
+   * extra is where a drafted pure container lives (the reference never
+   * declares it, but the describe pass writes it a description synthesized
+   * from its children), so rules here are what makes a container's
+   * description judged rather than merely present. A pin without rules
+   * scores exactly as before.
+   */
+  describeMust?: string[]
+  describeMustNot?: string[]
 }
 
 export interface DraftPinnedExtraEdge {
@@ -259,7 +273,7 @@ export async function scoreDescribeReview(
  */
 function describeViolations(
   description: string,
-  expected: DraftExpectedElement | undefined,
+  expected: Pick<DraftExpectedElement, 'describeMust' | 'describeMustNot'> | undefined,
 ): string[] {
   const haystack = description.toLowerCase()
   const broken: string[] = []
@@ -324,6 +338,7 @@ export function scoreDraft(
     }
   }
   const pinnedExtraElements = [...(expectations.expectedExtras?.elements ?? [])]
+  const pinnedMatches: { element: DraftedElement; pin: DraftPinnedExtraElement }[] = []
   for (const element of elements) {
     if (matchedElements.has(element)) continue
     elementRow.extras += 1
@@ -331,6 +346,8 @@ export function scoreDraft(
       (pin) => pin.title === element.title && pin.sources === element.sources,
     )
     if (pinIndex !== -1) {
+      const pin = pinnedExtraElements[pinIndex]
+      if (pin !== undefined) pinnedMatches.push({ element, pin })
       pinnedExtraElements.splice(pinIndex, 1)
       elementRow.pinned = (elementRow.pinned ?? 0) + 1
       continue
@@ -406,7 +423,11 @@ export function scoreDraft(
       notes: [],
     }
     for (const element of matchedElements) {
-      if (element.sources === undefined) continue
+      const expected = matchedExpectation.get(element)
+      const hasRules = expected?.describeMust !== undefined || expected?.describeMustNot !== undefined
+      // A sources-less element without rules is a container the presence
+      // check never covered; with rules, the fixture opted it in.
+      if (element.sources === undefined && !hasRules) continue
       const name = referenceName.get(element.id) ?? element.title
       const description = element.description
       if (description === undefined || description.startsWith('TODO')) {
@@ -414,13 +435,32 @@ export function scoreDraft(
         descriptionRow.notes.push(`undescribed element: ${name} kept the TODO`)
         continue
       }
-      const broken = describeViolations(description, matchedExpectation.get(element))
+      const broken = describeViolations(description, expected)
       if (broken.length === 0) {
         descriptionRow.hits += 1
         continue
       }
       descriptionRow.misses += 1
       descriptionRow.notes.push(`wrong description: ${name} ${broken.join(', ')}`)
+    }
+    // Pinned extras with rules are the drafted pure containers: the describe
+    // pass synthesizes their descriptions from their children, so a fixture
+    // that pins one may also judge what it says.
+    for (const { element, pin } of pinnedMatches) {
+      if (pin.describeMust === undefined && pin.describeMustNot === undefined) continue
+      const description = element.description
+      if (description === undefined || description.startsWith('TODO')) {
+        descriptionRow.misses += 1
+        descriptionRow.notes.push(`undescribed element: ${element.title} kept the TODO`)
+        continue
+      }
+      const broken = describeViolations(description, pin)
+      if (broken.length === 0) {
+        descriptionRow.hits += 1
+        continue
+      }
+      descriptionRow.misses += 1
+      descriptionRow.notes.push(`wrong description: ${element.title} ${broken.join(', ')}`)
     }
     rows.push(descriptionRow)
   }

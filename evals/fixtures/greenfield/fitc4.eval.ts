@@ -6,7 +6,11 @@
  * alongside the standard resolver, exactly as the docs compose it. Ground
  * truth: `stripe` unambiguously belongs to `shop.external.payments` (must be
  * mapped), while `@aws-sdk/client-s3` could be either of two object-storage
- * elements (must be left unmapped — abstention is the right answer).
+ * elements (must be left unmapped — abstention is the right answer). The
+ * model also declares an `External packages` junk-drawer element, and both
+ * answers must resist it: a payments SDK dumped there instead of on the
+ * system it talks to is the measured live failure the default prompt now
+ * steers against.
  */
 
 import path from 'node:path'
