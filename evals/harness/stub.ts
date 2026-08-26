@@ -23,8 +23,14 @@ export interface ScriptedReply {
   when: {
     /** Substring the request prompt must contain. */
     promptIncludes?: string
-    /** Substring the prefilled context must contain. */
-    contextIncludes?: string
+    /**
+     * Substring(s) the prefilled context must contain — all of them, when a
+     * list. A list is for requests only a conjunction can tell apart: a
+     * focused scan under the shipped default instructions shares its
+     * instruction text with an agentic whole-repo scan and its focus header
+     * with the fixture's own oracle scan, and only both together name it.
+     */
+    contextIncludes?: string | string[]
   }
   /** The JSON value the ideal agent replies with. */
   reply: JsonValue
@@ -54,8 +60,12 @@ function matches(when: ScriptedReply['when'], request: AgentRequest): boolean {
   if (when.promptIncludes !== undefined && !request.prompt.includes(when.promptIncludes)) {
     return false
   }
-  if (when.contextIncludes !== undefined && !(request.context ?? '').includes(when.contextIncludes)) {
-    return false
-  }
-  return true
+  const context = request.context ?? ''
+  const needed =
+    when.contextIncludes === undefined
+      ? []
+      : Array.isArray(when.contextIncludes)
+        ? when.contextIncludes
+        : [when.contextIncludes]
+  return needed.every((needle) => context.includes(needle))
 }

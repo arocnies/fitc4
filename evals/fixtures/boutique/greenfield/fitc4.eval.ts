@@ -105,6 +105,25 @@ export default function boutiqueGreenfield(exec: AgentExec, root: string): Pipel
 }
 
 /**
+ * What a user would actually type before reading any documentation: the two
+ * facts about this repository that are not written down in any one file. Two
+ * sentences, 21 words. Everything the gate instructions say beyond this —
+ * emit kind 'dependency', stand a Dockerfile in for a service, ignore
+ * REDIS_ADDR, list examined — is the tool's job, and the `user-hint` angle
+ * measures whether the tool does it.
+ *
+ * The first live pass measured exactly one gap: both models answered in the
+ * natural vocabulary, `{ kind: 'service', id: 'checkoutservice' }`, and the
+ * resolver only spoke paths, so every edge vanished without a finding. The
+ * fix went into the tool, not this prose: `source-root` now resolves a ref's
+ * id as an element name when it is not a claimed path, and the angle's
+ * expectations pin the service-name vocabulary end to end.
+ */
+export const USER_HINT =
+  'Each kubernetes-manifests/<name>.yaml deploys the service implemented under src/<name>. ' +
+  'Env vars ending in _SERVICE_ADDR name the services it calls.'
+
+/**
  * The same manifests with the inventory taken away.
  *
  * `roots` narrows to the focused directory, which is what every focused scan
@@ -122,6 +141,44 @@ export const angles = {
     return {
       ...config,
       scan: [boutiqueScan(exec, SCAN_INSTRUCTIONS, ['kubernetes-manifests'])],
+    }
+  },
+
+  /**
+   * The same wiring with zero authored words: no `instructions` at all, so the
+   * scan runs on the shipped import-scan default over files that contain no
+   * imports. This is the floor. Whatever this row scores is what a user gets
+   * for pointing the tool at manifests and writing nothing, and the distance
+   * to the base row is the price of the prose, measured.
+   */
+  'default-prompt': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = boutiqueGreenfield(exec, root)
+    return {
+      ...config,
+      scan: [
+        agentScan({
+          exec,
+          id: 'manifests',
+          roots: ROOTS,
+          focus: ['kubernetes-manifests/*.yaml'],
+          excerptChars: 4_500,
+        }),
+      ],
+    }
+  },
+
+  /**
+   * The two-sentence tier: `USER_HINT` instead of the 147-word oracle, with
+   * its own expectations because the ideal reply speaks service names, not
+   * Dockerfile stand-ins. The associations it must reach are the base row's
+   * fifteen, verbatim — same graph, different words — so a miss here is a
+   * vocabulary the tool stopped understanding, not a fact the hint omits.
+   */
+  'user-hint': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = boutiqueGreenfield(exec, root)
+    return {
+      ...config,
+      scan: [boutiqueScan(exec, USER_HINT)],
     }
   },
 }

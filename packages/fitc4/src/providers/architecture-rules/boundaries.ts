@@ -70,6 +70,60 @@ export function dependencyRule(
 }
 
 /**
+ * A dependency the resolver could not map onto the model.
+ *
+ * The scan reported an edge in some vocabulary — a path no element claims, a
+ * name no element bears, or a name two elements share — and resolution came
+ * back empty or ambiguous. Reported for the same reason as `unresolved-import`:
+ * the alternative is silence, and a dependency that maps to nothing is a
+ * boundary crossing the gate never judged. Two entire agent-scan replies were
+ * once dropped this way without a single finding, which is the fail-open
+ * outcome nothing downstream can flag.
+ *
+ * Scoped to edges that speak names: an endpoint whose kind is not a path
+ * (`file`, `directory`) or a package (`module`). Path refs have their own
+ * rule family — `unmapped-source` names the unowned file, `unresolved-import`
+ * the broken specifier — and repeating those per edge would bury a brownfield
+ * report. A named endpoint that maps to nothing has no other rule to speak
+ * for it, and external packages are exempt because a `module` target no
+ * element claims is the normal state of almost every import, not a gap in
+ * the model.
+ */
+export function unmappedReferenceRule(
+  association: Association,
+  observation: Observation,
+  severityOf: SeverityOf,
+): Finding | undefined {
+  if (association.status !== 'unresolved' && association.status !== 'ambiguous') return undefined
+  if (observation.target === undefined || observation.target.kind === 'module') return undefined
+
+  const speaksNames = [observation.subject, observation.target].some(
+    (ref) =>
+      ref !== undefined && ref.kind !== 'file' && ref.kind !== 'directory' && ref.kind !== 'module',
+  )
+  if (!speaksNames) return undefined
+
+  const fromId = observation.subject?.id ?? association.observationId
+  const toId = observation.target.id
+  const candidates = association.candidates ?? []
+  const why =
+    association.status === 'ambiguous'
+      ? `an endpoint is claimed by ${candidates.map((ref) => ref.id).join(' and ')}`
+      : 'the edge does not map onto two model elements'
+
+  return {
+    id: findingId(PROVIDER_ID, 'unmapped-reference', `${fromId}->${toId}`),
+    ruleId: 'unmapped-reference',
+    severity: severityOf('unmapped-reference', 'warning'),
+    description: `${fromId} depends on ${toId}, but ${why}, so the dependency cannot be checked.`,
+    subject: observation.subject ?? { kind: 'file', id: fromId },
+    ...(candidates.length > 0 ? { related: candidates } : {}),
+    evidence: observation.evidence,
+    provider: PROVIDER_ID,
+  }
+}
+
+/**
  * A relative import that resolves to nothing.
  *
  * Reported because the alternative is silence: an unresolvable dependency

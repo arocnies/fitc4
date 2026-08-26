@@ -372,6 +372,58 @@ export function declaredRelationships(model: LikeC4Model): DeclaredRelationships
   return { byId, duplicates }
 }
 
+/** Elements addressable by a name, exactly and by normalized spelling. */
+export interface ElementNameIndex {
+  /** Full LikeC4 ids and their leaf names, verbatim. */
+  exact: Map<string, string[]>
+  /** The same names under `normalizeElementName`, for cross-convention hits. */
+  normalized: Map<string, string[]>
+}
+
+/**
+ * Lowercase, alphanumerics only: the spelling-insensitive form of a name.
+ *
+ * LikeC4 identifiers cannot contain `-`, so the element standing for a
+ * compose service `api-gw` is inevitably spelled `apiGw` or `api_gw`, and a
+ * scanner that names the real thing can never hit it verbatim. Normalizing
+ * both sides makes those the same name without inventing anything: `apiGw`,
+ * `api_gw`, and `api-gw` all become `apigw`.
+ */
+export function normalizeElementName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+/**
+ * Elements addressable by name: each full id maps to itself, and each leaf
+ * name (`checkoutservice` for `boutique.checkoutservice`) maps to every
+ * element that ends in it, verbatim in `exact` and spelling-insensitively in
+ * `normalized`. A name two elements share stays in the index with both ids,
+ * so a lookup can distinguish "unknown name" from "ambiguous name" — the
+ * resolver reports the second, never guesses.
+ *
+ * This exists because agents describing conceptual components — a compose
+ * service, a deployment, a queue — naturally name the thing rather than a
+ * file that stands in for it. The name is a valid address exactly when the
+ * model declares an element by it.
+ */
+export function elementsByName(model: LikeC4Model): ElementNameIndex {
+  const exact = new Map<string, string[]>()
+  const normalized = new Map<string, string[]>()
+  const add = (index: Map<string, string[]>, name: string, id: string) => {
+    if (name === '') return
+    const existing = index.get(name) ?? []
+    if (!existing.includes(id)) index.set(name, [...existing, id].sort())
+  }
+  for (const element of model.elements()) {
+    const leaf = element.id.split('.').at(-1)
+    for (const name of new Set([element.id, leaf ?? ''])) {
+      add(exact, name, element.id)
+      add(normalized, normalizeElementName(name), element.id)
+    }
+  }
+  return { exact, normalized }
+}
+
 /** True when `ancestor` contains `descendant` in the LikeC4 hierarchy. */
 export function isAncestorOf(ancestor: string, descendant: string): boolean {
   return descendant.startsWith(`${ancestor}.`)

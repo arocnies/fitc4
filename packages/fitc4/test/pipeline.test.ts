@@ -64,6 +64,15 @@ describe('a model whose implementation contradicts the contract', () => {
     ])
   })
 
+  test('a path-vocabulary dependency into unowned code stays with unmapped-source alone', () => {
+    // src/orphan/thing.ts imports owned code and no element owns it. The file
+    // gets its unmapped-source warning; the edge repeats no second warning,
+    // because unmapped-reference is scoped to name-vocabulary endpoints.
+    expect(findingFor(result.findings, 'unmapped-reference')).toBeUndefined()
+    const unmapped = result.findings.filter((finding) => finding.ruleId === 'unmapped-source')
+    expect(unmapped.some((finding) => finding.subject?.id === 'src/orphan/thing.ts')).toBe(true)
+  })
+
   test('flags the undeclared dependency and names both elements', () => {
     const finding = findingFor(result.findings, 'missing-relationship')
 

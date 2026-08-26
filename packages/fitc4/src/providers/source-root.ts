@@ -12,13 +12,16 @@
 
 import {
   declaredRelationships,
+  elementsByName,
   hasRelationship,
   isSameOrNested,
   matchesClaim,
+  normalizeElementName,
   ownershipPrefixes,
   packageClaims,
   packageNameOf,
   type DeclaredRelationships,
+  type ElementNameIndex,
   type OwnershipPrefix,
 } from '../model.ts'
 import type {
@@ -41,6 +44,7 @@ export function sourceRoot(): NamedProvider<ResolveProvider> {
     const { prefixes } = ownershipPrefixes(context.model)
     const declared = declaredRelationships(context.model)
     const claimants = claimantsByPackage(context)
+    const names = elementsByName(context.model)
     const associations: Association[] = []
 
     for (const observation of context.observations) {
@@ -54,7 +58,7 @@ export function sourceRoot(): NamedProvider<ResolveProvider> {
       // branch below and the rules provider is the one that says anything
       // about it.
       if (observation.kind === 'dependency' || observation.kind === 'unresolved-dependency') {
-        const association = dependencyAssociation(observation, prefixes, declared, claimants)
+        const association = dependencyAssociation(observation, prefixes, declared, claimants, names)
         if (association !== undefined) associations.push(association)
       }
     }
@@ -104,6 +108,54 @@ export function ownerOf(filePath: string, prefixes: OwnershipPrefix[]): Ownershi
   const [first, ...rest] = elementIds
   if (first === undefined) return { status: 'unresolved' }
   if (rest.length > 0) return { status: 'ambiguous', candidates: elementIds }
+  return { status: 'resolved', elementId: first }
+}
+
+/**
+ * Find the owning element of one dependency ref, whatever vocabulary the
+ * scanner spoke.
+ *
+ * The ref's kind is descriptive, not structural: an agent describing a
+ * compose service or a deployment writes `{ kind: 'service', id: ... }`
+ * because that is what the thing is, and making ownership depend on it
+ * saying 'file' instead would demand ref-kind discipline no instruction
+ * should have to teach. So ownership goes by the id alone, in order of
+ * evidence strength:
+ *
+ * 1. As a path or fragment claim — `ownerOf`, same as a plain file ref. A
+ *    directory id gets a second try with a trailing slash, because claims
+ *    are stored slash-terminated and `src/adservice` should land inside
+ *    `src/adservice/**`.
+ * 2. As an element name — the full LikeC4 id or its leaf, verbatim first and
+ *    spelling-insensitively second, so `redis-cart` finds the `redis_cart`
+ *    identifier LikeC4 forced. Only for refs that are not paths on their own
+ *    evidence: `file` and `directory` refs went through the existence guard
+ *    as paths, and `module` ids are package names where a name match would
+ *    invent edges (a package named like an element is a coincidence, not an
+ *    address).
+ *
+ * A name two elements share resolves as ambiguous, never as a guess.
+ */
+function refOwnership(
+  ref: Ref,
+  prefixes: OwnershipPrefix[],
+  names: ElementNameIndex,
+): Ownership {
+  const byPath = ownerOf(ref.id, prefixes)
+  if (byPath.status !== 'unresolved') return byPath
+
+  if (!ref.id.includes('#') && !ref.id.endsWith('/')) {
+    const asDirectory = ownerOf(`${ref.id}/`, prefixes)
+    if (asDirectory.status !== 'unresolved') return asDirectory
+  }
+
+  if (ref.kind === 'file' || ref.kind === 'directory' || ref.kind === 'module') return byPath
+
+  const elementIds =
+    names.exact.get(ref.id) ?? names.normalized.get(normalizeElementName(ref.id))
+  const [first, ...rest] = elementIds ?? []
+  if (first === undefined) return { status: 'unresolved' }
+  if (rest.length > 0) return { status: 'ambiguous', candidates: elementIds ?? [] }
   return { status: 'resolved', elementId: first }
 }
 
@@ -158,9 +210,11 @@ function dependencyAssociation(
   prefixes: OwnershipPrefix[],
   declared: DeclaredRelationships,
   claimants: PackageClaimants,
+  names: ElementNameIndex,
 ): Association | undefined {
-  const fromPath = observation.subject?.id
-  if (fromPath === undefined) return undefined
+  const subjectRef = observation.subject
+  if (subjectRef === undefined) return undefined
+  const fromPath = subjectRef.id
 
   const base = {
     id: `dependency:${observation.id}`,
@@ -180,10 +234,17 @@ function dependencyAssociation(
     }
   }
 
-  // An unclaimed package or a broken specifier has no owning element by
-  // construction, so there is no model-level dependency for the contract to
-  // speak about.
-  if (observation.target?.kind !== 'file') {
+  // An unclaimed package, a broken specifier, or a scanner's own abstention
+  // (`unresolved-dependency`) has no owning element by construction, so there
+  // is no model-level dependency for the contract to speak about. Every other
+  // ref resolves below, whatever its kind: the kind is the model's choice of
+  // words, and the id is what maps — as a path or fragment some element
+  // claims, or as the name of an element itself.
+  if (
+    observation.kind !== 'dependency' ||
+    observation.target === undefined ||
+    observation.target.kind === 'module'
+  ) {
     return {
       ...base,
       status: 'unresolved',
@@ -192,8 +253,8 @@ function dependencyAssociation(
   }
 
   const toPath = observation.target.id
-  const from = ownerOf(fromPath, prefixes)
-  const to = ownerOf(toPath, prefixes)
+  const from = refOwnership(subjectRef, prefixes, names)
+  const to = refOwnership(observation.target, prefixes, names)
 
   if (from.status !== 'resolved' || to.status !== 'resolved') {
     return {

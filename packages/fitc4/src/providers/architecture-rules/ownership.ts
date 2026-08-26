@@ -98,10 +98,13 @@ export function coverageRules(
   // outside the scan roots. A claim inside an examined file that no
   // observation touches is the fragment-side fail-open: a typo'd locator
   // would otherwise silently gate nothing.
+  // Whatever kind the ref declares: an agent describing a compose service
+  // writes `kind: 'service'` around the same fragment locator, and a claim
+  // the scan touched under that name is still a claim the scan touched.
   const fragmentSubjects = new Set<string>()
   for (const observation of all) {
     for (const ref of [observation.subject, observation.target]) {
-      if (ref?.kind === 'file' && ref.id.includes('#')) fragmentSubjects.add(ref.id)
+      if (ref !== undefined && ref.id.includes('#')) fragmentSubjects.add(ref.id)
     }
   }
   const examined = new Set(
@@ -109,8 +112,22 @@ export function coverageRules(
       .filter((observation) => observation.kind === 'scan-root')
       .map((observation) => observation.subject?.id ?? ''),
   )
+  // Elements resolution actually landed on, by any vocabulary. A fragment
+  // claim exists to make its element reachable; when the element was reached
+  // another way — the scan named it, and `source-root` resolved the name —
+  // the claim is not the silently-open gate this rule exists to catch, and
+  // blaming the model for the scan's choice of words would be false.
+  const reached = new Set<string>()
+  for (const association of context.associations) {
+    if (association.status !== 'resolved') continue
+    for (const ref of [association.source, association.target]) {
+      if (ref?.kind === 'element') reached.add(ref.id)
+    }
+  }
+
   for (const entry of prefixes.filter((candidate) => isFragmentClaim(candidate.prefix))) {
     if ([...fragmentSubjects].some((subject) => matchesClaim(entry.prefix, subject))) continue
+    if (reached.has(entry.elementId)) continue
     if (!examined.has(entry.prefix.slice(0, entry.prefix.indexOf('#')))) continue
     findings.push(unmatched(entry))
   }

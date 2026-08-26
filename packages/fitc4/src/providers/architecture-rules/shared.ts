@@ -35,6 +35,7 @@ export const ARCHITECTURE_RULE_IDS = [
   'ambiguous-package',
   'unmatched-packages',
   'unmapped-source',
+  'unmapped-reference',
   'unresolved-import',
   'drift-relationship',
   'unused-drift',

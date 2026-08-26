@@ -1,0 +1,143 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker/docker-compose.yml"
+      },
+      "label": "the compose file itself is unowned; elements claim fragments inside it"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.studio"
+      },
+      "label": "supabase.studio's fragment claim went untouched: the default prompt speaks no fragments"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.apiGw"
+      },
+      "label": "supabase.apiGw's fragment claim went untouched: the default prompt speaks no fragments"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.auth"
+      },
+      "label": "supabase.auth's fragment claim went untouched: the default prompt speaks no fragments"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.rest"
+      },
+      "label": "supabase.rest's fragment claim went untouched: the default prompt speaks no fragments"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.realtime"
+      },
+      "label": "supabase.realtime's fragment claim went untouched: the default prompt speaks no fragments"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.storage"
+      },
+      "label": "supabase.storage's fragment claim went untouched: the default prompt speaks no fragments"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.imgproxy"
+      },
+      "label": "supabase.imgproxy's fragment claim went untouched: the default prompt speaks no fragments"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.meta"
+      },
+      "label": "supabase.meta's fragment claim went untouched: the default prompt speaks no fragments"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.functions"
+      },
+      "label": "supabase.functions's fragment claim went untouched: the default prompt speaks no fragments"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.db"
+      },
+      "label": "supabase.db's fragment claim went untouched: the default prompt speaks no fragments"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmatched-sources",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.supavisor"
+      },
+      "label": "supabase.supavisor's fragment claim went untouched: the default prompt speaks no fragments"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:compose",
+        "kind": "scan-root",
+        "subject": "docker/docker-compose.yml",
+        "label": "the scan attests to having examined the compose file"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "file",
+        "subject": "docker/docker-compose.yml",
+        "label": "the compose file reported as a source file with no imports"
+      }
+    ]
+  },
+  "associations": {
+    "must": []
+  }
+}

@@ -1,0 +1,288 @@
+{
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unobserved-elements",
+      "severity": "info",
+      "related": [
+        "boutique.redis"
+      ],
+      "label": "the description-only redis element is reported as unobserved"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/adservice.yaml",
+        "label": "the scan attests to having examined adservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/cartservice.yaml",
+        "label": "the scan attests to having examined cartservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/checkoutservice.yaml",
+        "label": "the scan attests to having examined checkoutservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/currencyservice.yaml",
+        "label": "the scan attests to having examined currencyservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/emailservice.yaml",
+        "label": "the scan attests to having examined emailservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/frontend.yaml",
+        "label": "the scan attests to having examined frontend.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "label": "the scan attests to having examined kustomization.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/loadgenerator.yaml",
+        "label": "the scan attests to having examined loadgenerator.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/paymentservice.yaml",
+        "label": "the scan attests to having examined paymentservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/productcatalogservice.yaml",
+        "label": "the scan attests to having examined productcatalogservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/recommendationservice.yaml",
+        "label": "the scan attests to having examined recommendationservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "scan-root",
+        "subject": "kubernetes-manifests/shippingservice.yaml",
+        "label": "the scan attests to having examined shippingservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "productcatalogservice",
+        "label": "frontend -> productcatalogservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "currencyservice",
+        "label": "frontend -> currencyservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "cartservice",
+        "label": "frontend -> cartservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "recommendationservice",
+        "label": "frontend -> recommendationservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "shippingservice",
+        "label": "frontend -> shippingservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "checkoutservice",
+        "label": "frontend -> checkoutservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "adservice",
+        "label": "frontend -> adservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "shoppingassistantservice",
+        "label": "frontend -> shoppingassistantservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "productcatalogservice",
+        "label": "checkoutservice -> productcatalogservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "shippingservice",
+        "label": "checkoutservice -> shippingservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "paymentservice",
+        "label": "checkoutservice -> paymentservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "emailservice",
+        "label": "checkoutservice -> emailservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "currencyservice",
+        "label": "checkoutservice -> currencyservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "cartservice",
+        "label": "checkoutservice -> cartservice, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "recommendationservice",
+        "target": "productcatalogservice",
+        "label": "recommendationservice -> productcatalogservice, spoken as service names"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.productcatalogservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.currencyservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.cartservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.recommendationservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.shippingservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.checkoutservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.adservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.shoppingassistantservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.productcatalogservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.shippingservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.paymentservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.emailservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.currencyservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.cartservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.recommendationservice",
+        "target": "boutique.productcatalogservice",
+        "declared": true
+      }
+    ]
+  }
+}

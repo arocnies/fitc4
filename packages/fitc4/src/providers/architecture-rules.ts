@@ -33,6 +33,7 @@ import {
   applyTypeOnlyPolicy,
   dependencyRule,
   isTypeOnlyDependency,
+  unmappedReferenceRule,
   unresolvedImportRule,
 } from './architecture-rules/boundaries.ts'
 import { DriftLedger } from './architecture-rules/drift.ts'
@@ -107,6 +108,10 @@ export function architectureRules(
           )
           collector.add(finding)
         }
+        // A dependency the resolver could not place is a crossing the gate
+        // never judged; saying so is the difference between an advisory miss
+        // and a silent one.
+        collector.add(unmappedReferenceRule(association, observation, severityOf))
         // Ignored means not counted anywhere: under 'ignore' a type-only
         // dependency must not keep a drift edge alive either.
         if (typeOnlyPolicy !== 'ignore' || !isTypeOnlyDependency(observation)) {

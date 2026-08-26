@@ -55,6 +55,19 @@ export const SCAN_INSTRUCTIONS =
   FRAGMENT_NOTE
 
 /**
+ * What a user whose model owns compose fragments would type on day one: where
+ * the stack is declared, and the locator form their own elements already use.
+ * Two sentences, 25 words. What counts as a dependency inside a compose file
+ * — depends_on, literal service-host URLs, not variable interpolations — is
+ * deliberately absent: that is compose knowledge, not repository knowledge,
+ * and the `user-hint` angle measures whether the tool supplies it.
+ */
+export const USER_HINT =
+  'docker/docker-compose.yml declares every service of this stack. Report dependencies between ' +
+  'services, using the fragment docker/docker-compose.yml#services.<name> to stand for the ' +
+  'service <name>.'
+
+/**
  * The `agent-scan` options every variant shares; only the workdir differs.
  * The draft variant passes its own instructions, the gate instructions plus
  * one extra rule; everything else stays identical.
@@ -150,6 +163,52 @@ export const angles = {
     const config = supabaseGreenfield(exec, root)
     return { ...config, scan: [...config.scan, agentScan({ exec, id: 'repo' })] }
   },
+  /**
+   * Zero authored words over the focused compose file: the shipped import-scan
+   * default reading a file that declares services, not imports. The floor row,
+   * paired with boutique@default-prompt, and the floor is loud by design: the
+   * ideal reply reports the compose file and no edges, every fragment claim
+   * goes untouched inside an examined file, and `unmatched-sources` fires per
+   * element. Out of the box on a fragment-claimed model, fitc4 says plainly
+   * that nothing got checked — the opposite of a green silence.
+   */
+  'default-prompt': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = supabaseGreenfield(exec, root)
+    return {
+      ...config,
+      scan: [
+        agentScan({
+          exec,
+          id: 'compose',
+          roots: ['docker'],
+          focus: ['docker/docker-compose.yml'],
+          excerptChars: 22_000,
+        }),
+      ],
+    }
+  },
+
+  /**
+   * The two-sentence tier: `USER_HINT` instead of the 198-word oracle. It
+   * names the file and the locator form and nothing else, so the row measures
+   * whether the shipped prompt plus a model's own compose literacy recover
+   * depends_on edges, service-host URLs, and the plain-path citation rule
+   * without being told. Shares the base expectations, and both live models
+   * reach every association: the only observation-level misses are the three
+   * env-URL duplicates of edges depends_on already states, a bookkeeping
+   * convention of the oracle, not information. One model spoke fragments
+   * under `kind: 'service'` and briefly lost everything to it; the resolver
+   * now goes by the id, and the `unmatched-sources` rule exempts elements
+   * that resolution reached, so the vocabulary costs nothing.
+   */
+  'user-hint': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = supabaseGreenfield(exec, root)
+    return {
+      ...config,
+      scan: [supabaseScan(exec, USER_HINT)],
+    }
+  },
+
   'no-fragment-note': (exec: AgentExec, root: string): PipelineConfig => {
     const config = supabaseGreenfield(exec, root)
     return {
