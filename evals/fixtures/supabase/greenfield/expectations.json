@@ -4,7 +4,23 @@
     "source-root",
     "architecture-rules"
   ],
-  "findings": [],
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "circular-dependency",
+      "severity": "warning",
+      "subject": {
+        "kind": "element",
+        "id": "supabase.apiGw"
+      },
+      "related": [
+        "supabase.apiGw",
+        "supabase.studio"
+      ],
+      "descriptionIncludes": "supabase.apiGw -> supabase.studio -> supabase.apiGw",
+      "label": "the gateway <-> studio routing cycle the compose file genuinely wires"
+    }
+  ],
   "observations": {
     "must": [
       {

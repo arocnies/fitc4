@@ -205,6 +205,29 @@ function fileAssociation(
   return { ...base, status: 'unresolved', description: `${filePath} is owned by no element` }
 }
 
+/**
+ * The element a scanner's abstention still names, if any.
+ *
+ * An `unresolved-dependency` usually carries a specifier that resolves
+ * nowhere, and blessing one as a checked edge would hide a broken import.
+ * But a scanner speaking name vocabulary abstains differently: it reports
+ * `orders -> payment` as unresolved because no FILE backs the name — either
+ * the model chose the kind itself, or the scan downgraded a dependency whose
+ * claimed path does not exist. The id is still the name of an element, and
+ * the resolver knows the catalog better than the scanner's uncertainty. A
+ * bare name (no path separators, no fragment) that names exactly one element
+ * is rescued; anything path-shaped, package-shaped, or shared by two elements
+ * stays abstained and keeps its `unresolved-import` finding.
+ */
+function rescuedByName(ref: Ref | undefined, names: ElementNameIndex): string | undefined {
+  if (ref === undefined) return undefined
+  if (ref.id.includes('/') || ref.id.includes('\\') || ref.id.includes('#')) return undefined
+  const elementIds = names.exact.get(ref.id) ?? names.normalized.get(normalizeElementName(ref.id))
+  const [first, ...rest] = elementIds ?? []
+  if (first === undefined || rest.length > 0) return undefined
+  return first
+}
+
 function dependencyAssociation(
   observation: Observation,
   prefixes: OwnershipPrefix[],
@@ -234,16 +257,21 @@ function dependencyAssociation(
     }
   }
 
-  // An unclaimed package, a broken specifier, or a scanner's own abstention
-  // (`unresolved-dependency`) has no owning element by construction, so there
-  // is no model-level dependency for the contract to speak about. Every other
-  // ref resolves below, whatever its kind: the kind is the model's choice of
-  // words, and the id is what maps — as a path or fragment some element
-  // claims, or as the name of an element itself.
+  // An unclaimed package or a broken specifier has no owning element by
+  // construction, so there is no model-level dependency for the contract to
+  // speak about. A scanner's abstention (`unresolved-dependency`) gets one
+  // more look first: see `rescuedByName`. Every other ref resolves below,
+  // whatever its kind: the kind is the model's choice of words, and the id is
+  // what maps — as a path or fragment some element claims, or as the name of
+  // an element itself.
+  const rescued =
+    observation.kind === 'unresolved-dependency'
+      ? rescuedByName(observation.target, names)
+      : undefined
   if (
-    observation.kind !== 'dependency' ||
+    (observation.kind !== 'dependency' && rescued === undefined) ||
     observation.target === undefined ||
-    observation.target.kind === 'module'
+    (observation.target.kind === 'module' && rescued === undefined)
   ) {
     return {
       ...base,
@@ -254,7 +282,10 @@ function dependencyAssociation(
 
   const toPath = observation.target.id
   const from = refOwnership(subjectRef, prefixes, names)
-  const to = refOwnership(observation.target, prefixes, names)
+  const to: Ownership =
+    rescued !== undefined
+      ? { status: 'resolved', elementId: rescued }
+      : refOwnership(observation.target, prefixes, names)
 
   if (from.status !== 'resolved' || to.status !== 'resolved') {
     return {

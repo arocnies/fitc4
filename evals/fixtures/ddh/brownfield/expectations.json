@@ -66,6 +66,54 @@
         "vendor.postgres"
       ],
       "label": "the description-only PostgreSQL element is reported as unobserved"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "circular-dependency",
+      "severity": "warning",
+      "subject": {
+        "kind": "element",
+        "id": "ddh.libs.api"
+      },
+      "related": [
+        "ddh.libs.api",
+        "ddh.libs.application",
+        "ddh.libs.ddd"
+      ],
+      "descriptionIncludes": "ddh.libs.api -> ddh.libs.ddd -> ddh.libs.application -> ddh.libs.api",
+      "label": "the libs layer cycle the transcribed dependency-cruiser rules permit"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "circular-dependency",
+      "severity": "warning",
+      "subject": {
+        "kind": "element",
+        "id": "ddh.user.commands"
+      },
+      "related": [
+        "ddh.user.commands",
+        "ddh.user.database",
+        "ddh.user.wiring"
+      ],
+      "descriptionIncludes": "ddh.user.commands -> ddh.user.database -> ddh.user.wiring -> ddh.user.commands",
+      "label": "the user module's commands/database/wiring cycle, declared and exercised"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "circular-dependency",
+      "severity": "warning",
+      "subject": {
+        "kind": "element",
+        "id": "ddh.wallet.application"
+      },
+      "related": [
+        "ddh.wallet.application",
+        "ddh.wallet.database",
+        "ddh.wallet.wiring"
+      ],
+      "descriptionIncludes": "ddh.wallet.application -> ddh.wallet.database -> ddh.wallet.wiring -> ddh.wallet.application",
+      "label": "the wallet module's application/database/wiring cycle, declared and exercised"
     }
   ],
   "associations": {

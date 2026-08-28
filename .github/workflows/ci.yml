@@ -70,7 +70,12 @@ jobs:
       # Naming the external fixtures is the harness's permission to fetch on
       # a cache miss; the second run covers everything, externals included,
       # and is what gates.
-      - run: npm run eval -- --fixture ddh --fixture boutique --fixture ecom --fixture supabase
+      - run: >
+          npm run eval --
+          --fixture ddh/greenfield --fixture ddh/brownfield --fixture ddh/draft
+          --fixture boutique/greenfield --fixture boutique/brownfield --fixture boutique/draft
+          --fixture ecom/greenfield --fixture ecom/brownfield
+          --fixture supabase/greenfield --fixture supabase/brownfield --fixture supabase/draft
       - run: npm run eval
 
   likec4-latest:

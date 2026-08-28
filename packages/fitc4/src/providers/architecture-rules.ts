@@ -133,7 +133,33 @@ export function architectureRules(
           drift.record(association, observation)
         }
       } else if (observation.kind === 'unresolved-dependency') {
-        collector.add(unresolvedImportRule(association, observation, severityOf))
+        // A rescued abstention (see source-root's `rescuedByName`) resolved
+        // onto two elements after all, so it is judged like any dependency;
+        // only a genuinely unresolved one keeps the advisory finding.
+        if (association.status === 'resolved') {
+          const finding = dependencyRule(association, observation, declared, severityOf)
+          if (finding !== undefined) {
+            edgeIsTypeOnly.set(
+              finding.id,
+              (edgeIsTypeOnly.get(finding.id) ?? true) && isTypeOnlyDependency(observation),
+            )
+            collector.add(finding)
+          }
+          if (
+            association.relationship !== undefined &&
+            association.source?.id !== undefined &&
+            association.target?.id !== undefined &&
+            association.source.id !== association.target.id
+          ) {
+            const edge = { source: association.source.id, target: association.target.id }
+            declaredEdges.set(`${edge.source}->${edge.target}`, edge)
+          }
+          if (typeOnlyPolicy !== 'ignore' || !isTypeOnlyDependency(observation)) {
+            drift.record(association, observation)
+          }
+        } else {
+          collector.add(unresolvedImportRule(association, observation, severityOf))
+        }
       }
     }
 

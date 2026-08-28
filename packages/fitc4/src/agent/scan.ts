@@ -229,10 +229,14 @@ const REPLY_SCHEMA: JsonObject = {
 
 const PROMPT =
   'Carry out the scan instructions in the context against this repository. ' +
-  'Report each fact you observe as one observation: `kind` names what kind of fact it is ' +
-  "(prefer the standard kinds 'file', 'dependency', 'unresolved-dependency' where they fit; " +
-  'a domain-specific kind is allowed), `subject` is what the fact is about, `target` is what ' +
-  'it points at (for dependency-shaped facts), and `evidence` cites where you saw it. ' +
+  'Report each fact you observe as one observation: `kind` names what kind of fact it is, ' +
+  '`subject` is what the fact is about, `target` is what it points at (for dependency-shaped ' +
+  'facts), and `evidence` cites where you saw it. Only the standard kinds are checked against ' +
+  "the architecture model: 'file' for a source file, 'dependency' for one thing relying on " +
+  "another, 'unresolved-dependency' for a reliance whose target you cannot locate. Whatever a " +
+  "domain calls its dependencies — depends_on, an env var URL, a wired parameter, a documented " +
+  "call — report each one under kind 'dependency'. A domain-specific kind is allowed for facts " +
+  'that are genuinely none of these, and is recorded but never checked. ' +
   'Every path — in refs of kind file or directory, in evidence, and in examined — must be a ' +
   'repository-relative POSIX path to something that exists in this repository. ' +
   "A ref of kind file may append '#<fragment>' to scope itself to a region inside the file, but " +

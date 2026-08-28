@@ -169,3 +169,50 @@ describe('vocabulary that maps onto nothing', () => {
     expect(findingFor(result.findings, 'unmapped-reference')?.severity).toBe('error')
   })
 })
+
+describe('rescued abstentions', () => {
+  const abstention = (targetId: string, targetKind = 'module') => ({
+    kind: 'unresolved-dependency',
+    subject: { kind: 'service', id: 'web' },
+    target: { kind: targetKind, id: targetId },
+    description: `web relies on ${targetId}, which the scan could not locate`,
+    evidence: [{ path: COMPOSE, line: 1 }],
+  })
+
+  test('an abstention whose target uniquely names an element is judged as a dependency', async () => {
+    // The declared web -> api edge, reported as unresolved because no file
+    // backs the name: the resolver knows the catalog better than the
+    // scanner's uncertainty, so the edge resolves and passes.
+    const result = await run([abstention('api')])
+
+    const resolved = result.associations.filter((item) => item.status === 'resolved')
+    expect(resolved.map((item) => `${item.source?.id}->${item.target?.id}`)).toEqual([
+      'fixture.web->fixture.api',
+    ])
+    expect(findingFor(result.findings, 'unresolved-import')).toBeUndefined()
+  })
+
+  test('a rescued undeclared edge fails the gate instead of staying advisory', async () => {
+    const result = await run([abstention('db')])
+
+    const finding = findingFor(result.findings, 'missing-relationship')
+    expect(finding?.severity).toBe('error')
+    expect(finding?.subject?.id).toBe('fixture.web')
+    expect(findingFor(result.findings, 'unresolved-import')).toBeUndefined()
+  })
+
+  test('a path-shaped specifier is never rescued', async () => {
+    const result = await run([abstention('./missing/api')])
+
+    expect(result.associations.filter((item) => item.status === 'resolved')).toEqual([])
+    expect(findingFor(result.findings, 'unresolved-import')?.severity).toBe('warning')
+    expect(findingFor(result.findings, 'missing-relationship')).toBeUndefined()
+  })
+
+  test('a name no element bears keeps the unresolved-import finding', async () => {
+    const result = await run([abstention('cache')])
+
+    expect(findingFor(result.findings, 'unresolved-import')?.severity).toBe('warning')
+    expect(findingFor(result.findings, 'missing-relationship')).toBeUndefined()
+  })
+})
