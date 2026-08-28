@@ -161,7 +161,14 @@ export const angles = {
    */
   'whole-repo': (exec: AgentExec, root: string): PipelineConfig => {
     const config = supabaseGreenfield(exec, root)
-    return { ...config, scan: [...config.scan, agentScan({ exec, id: 'repo' })] }
+    // 20 minutes per batch, not the 10-minute scan default: an agentic pass
+    // over a quarter of the supabase docker tree was measured needing more
+    // (codex/gpt-5.6-luna timed out a batch at 600s). The raise keeps the row
+    // measuring the model instead of the stopwatch.
+    return {
+      ...config,
+      scan: [...config.scan, agentScan({ exec, id: 'repo', timeoutMs: 1_200_000 })],
+    }
   },
   /**
    * Zero authored words over the focused compose file: the shipped import-scan
