@@ -289,6 +289,122 @@
         },
         "label": "the planted edge, spoken as service names, citing the patched metadata line"
       }
+    ],
+    "may": [
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "delivery-pricing/metadata.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "delivery-pricing/template.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "delivery/metadata.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "delivery/template.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "frontend-api/metadata.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "frontend-api/template.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "orders/metadata.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "orders/template.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "payment-3p/metadata.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "payment/metadata.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "payment/template.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "platform/metadata.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "platform/template.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "products/metadata.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "products/template.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "users/metadata.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "users/template.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "warehouse/metadata.yaml",
+        "label": "the contract permits a file observation per focused file"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "file",
+        "subject": "warehouse/template.yaml",
+        "label": "the contract permits a file observation per focused file"
+      }
     ]
   },
   "associations": {

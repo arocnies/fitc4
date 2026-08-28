@@ -79,6 +79,15 @@ export interface Expectations {
     must?: ExpectedObservation[]
     mustNot?: ExpectedObservation[]
     /**
+     * Tolerated output: observations the reply contract permits but the ideal
+     * reply does not require, such as a 'file' observation per focused file.
+     * A match is claimed silently — no hit, no extra — so a model exercising
+     * the permission does not lose the row, and one omitting it does not
+     * either. Anything matching neither must, mustNot, nor may stays an
+     * extra.
+     */
+    may?: ExpectedObservation[]
+    /**
      * Declares the agent observation set open-ended: unclaimed agent
      * observations are tolerated instead of counted as extras. The default is
      * the strict reading, mirroring associations, because an agent scan's
@@ -294,9 +303,14 @@ export function scoreFixture(
   // complete set, and `openEnded: true` opts a fixture out where the ideal
   // set genuinely cannot be written down.
   const observationsMustNot = expectations.observations?.mustNot ?? []
+  const observationsMay = expectations.observations?.may ?? []
   const openEnded = expectations.observations?.openEnded === true
   for (const observation of result.observations) {
     if (claimedObservations.has(observation)) continue
+    if (observationsMay.some((entry) => observationMatches(entry, observation))) {
+      claimedObservations.add(observation)
+      continue
+    }
     const named = observationsMustNot.find((entry) => observationMatches(entry, observation))
     if (named !== undefined) {
       claimedObservations.add(observation)
@@ -331,12 +345,20 @@ function checkEvidence(
   if (repositoryRoot === undefined) return 'no repositoryRoot was passed to the scorer'
   const entry = (observation.evidence ?? []).find((candidate) => candidate.path === expected.path)
   if (entry === undefined) return `no evidence entry cites ${expected.path}`
-  if (entry.line === undefined) return `the ${expected.path} evidence entry carries no line number`
   let content: string
   try {
     content = fs.readFileSync(path.join(repositoryRoot, expected.path), 'utf8')
   } catch {
     return `cited file ${expected.path} is unreadable under the repository root`
+  }
+  // A citation without a line number is weaker but still checkable: the
+  // cited FILE must contain the pinned text somewhere. With a line, the
+  // check is exact, and a wrong line fails even when the file would match.
+  if (entry.line === undefined) {
+    if (!content.includes(expected.lineIncludes)) {
+      return `${expected.path} nowhere contains '${expected.lineIncludes}'`
+    }
+    return undefined
   }
   const line = content.split(/\r?\n/)[entry.line - 1]
   if (line === undefined) return `cited line ${entry.line} is past the end of ${expected.path}`

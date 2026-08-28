@@ -151,6 +151,37 @@ describe('evidence checking', () => {
     expect(perfect(score)).toBe(false)
   })
 
+  it('a line-less citation passes on file content and fails when the file lacks it', () => {
+    const pathOnly = resultWith({
+      observations: [
+        observation({
+          provider: 'agent-scan',
+          kind: 'dependency',
+          subject: { kind: 'file', id: 'web' },
+          evidence: [{ path: 'compose.yml' }],
+        }),
+      ],
+    })
+    expect(perfect(scoreFixture('fixture', expecting('- db'), pathOnly, { repositoryRoot }))).toBe(true)
+    expect(perfect(scoreFixture('fixture', expecting('- api'), pathOnly, { repositoryRoot }))).toBe(false)
+  })
+
+  it('tolerates a may observation without requiring it', () => {
+    const may: Expectations = {
+      findings: [],
+      observations: {
+        may: [{ provider: 'agent-scan', kind: 'file', subject: 'compose.yml' }],
+      },
+    }
+    const reported = resultWith({
+      observations: [
+        observation({ provider: 'agent-scan', kind: 'file', subject: { kind: 'file', id: 'compose.yml' } }),
+      ],
+    })
+    expect(perfect(scoreFixture('fixture', may, reported))).toBe(true)
+    expect(perfect(scoreFixture('fixture', may, resultWith()))).toBe(true)
+  })
+
   it('fails loudly when the scorer got no repositoryRoot', () => {
     const score = scoreFixture('fixture', expecting('- db'), cited)
     expect(perfect(score)).toBe(false)
