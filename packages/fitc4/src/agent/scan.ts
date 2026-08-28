@@ -59,7 +59,7 @@ import { pathMatcher } from '../globs.ts'
 import { count, elapsed } from '../report.ts'
 import type { Evidence, JsonObject, NamedProvider, Observation, Ref, ScanContext, ScanProvider } from '../types.ts'
 import { assemblePack, DEFAULT_PACK_BUDGET_BYTES, fencedExcerpt } from './context-pack.ts'
-import { schemaMismatch, seconds, truncate } from './exec.ts'
+import { runWithRetry, schemaMismatch, seconds, truncate } from './exec.ts'
 import type { AgentExec } from './exec.ts'
 
 export const PROVIDER_ID = 'agent-scan'
@@ -375,7 +375,7 @@ export function agentScan(options: AgentScanOptions): NamedProvider<ScanProvider
       inFlight.set(index, Date.now())
       let reply
       try {
-        reply = await options.exec.run(request)
+        reply = await runWithRetry(options.exec, request)
       } finally {
         inFlight.delete(index)
       }

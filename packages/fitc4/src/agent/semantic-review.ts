@@ -43,6 +43,7 @@ import {
   fencedExcerpt,
 } from './context-pack.ts'
 import type { AgentExec } from './exec.ts'
+import { runWithRetry } from './exec.ts'
 import { agentTruncated, agentUnavailable, elementText } from './findings.ts'
 
 export const PROVIDER_ID = 'agent-semantic-review'
@@ -149,7 +150,7 @@ export function agentSemanticReview(options: SemanticReviewOptions): NamedProvid
         `judging ${element.id} against its description with ${options.exec.id} (${index + 1} of ${reviewed.length})`,
       )
 
-      const reply = await options.exec.run({
+      const reply = await runWithRetry(options.exec, {
         prompt:
           `Element ${element.id} declares: "${element.description}". Judge whether the element ` +
           'facts and excerpted implementation in the context match that description. Report only ' +

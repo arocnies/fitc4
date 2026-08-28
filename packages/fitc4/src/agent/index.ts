@@ -12,7 +12,7 @@
  */
 
 export type { AgentExec, AgentReply, AgentRequest } from './exec.ts'
-export { composeInput, extractJson } from './exec.ts'
+export { composeInput, extractJson, runWithRetry } from './exec.ts'
 
 export { claudeCli, DEFAULT_CLAUDE_MODEL, type ClaudeCliOptions } from './claude-cli.ts'
 export { codexCli, type CodexCliOptions } from './codex-cli.ts'

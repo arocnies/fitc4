@@ -36,6 +36,7 @@ import {
   fileNeighborhood,
 } from './context-pack.ts'
 import type { AgentExec } from './exec.ts'
+import { runWithRetry } from './exec.ts'
 import { agentTruncated, agentUnavailable, elementCatalog } from './findings.ts'
 
 export const PROVIDER_ID = 'agent-ownership-advisor'
@@ -156,7 +157,7 @@ export function agentOwnershipAdvisor(
           (batches.length > 1 ? ` (batch ${index + 1} of ${batches.length})` : ''),
       )
 
-      const reply = await options.exec.run({
+      const reply = await runWithRetry(options.exec, {
         prompt: PROMPT,
         context: pack.text,
         schema: REPLY_SCHEMA,

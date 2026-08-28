@@ -68,7 +68,7 @@ import type {
 } from '../types.ts'
 import { unambiguousOwner } from './context-pack.ts'
 import type { AgentExec } from './exec.ts'
-import { schemaMismatch, truncate } from './exec.ts'
+import { runWithRetry, schemaMismatch, truncate } from './exec.ts'
 import { elementCatalog } from './findings.ts'
 
 export const PROVIDER_ID = 'agent-resolve'
@@ -162,7 +162,7 @@ export function agentResolve(options: AgentResolveOptions): NamedProvider<Resolv
           (batches.length > 1 ? ` (batch ${index + 1} of ${batches.length})` : ''),
       )
 
-      const reply = await options.exec.run({
+      const reply = await runWithRetry(options.exec, {
         prompt: PROMPT,
         context: composeContext(context, options.instructions, sent),
         schema: REPLY_SCHEMA,

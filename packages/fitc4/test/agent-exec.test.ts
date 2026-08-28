@@ -13,7 +13,15 @@ import { afterAll, afterEach, describe, expect, test } from 'vitest'
 
 import { claudeCli } from '../src/agent/claude-cli.ts'
 import { codexCli, strictSchema } from '../src/agent/codex-cli.ts'
-import { extractJson, finishReply, schemaMismatch, tailExcerpt, withoutRepeats } from '../src/agent/exec.ts'
+import {
+  extractJson,
+  finishReply,
+  runWithRetry,
+  schemaMismatch,
+  tailExcerpt,
+  withoutRepeats,
+} from '../src/agent/exec.ts'
+import type { AgentExec, AgentReply } from '../src/agent/exec.ts'
 import type { JsonObject, JsonValue } from '../src/types.ts'
 
 const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fitc4-fake-agent-'))
@@ -695,6 +703,84 @@ describe('unparseable reply diagnostics', () => {
     if (reply.ok) return
     expect(reply.error).toContain('was not the requested JSON')
     expect(reply.error).not.toContain('ended mid-value')
+  })
+})
+
+// A defective reply is the one failure a second billed call plausibly fixes,
+// measured live: one cut-off describe reply out of 32 aborted a whole draft,
+// and the human rerun that followed was exactly one retry. `runWithRetry` is
+// that rerun without the human, and it must never spend a second call on a
+// failure a retry cannot fix, such as a missing binary or a login problem.
+describe('runWithRetry', () => {
+  function execReplying(...replies: AgentReply[]): AgentExec & { calls: number } {
+    const queue = [...replies]
+    const exec = {
+      id: 'fake-cli/fake-model',
+      calls: 0,
+      run: (): Promise<AgentReply> => {
+        exec.calls += 1
+        const reply = queue.shift()
+        if (reply === undefined) throw new Error('ran out of scripted replies')
+        return Promise.resolve(reply)
+      },
+    }
+    return exec
+  }
+
+  test('a defective first reply gets one retry, and the retry answers', async () => {
+    const exec = execReplying(
+      { ok: false, error: 'reply ended mid-value', transient: true },
+      { ok: true, value: { description: 'whole' }, raw: '{"description":"whole"}' },
+    )
+    const reply = await runWithRetry(exec, { prompt: 'describe' })
+    expect(exec.calls).toBe(2)
+    expect(reply.ok).toBe(true)
+  })
+
+  test('a non-transient failure is never retried', async () => {
+    const exec = execReplying({ ok: false, error: 'claude not found; is it installed?' })
+    const reply = await runWithRetry(exec, { prompt: 'describe' })
+    expect(exec.calls).toBe(1)
+    expect(reply.ok).toBe(false)
+  })
+
+  test('a success costs exactly one call', async () => {
+    const exec = execReplying({ ok: true, value: 'fine', raw: 'fine' })
+    await runWithRetry(exec, { prompt: 'describe' })
+    expect(exec.calls).toBe(1)
+  })
+
+  test('two defective replies in a row fail, saying the retry happened', async () => {
+    const exec = execReplying(
+      { ok: false, error: 'reply ended mid-value', transient: true },
+      { ok: false, error: 'reply was not the requested JSON', transient: true },
+    )
+    const reply = await runWithRetry(exec, { prompt: 'describe' })
+    expect(exec.calls).toBe(2)
+    expect(reply.ok).toBe(false)
+    if (reply.ok) return
+    expect(reply.error).toContain('already retried once')
+  })
+})
+
+// The transient flag is what routes a failure into that retry, so which
+// failures carry it is contractual: reply defects do, and finishReply is
+// where the shared adapters produce all of them.
+describe('transient marking', () => {
+  const schema = { type: 'object', required: ['description'], properties: { description: { type: 'string' } } }
+
+  test('a cut-off reply is transient', () => {
+    const reply = finishReply({ prompt: 'describe', schema }, '{"description":"half a sent')
+    expect(reply.ok).toBe(false)
+    if (reply.ok) return
+    expect(reply.transient).toBe(true)
+  })
+
+  test('a schema-mismatched reply is transient', () => {
+    const reply = finishReply({ prompt: 'describe', schema }, '{}')
+    expect(reply.ok).toBe(false)
+    if (reply.ok) return
+    expect(reply.transient).toBe(true)
   })
 })
 

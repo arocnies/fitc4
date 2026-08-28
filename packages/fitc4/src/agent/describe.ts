@@ -31,6 +31,7 @@ import type { DraftDescribe, DraftElementFacts } from '../draft.ts'
 import type { JsonObject } from '../types.ts'
 import { assemblePack, fencedExcerpt } from './context-pack.ts'
 import type { AgentExec } from './exec.ts'
+import { runWithRetry } from './exec.ts'
 
 export interface DraftDescriberOptions {
   exec: AgentExec
@@ -80,7 +81,7 @@ export function draftDescriber(options: DraftDescriberOptions): DraftDescribe {
     // children, no claim means no facts a model could answer over.
     if (request === undefined) return undefined
 
-    const reply = await options.exec.run({
+    const reply = await runWithRetry(options.exec, {
       ...request,
       schema: REPLY_SCHEMA,
       cwd: repositoryRoot,

@@ -15,7 +15,11 @@
  * the calling provider decides what an unavailable CLI or malformed reply
  * means for its findings. Adapters do not retry. A retry is another billed
  * call, and whether one is worth it is the provider's judgment, not the
- * transport's.
+ * transport's. Providers exercise that judgment through `runWithRetry`, which
+ * retries exactly the failures marked `transient`: the CLI ran and answered,
+ * the answer was defective, and a fresh sample is the plausible fix. A missing
+ * binary, a login failure, or a timeout is none of that, and repeating it
+ * would bill the user for the same wall.
  */
 
 import { spawn } from 'node:child_process'
@@ -39,7 +43,17 @@ export interface AgentRequest {
 
 export type AgentReply =
   | { ok: true; value: JsonValue; raw: string }
-  | { ok: false; error: string }
+  | {
+      ok: false
+      error: string
+      /**
+       * The CLI ran and produced a reply, and the reply itself was defective
+       * (cut off, not JSON, or the wrong shape), so one fresh sample is worth
+       * a try. Absent on failures a retry cannot fix: a missing binary, a
+       * login problem, a timeout.
+       */
+      transient?: true
+    }
 
 export interface AgentExec {
   /** Stable identity for cache keys and finding provenance; includes the model. */
@@ -197,7 +211,7 @@ export function finishReply(request: AgentRequest, text: string): AgentReply {
     const why = looksTruncated(text.trim())
       ? 'reply ended mid-value, so it was cut off rather than merely malformed'
       : 'reply was not the requested JSON'
-    return { ok: false, error: `${why}: ${truncate(text, 200)}` }
+    return { ok: false, error: `${why}: ${truncate(text, 200)}`, transient: true }
   }
 
   // Parsing is not conforming. A reply that is JSON but not the requested
@@ -206,9 +220,31 @@ export function finishReply(request: AgentRequest, text: string): AgentReply {
   // absence-of-problem is the gate passing exactly when its judge mumbled.
   const mismatch = schemaMismatch(value, request.schema)
   if (mismatch !== undefined) {
-    return { ok: false, error: `reply did not match the requested schema: ${mismatch}` }
+    return { ok: false, error: `reply did not match the requested schema: ${mismatch}`, transient: true }
   }
   return { ok: true, value, raw: text }
+}
+
+/**
+ * One call, plus one retry if the reply itself was the problem.
+ *
+ * This is where a defective reply stops costing a whole run. Measured live on
+ * the first real brownfield draft: one describe reply out of 32 arrived cut
+ * off mid-value, the draft aborted fail-closed, and the rerun succeeded
+ * immediately, which is precisely one retry performed by a human. Only
+ * `transient` failures qualify, so a login failure or a missing binary still
+ * surfaces on the first attempt, and a second defective reply in a row is
+ * reported as such rather than looping.
+ */
+export async function runWithRetry(exec: AgentExec, request: AgentRequest): Promise<AgentReply> {
+  const first = await exec.run(request)
+  if (first.ok || first.transient !== true) return first
+  const second = await exec.run(request)
+  if (second.ok || second.transient !== true) return second
+  return {
+    ...second,
+    error: `${second.error} (already retried once; the first reply was defective too)`,
+  }
 }
 
 /**

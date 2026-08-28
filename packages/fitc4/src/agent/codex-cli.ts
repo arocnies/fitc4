@@ -251,18 +251,26 @@ export function codexCli(options: CodexCliOptions = {}): AgentExec {
           const why = looksTruncated(reply.trim())
             ? 'reply ended mid-value, so it was cut off rather than merely malformed'
             : 'reply was not the requested JSON'
-          return { ok: false, error: `${why}: ${truncate(reply, 200)}` }
+          return { ok: false, error: `${why}: ${truncate(reply, 200)}`, transient: true }
         }
         if (enveloped) {
           if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-            return { ok: false, error: `reply was not the enveloped JSON object: ${truncate(reply, 200)}` }
+            return {
+              ok: false,
+              error: `reply was not the enveloped JSON object: ${truncate(reply, 200)}`,
+              transient: true,
+            }
           }
           value = (value as JsonObject)[ENVELOPE_KEY] ?? null
         }
         const stripped = withoutNullOptionals(value, request.schema)
         const mismatch = schemaMismatch(stripped, request.schema)
         if (mismatch !== undefined) {
-          return { ok: false, error: `reply did not match the requested schema: ${mismatch}` }
+          return {
+            ok: false,
+            error: `reply did not match the requested schema: ${mismatch}`,
+            transient: true,
+          }
         }
         return { ok: true, value: stripped, raw: reply }
       } finally {
