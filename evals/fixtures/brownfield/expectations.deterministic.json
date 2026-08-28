@@ -1,4 +1,9 @@
 {
+  "providersMust": [
+    "typescript-imports",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",

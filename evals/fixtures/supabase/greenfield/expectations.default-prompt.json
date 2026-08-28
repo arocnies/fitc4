@@ -1,4 +1,10 @@
 {
+  "gate": false,
+  "providersMust": [
+    "agent-scan:compose",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",

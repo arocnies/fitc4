@@ -1,19 +1,34 @@
 {
+  "providersMust": [
+    "agent-scan:metadata",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",
       "ruleId": "missing-relationship",
       "severity": "error",
-      "subject": {"kind": "element", "id": "ecommerce.orders"},
-      "related": ["ecommerce.payment"],
+      "subject": {
+        "kind": "element",
+        "id": "ecommerce.orders"
+      },
+      "related": [
+        "ecommerce.payment"
+      ],
       "label": "the pinned tree wires orders -> payment without declaring it; genuine upstream drift"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "missing-relationship",
       "severity": "error",
-      "subject": {"kind": "element", "id": "ecommerce.orders"},
-      "related": ["ecommerce.warehouse"],
+      "subject": {
+        "kind": "element",
+        "id": "ecommerce.orders"
+      },
+      "related": [
+        "ecommerce.warehouse"
+      ],
       "label": "the planted orders -> warehouse edge is undeclared in the model"
     }
   ],
@@ -341,7 +356,12 @@
         "provider": "agent-scan:metadata",
         "kind": "dependency",
         "subject": "orders/metadata.yaml",
-        "target": "warehouse/metadata.yaml"
+        "target": "warehouse/metadata.yaml",
+        "evidence": {
+          "path": "orders/metadata.yaml",
+          "lineIncludes": "warehouse"
+        },
+        "label": "the planted edge cites the metadata line that actually wires the parameter"
       }
     ]
   },

@@ -19,7 +19,17 @@ import path from 'node:path'
 import { architectureRules, sourceRoot, type PipelineConfig } from '@arocnies/fitc4'
 import { agentScan, type AgentExec } from '@arocnies/fitc4/agent'
 
-const INSTRUCTIONS =
+/**
+ * The two-sentence tier: the two facts a user whose model claims these
+ * directories would type on day one, and nothing about output shape. What a
+ * compose dependency IS (depends_on), which file stands in for a service, and
+ * what to put in `examined` are all the tool's job here.
+ */
+export const USER_HINT =
+  'docker-compose.yml defines the services this deployment runs. Each service <name> is ' +
+  'implemented under services/<name>.'
+
+export const INSTRUCTIONS =
   'docker-compose.yml defines the services this deployment runs. Each compose service ' +
   '<name> is implemented by its build-context directory services/<name>, and the file ' +
   "services/<name>/Dockerfile stands in for the service wherever a fact needs a file. Emit: " +
@@ -30,7 +40,7 @@ const INSTRUCTIONS =
   "{ kind: 'file', id: 'services/B/Dockerfile' }, citing docker-compose.yml and the line of " +
   'the depends_on entry as evidence.'
 
-export default function nonTs(exec: AgentExec, root: string): PipelineConfig {
+function nonTsConfig(exec: AgentExec, root: string, instructions?: string): PipelineConfig {
   return {
     repositoryRoot: root,
     modelDir: path.join(root, 'arch'),
@@ -43,10 +53,28 @@ export default function nonTs(exec: AgentExec, root: string): PipelineConfig {
         // the reply can only come from it — and a `cached()` live run is
         // invalidated by any edit to the file.
         focus: ['docker-compose.yml'],
-        instructions: INSTRUCTIONS,
+        ...(instructions === undefined ? {} : { instructions }),
       }),
     ],
     resolve: [sourceRoot()],
     validate: [architectureRules()],
   }
+}
+
+export default function nonTs(exec: AgentExec, root: string): PipelineConfig {
+  return nonTsConfig(exec, root, INSTRUCTIONS)
+}
+
+/**
+ * The near-zero tier over the same compose file, mirroring the boutique and
+ * supabase pairs: `default-prompt` is the floor (zero authored words, the
+ * shipped import scan reading a file that declares services, not imports) and
+ * `user-hint` is the two sentences above, measuring whether the tool plus a
+ * model's own compose literacy recover the edges the 94-word oracle used to
+ * spell out.
+ */
+export const angles = {
+  'default-prompt': (exec: AgentExec, root: string): PipelineConfig => nonTsConfig(exec, root),
+  'user-hint': (exec: AgentExec, root: string): PipelineConfig =>
+    nonTsConfig(exec, root, USER_HINT),
 }

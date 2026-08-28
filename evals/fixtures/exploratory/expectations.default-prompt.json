@@ -1,0 +1,57 @@
+{
+  "gate": false,
+  "providersMust": [
+    "agent-scan:runbooks",
+    "source-root",
+    "architecture-rules"
+  ],
+  "findings": [],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "scan-root",
+        "subject": "docs/runbooks/gateway/runbook.md"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "scan-root",
+        "subject": "docs/runbooks/worker/runbook.md"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "scan-root",
+        "subject": "docs/runbooks/store/runbook.md"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "scan-root",
+        "subject": "docs/runbooks/alerts/runbook.md"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "file",
+        "subject": "docs/runbooks/gateway/runbook.md",
+        "label": "the shipped import scan reports the gateway runbook and finds no imports in it"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "file",
+        "subject": "docs/runbooks/worker/runbook.md",
+        "label": "the shipped import scan reports the worker runbook and finds no imports in it"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "file",
+        "subject": "docs/runbooks/store/runbook.md",
+        "label": "the shipped import scan reports the store runbook and finds no imports in it"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "file",
+        "subject": "docs/runbooks/alerts/runbook.md",
+        "label": "the shipped import scan reports the alerts runbook and finds no imports in it"
+      }
+    ]
+  }
+}

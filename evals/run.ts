@@ -1,6 +1,6 @@
 /**
- * The opt-in eval harness for the agent providers. Never part of `npm test`
- * or CI — run it deliberately:
+ * The eval harness for the agent providers. Stub mode is deterministic and
+ * free, and CI runs it on every push; live mode is opt-in and never CI's:
  *
  *   npm run eval                      # stub mode: free, deterministic, exact
  *   npm run eval -- --exec claude     # live mode: YOUR claude CLI, YOUR bill
@@ -305,8 +305,9 @@ for (const job of selected) {
       }
     } else {
       const expectations = expectationsFor(job) as Expectations
-      const result = await runPipeline(await job.spec(execFor(job.fixture), root))
-      score = scoreFixture(job.id, expectations, result)
+      const config = await job.spec(execFor(job.fixture), root)
+      const result = await runPipeline(config)
+      score = scoreFixture(job.id, expectations, result, { repositoryRoot: config.repositoryRoot })
     }
   } catch (error) {
     score = {
@@ -332,8 +333,20 @@ if (skipped.length > 0) {
   )
 }
 
-const allPerfect = scores.every(perfect)
-const anyBroken = scores.some((score) => score.error !== undefined)
+// Floors are measured snapshots, not targets: their drift is printed and
+// deliberately kept out of every exit-code decision.
+const gated = scores.filter((score) => score.floor !== true)
+const floorDrift = scores.filter((score) => score.floor === true && !perfect(score))
+const allPerfect = gated.every(perfect)
+const anyBroken = gated.some((score) => score.error !== undefined)
+
+if (floorDrift.length > 0) {
+  console.log(
+    `note: floor rows drifted from their snapshots (never failing): ${floorDrift
+      .map((score) => score.fixture)
+      .join(', ')}. If the drift is an improvement, re-snapshot the floor expectations.\n`,
+  )
+}
 
 if (flags.exec === 'stub') {
   if (!allPerfect) {

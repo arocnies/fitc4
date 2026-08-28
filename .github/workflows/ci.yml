@@ -11,6 +11,12 @@
 #         releases shows up here instead of in a consumer's install. It never
 #         blocks a merge; a red leg means "look at the new likec4 release".
 #
+# eval:  the eval harness in stub mode — deterministic, free, and the gate
+#         over the fixtures, expectations, and pipeline wiring (harness
+#         regressions surface here, agent quality never does; live mode stays
+#         a human's command). External fixture checkouts are cached by their
+#         pins; a cache miss fetches the four pinned sparse checkouts once.
+#
 # `npm ci` runs the package's `prepare` script, which builds dist/ — no
 # separate build step is needed. Node 22 is the matrix floor because the
 # likec4 dependency requires node >=22.22.3.
@@ -51,6 +57,21 @@ jobs:
       - run: npm run verify
 
       - run: npm run smoke
+
+      # The external fixtures' sparse checkouts, keyed on their pins: the
+      # key changes exactly when an external.json changes, and a cached
+      # checkout is verified against its pin on every use, so a stale
+      # restore fails loudly rather than scoring silently.
+      - uses: actions/cache@v4
+        with:
+          path: evals/.cache/repos
+          key: eval-checkouts-${{ hashFiles('evals/fixtures/*/external.json') }}
+
+      # Naming the external fixtures is the harness's permission to fetch on
+      # a cache miss; the second run covers everything, externals included,
+      # and is what gates.
+      - run: npm run eval -- --fixture ddh --fixture boutique --fixture ecom --fixture supabase
+      - run: npm run eval
 
   likec4-latest:
     name: likec4 latest (advisory)

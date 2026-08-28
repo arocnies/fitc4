@@ -160,7 +160,7 @@ const KNOWN_KEYS = [
 
 /** What each missing phase's error suggests, ready to paste. */
 const STANDARD_PHASES: Record<string, string> = {
-  scan: `scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })]`,
+  scan: `scan: [importScan()]`,
   resolve: `resolve: [sourceRoot()]`,
   validate: `validate: [architectureRules()]`,
 }

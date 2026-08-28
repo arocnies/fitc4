@@ -1,11 +1,21 @@
 {
+  "providersMust": [
+    "agent-scan:compose",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",
       "ruleId": "missing-relationship",
       "severity": "error",
-      "subject": { "kind": "element", "id": "deploy.web" },
-      "related": ["deploy.db"],
+      "subject": {
+        "kind": "element",
+        "id": "deploy.web"
+      },
+      "related": [
+        "deploy.db"
+      ],
       "label": "the planted web -> db compose edge is forbidden by the model"
     },
     {
@@ -26,6 +36,24 @@
       },
       {
         "provider": "agent-scan:compose",
+        "kind": "service",
+        "subject": "db",
+        "label": "the domain-specific service observation for db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "service",
+        "subject": "api",
+        "label": "the domain-specific service observation for api"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "service",
+        "subject": "web",
+        "label": "the domain-specific service observation for web"
+      },
+      {
+        "provider": "agent-scan:compose",
         "kind": "dependency",
         "subject": "services/web/Dockerfile",
         "target": "services/api/Dockerfile"
@@ -34,7 +62,12 @@
         "provider": "agent-scan:compose",
         "kind": "dependency",
         "subject": "services/web/Dockerfile",
-        "target": "services/db/Dockerfile"
+        "target": "services/db/Dockerfile",
+        "evidence": {
+          "path": "docker-compose.yml",
+          "lineIncludes": "db"
+        },
+        "label": "the planted web -> db edge cites the depends_on line that states it"
       },
       {
         "provider": "agent-scan:compose",

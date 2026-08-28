@@ -105,9 +105,11 @@ export default function boutiqueGreenfield(exec: AgentExec, root: string): Pipel
 }
 
 /**
- * What a user would actually type before reading any documentation: the two
- * facts about this repository that are not written down in any one file. Two
- * sentences, 21 words. Everything the gate instructions say beyond this —
+ * What the repository's owner would type, having identified their own
+ * conventions but written no instructions: the two facts that are not stated
+ * in any one file. Two sentences, 18 words. Discovering the _SERVICE_ADDR
+ * convention from scratch is a different, harder task this row does not
+ * measure. Everything the gate instructions say beyond this —
  * emit kind 'dependency', stand a Dockerfile in for a service, ignore
  * REDIS_ADDR, list examined — is the tool's job, and the `user-hint` angle
  * measures whether the tool does it.
@@ -168,7 +170,7 @@ export const angles = {
   },
 
   /**
-   * The two-sentence tier: `USER_HINT` instead of the 147-word oracle, with
+   * The two-sentence tier (18 words): `USER_HINT` instead of the 147-word oracle, with
    * its own expectations because the ideal reply speaks service names, not
    * Dockerfile stand-ins. The associations it must reach are the base row's
    * fifteen, verbatim — same graph, different words — so a miss here is a

@@ -1,4 +1,9 @@
 {
+  "providersMust": [
+    "agent-scan:manifests",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",
@@ -192,7 +197,11 @@
         "kind": "dependency",
         "subject": "src/recommendationservice/Dockerfile",
         "target": "src/paymentservice/Dockerfile",
-        "label": "the scan reports the planted payment edge honestly"
+        "label": "the scan reports the planted payment edge honestly",
+        "evidence": {
+          "path": "kubernetes-manifests/recommendationservice.yaml",
+          "lineIncludes": "PAYMENT_SERVICE_ADDR"
+        }
       }
     ]
   },

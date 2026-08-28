@@ -74,4 +74,26 @@ export const angles = {
       resolve: [...config.resolve.filter((provider) => provider.id !== 'agent-resolve'), agentResolve({ exec })],
     }
   },
+
+  /**
+   * The one-sentence tier: what the vendor system IS, and nothing about
+   * description-only elements or abstention — the clause that contained the
+   * slonik answer stays out. Shares the base expectations: the six decisions
+   * must land the same with the shipped prompt carrying the judgment.
+   */
+  'user-hint': async (exec: AgentExec, root: string): Promise<PipelineConfig> => {
+    const config = await ddhGreenfield(exec, root)
+    return {
+      ...config,
+      resolve: [
+        ...config.resolve.filter((provider) => provider.id !== 'agent-resolve'),
+        agentResolve({
+          exec,
+          instructions:
+            'The vendor system catalogs the third-party platforms and services this ' +
+            'application runs on.',
+        }),
+      ],
+    }
+  },
 }

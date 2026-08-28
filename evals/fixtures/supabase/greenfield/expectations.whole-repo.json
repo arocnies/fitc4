@@ -1,4 +1,10 @@
 {
+  "providersMust": [
+    "agent-scan:compose",
+    "agent-scan:repo",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",
@@ -308,7 +314,8 @@
         "subject": "docker/setup.sh",
         "label": "the whole-repo scan attests to what it read"
       }
-    ]
+    ],
+    "openEnded": true
   },
   "associations": {
     "must": [

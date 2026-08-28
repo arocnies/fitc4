@@ -106,7 +106,7 @@ describe('rejecting a malformed config', () => {
   // composition ready to paste: "explicit" must never mean "go find out what
   // the default would have been".
   test.each([
-    ['scan', /missing 'scan'.*typescriptImports\(\{ tsconfig: 'tsconfig\.json', roots: \['src'\] \}\)/],
+    ['scan', /missing 'scan'.*importScan\(\)/],
     ['resolve', /missing 'resolve'.*sourceRoot\(\)/],
     ['validate', /missing 'validate'.*architectureRules\(\)/],
   ] as const)('a missing %s phase names the standard one', async (phase, expected) => {

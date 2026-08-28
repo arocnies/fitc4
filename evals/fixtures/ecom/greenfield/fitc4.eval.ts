@@ -58,8 +58,21 @@ export const SCAN_INSTRUCTIONS =
   'blocks, and everything else in the templates. List every file you read in examined, ' +
   'including files that contribute no dependencies.'
 
-/** The `agent-scan` options both variants share; only the workdir differs. */
-export function ecomScan(exec: AgentExec) {
+/**
+ * The two-sentence tier: where the services are described and the one
+ * non-obvious wiring channel, in the words of someone who owns the repo. The
+ * oracle's remaining 160-odd words — the observation shape, the stand-in
+ * file, the path-segment rule, the duplicate-reporting convention, the
+ * exclusions — are the tool's job, and the `user-hint` angle measures whether
+ * the tool does it.
+ */
+export const USER_HINT =
+  "Each top-level service directory's metadata.yaml describes one service and lists its " +
+  'dependencies. Services are also wired together through SSM parameter paths under ' +
+  '/ecommerce/.'
+
+/** The `agent-scan` options the variants share; only workdir and prose differ. */
+export function ecomScan(exec: AgentExec, instructions: string = SCAN_INSTRUCTIONS) {
   return agentScan({
     exec,
     id: 'metadata',
@@ -71,7 +84,7 @@ export function ecomScan(exec: AgentExec) {
     // Parameters block (the largest, frontend-api's, ends at byte 1317).
     focus: ['*/metadata.yaml', '*/template.yaml'],
     excerptChars: 2_000,
-    instructions: SCAN_INSTRUCTIONS,
+    instructions,
   })
 }
 
@@ -97,4 +110,43 @@ export default function ecomGreenfield(exec: AgentExec, root: string): PipelineC
     resolve: [sourceRoot()],
     validate: [architectureRules()],
   }
+}
+
+/**
+ * The near-zero tier over the same pinned sources.
+ *
+ * `default-prompt` is the floor with a real defect in frame: the shipped
+ * import scan reads 19 YAML files that contain no imports, every file is
+ * owned by its own element, so the run is quiet green — and the genuine
+ * upstream orders -> payment drift the base row pins goes unseen. That is
+ * what zero authored words buys here, pinned so the distance to the hint is
+ * measured rather than assumed.
+ *
+ * `user-hint` is the two sentences above. The ideal reply speaks bare service
+ * names (the directory names), each distinct edge once — no oracle
+ * bookkeeping conventions — and the resolver carries the names onto the
+ * elements, spelling differences included (delivery-pricing ->
+ * deliveryPricing). The upstream drift error must survive the vocabulary.
+ */
+export const angles = {
+  'default-prompt': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = ecomGreenfield(exec, root)
+    return {
+      ...config,
+      scan: [
+        agentScan({
+          exec,
+          id: 'metadata',
+          roots: SERVICE_DIRECTORIES,
+          focus: ['*/metadata.yaml', '*/template.yaml'],
+          excerptChars: 2_000,
+        }),
+      ],
+    }
+  },
+
+  'user-hint': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = ecomGreenfield(exec, root)
+    return { ...config, scan: [ecomScan(exec, USER_HINT)] }
+  },
 }

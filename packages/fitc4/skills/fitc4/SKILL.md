@@ -47,7 +47,8 @@ Every finding carries a rule id and a severity:
 - **warning** passes but wants action: a file no element owns
   (`unmapped-source`), an import nothing can resolve (`unresolved-import`),
   a dependency naming endpoints no element answers to
-  (`unmapped-reference`), a stale drift edge (`unused-drift`).
+  (`unmapped-reference`), a declared-and-exercised dependency cycle
+  (`circular-dependency`), a stale drift edge (`unused-drift`).
 - **info** is counted, not blocking: exercised drift (`drift-relationship`),
   elements nothing checks (`unobserved-elements`).
 

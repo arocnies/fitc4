@@ -1,10 +1,18 @@
 {
+  "providersMust": [
+    "typescript-imports",
+    "source-root",
+    "agent-resolve",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",
       "ruleId": "unobserved-elements",
       "severity": "info",
-      "related": ["vendor.postgres"],
+      "related": [
+        "vendor.postgres"
+      ],
       "label": "the description-only PostgreSQL element is reported as unobserved"
     }
   ],

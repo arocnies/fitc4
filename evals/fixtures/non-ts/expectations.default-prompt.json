@@ -1,0 +1,36 @@
+{
+  "gate": false,
+  "providersMust": [
+    "agent-scan:compose",
+    "source-root",
+    "architecture-rules"
+  ],
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "docker-compose.yml"
+      },
+      "label": "the compose file is reported but owned by nothing, and no edge is seen"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:compose",
+        "kind": "scan-root",
+        "subject": "docker-compose.yml",
+        "label": "the scan attests to having examined the compose file"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "file",
+        "subject": "docker-compose.yml",
+        "label": "the shipped import scan reports the file and finds no imports in it"
+      }
+    ]
+  }
+}

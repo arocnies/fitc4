@@ -25,7 +25,17 @@ import path from 'node:path'
 import { architectureRules, sourceRoot, type PipelineConfig } from '@arocnies/fitc4'
 import { agentScan, type AgentExec } from '@arocnies/fitc4/agent'
 
-const INSTRUCTIONS =
+/**
+ * The two-sentence tier: where the runbooks live and that they document
+ * reliances — the two facts not written down in any one file. Which lines
+ * count as a dependency, what vocabulary to answer in, and the instruction to
+ * read all of them are the tool's and the model's job here.
+ */
+export const USER_HINT =
+  'Each directory docs/runbooks/<name>/ holds the operational runbook of service <name>. The ' +
+  'runbooks document which other services each service relies on.'
+
+export const INSTRUCTIONS =
   'Each directory docs/runbooks/<name>/ holds the operational runbook of service <name>, and ' +
   'the file docs/runbooks/<name>/runbook.md stands in for the service wherever a fact needs a ' +
   'file. Read every runbook — the dependencies are spread across them and no single file tells ' +
@@ -38,7 +48,7 @@ const INSTRUCTIONS =
   "{ kind: 'file', id: 'docs/runbooks/B/runbook.md' }, citing the runbook and the line " +
   'documenting the reliance as evidence.'
 
-export default function exploratory(exec: AgentExec, root: string): PipelineConfig {
+function exploratoryConfig(exec: AgentExec, root: string, instructions?: string): PipelineConfig {
   return {
     repositoryRoot: root,
     modelDir: path.join(root, 'arch'),
@@ -50,10 +60,29 @@ export default function exploratory(exec: AgentExec, root: string): PipelineConf
         // Deliberately no `focus`: the request prefills only the instructions
         // and the file listing, and live mode explores read-only
         // (`agentic: true`) to find what the runbooks actually say.
-        instructions: INSTRUCTIONS,
+        ...(instructions === undefined ? {} : { instructions }),
       }),
     ],
     resolve: [sourceRoot()],
     validate: [architectureRules()],
   }
+}
+
+export default function exploratory(exec: AgentExec, root: string): PipelineConfig {
+  return exploratoryConfig(exec, root, INSTRUCTIONS)
+}
+
+/**
+ * The near-zero tier over the same runbooks. `default-prompt` is the floor:
+ * the shipped import scan exploring markdown that contains no imports, worth
+ * pinning precisely because its failure mode is the quiet green — every
+ * runbook is owned by its own element, so nothing fires and nothing is
+ * checked. `user-hint` is the two sentences above; the ideal reply speaks
+ * service names and the resolver carries them onto the elements.
+ */
+export const angles = {
+  'default-prompt': (exec: AgentExec, root: string): PipelineConfig =>
+    exploratoryConfig(exec, root),
+  'user-hint': (exec: AgentExec, root: string): PipelineConfig =>
+    exploratoryConfig(exec, root, USER_HINT),
 }

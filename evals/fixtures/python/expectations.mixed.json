@@ -1,4 +1,10 @@
 {
+  "providersMust": [
+    "import-scan",
+    "agent-scan",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",
@@ -16,6 +22,24 @@
   ],
   "observations": {
     "must": [
+      {
+        "provider": "agent-scan",
+        "kind": "file",
+        "subject": "src/app/api/routes.py",
+        "label": "the shipped instructions report each source file: src/app/api/routes.py"
+      },
+      {
+        "provider": "agent-scan",
+        "kind": "file",
+        "subject": "src/app/core/engine.py",
+        "label": "the shipped instructions report each source file: src/app/core/engine.py"
+      },
+      {
+        "provider": "agent-scan",
+        "kind": "file",
+        "subject": "src/app/store/db.py",
+        "label": "the shipped instructions report each source file: src/app/store/db.py"
+      },
       {
         "provider": "import-scan",
         "kind": "scan-root",

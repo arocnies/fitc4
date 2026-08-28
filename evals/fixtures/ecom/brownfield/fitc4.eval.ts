@@ -23,7 +23,7 @@ import { architectureRules, sourceRoot, type PipelineConfig } from '@arocnies/fi
 import type { AgentExec } from '@arocnies/fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
-import { ecomScan } from '../greenfield/fitc4.eval.ts'
+import { ecomScan, USER_HINT } from '../greenfield/fitc4.eval.ts'
 
 export default function ecomBrownfield(exec: AgentExec, root: string): PipelineConfig {
   const fixtureDir = path.dirname(root)
@@ -55,4 +55,18 @@ export default function ecomBrownfield(exec: AgentExec, root: string): PipelineC
     resolve: [sourceRoot()],
     validate: [architectureRules()],
   }
+}
+
+/**
+ * The near-zero tier with the planted SSM edge in frame: the two-sentence
+ * hint names metadata.yaml and the /ecommerce/ parameter channel, and the
+ * patched orders -> warehouse wiring must come back as a bare-name edge and
+ * land as the second `missing-relationship` error, next to the genuine
+ * upstream one.
+ */
+export const angles = {
+  'user-hint': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = ecomBrownfield(exec, root)
+    return { ...config, scan: [ecomScan(exec, USER_HINT)] }
+  },
 }

@@ -1,4 +1,10 @@
 {
+  "providersMust": [
+    "typescript-imports",
+    "source-root",
+    "agent-resolve",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",

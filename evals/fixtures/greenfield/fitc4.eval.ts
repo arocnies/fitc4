@@ -55,4 +55,26 @@ export const angles = {
     const base = await resolveConfig(path.join(root, 'fitc4.config.mts'))
     return { ...base, resolve: [...base.resolve, agentResolve({ exec })] }
   },
+
+  /**
+   * The one-sentence tier between the two: a domain fact a user would type
+   * (what the managed-service elements ARE), with the mapping rule and the
+   * abstention rule left entirely to the shipped prompt. Shares the base
+   * expectations: same required mapping, same required abstention.
+   */
+  'user-hint': async (exec: AgentExec, root: string): Promise<PipelineConfig> => {
+    const base = await resolveConfig(path.join(root, 'fitc4.config.mts'))
+    return {
+      ...base,
+      resolve: [
+        ...base.resolve,
+        agentResolve({
+          exec,
+          instructions:
+            'The shop runs on managed third-party services; the model catalogs them as ' +
+            'managed-service elements.',
+        }),
+      ],
+    }
+  },
 }

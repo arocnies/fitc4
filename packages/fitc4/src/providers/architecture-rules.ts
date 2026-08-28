@@ -36,6 +36,7 @@ import {
   unmappedReferenceRule,
   unresolvedImportRule,
 } from './architecture-rules/boundaries.ts'
+import { circularDependencyRules, type DeclaredEdge } from './architecture-rules/cycles.ts'
 import { DriftLedger } from './architecture-rules/drift.ts'
 import {
   modelHygieneRules,
@@ -93,6 +94,10 @@ export function architectureRules(
     // value import flips the whole edge to runtime coupling.
     const edgeIsTypeOnly = new Map<string, boolean>()
 
+    // Exercised, declared element-level edges, for the cycle rule: the one
+    // family of defect every per-edge rule passes quietly.
+    const declaredEdges = new Map<string, DeclaredEdge>()
+
     for (const association of context.associations) {
       const observation = observations.get(association.observationId)
       if (observation === undefined) continue
@@ -100,6 +105,16 @@ export function architectureRules(
       if (observation.kind === 'file') {
         collector.add(fileRule(association, observation, severityOf))
       } else if (observation.kind === 'dependency') {
+        if (
+          association.status === 'resolved' &&
+          association.relationship !== undefined &&
+          association.source?.id !== undefined &&
+          association.target?.id !== undefined &&
+          association.source.id !== association.target.id
+        ) {
+          const edge = { source: association.source.id, target: association.target.id }
+          declaredEdges.set(`${edge.source}->${edge.target}`, edge)
+        }
         const finding = dependencyRule(association, observation, declared, severityOf)
         if (finding !== undefined) {
           edgeIsTypeOnly.set(
@@ -128,6 +143,7 @@ export function architectureRules(
       ...applyTypeOnlyPolicy(collector.findings(), edgeIsTypeOnly, typeOnlyPolicy),
       ...coverageRules(context, observations, severityOf),
       ...packageRules(context, observations, severityOf),
+      ...circularDependencyRules(declaredEdges.values(), severityOf),
       ...unobservedElementsRule(context, severityOf),
       ...modelHygieneRules(declared, severityOf),
       ...vocabularyRules(context, severityOf),

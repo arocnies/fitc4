@@ -24,6 +24,9 @@
  * not churn the expectations.
  */
 
+import fs from 'node:fs'
+import path from 'node:path'
+
 import type { Association, Finding, Observation, PipelineResult } from '@arocnies/fitc4'
 
 export interface ExpectedFinding {
@@ -55,6 +58,14 @@ export interface ExpectedObservation {
   kind: string
   subject?: string
   target?: string
+  /**
+   * The citation the observation must carry, checked against the repository
+   * itself: some evidence entry must name this `path`, and the file's line at
+   * that entry's `line` must contain `lineIncludes`. This is the only place
+   * the suite reads the cited line rather than trusting it, so pin it on the
+   * observations whose whole value is the citation.
+   */
+  evidence?: { path: string; lineIncludes: string }
   label?: string
 }
 
@@ -64,7 +75,33 @@ export interface Expectations {
   /** Named regressions: matches are extras reported under this label. */
   findingsMustNot?: ExpectedFinding[]
   associations?: { must?: ExpectedAssociation[]; mustNot?: ExpectedAssociation[] }
-  observations?: { must?: ExpectedObservation[]; mustNot?: ExpectedObservation[] }
+  observations?: {
+    must?: ExpectedObservation[]
+    mustNot?: ExpectedObservation[]
+    /**
+     * Declares the agent observation set open-ended: unclaimed agent
+     * observations are tolerated instead of counted as extras. The default is
+     * the strict reading, mirroring associations, because an agent scan's
+     * unpinned chatter is otherwise invisible. Set this only where the ideal
+     * observation set genuinely cannot be enumerated, and say why in the
+     * fixture's docs.
+     */
+    openEnded?: boolean
+  }
+  /**
+   * Provider ids that must be wired into the pipeline this row ran. This is
+   * the tripwire for the quietest regression: a row whose provider produced
+   * nothing scores identically whether the provider abstained correctly or
+   * was never composed at all, unless its presence is asserted here.
+   */
+  providersMust?: string[]
+  /**
+   * false marks the row a FLOOR: a measured snapshot of what a configuration
+   * currently produces, not a target to hold. The row is scored and printed,
+   * drift is visible in the notes, and nothing fails on it — so improving the
+   * shipped defaults shows up as drift to re-snapshot, never as a regression.
+   */
+  gate?: boolean
 }
 
 export interface ProviderScore {
@@ -92,6 +129,8 @@ export interface FixtureScore {
   fixture: string
   /** A run that never produced a result to score: model errors, load failure. */
   error?: string
+  /** From `expectations.gate === false`: scored and printed, never failing. */
+  floor?: boolean
   providers: ProviderScore[]
 }
 
@@ -110,13 +149,20 @@ export function perfect(score: FixtureScore): boolean {
   return score.providers.every(rowOk)
 }
 
+export interface ScoreOptions {
+  /** Where evidence citations are checked against real files (see `ExpectedObservation.evidence`). */
+  repositoryRoot?: string
+}
+
 export function scoreFixture(
   fixture: string,
   expectations: Expectations,
   result: PipelineResult,
+  options: ScoreOptions = {},
 ): FixtureScore {
+  const floor = expectations.gate === false ? { floor: true as const } : {}
   if (result.modelErrors.length > 0) {
-    return { fixture, error: `model errors: ${result.modelErrors.join('; ')}`, providers: [] }
+    return { fixture, ...floor, error: `model errors: ${result.modelErrors.join('; ')}`, providers: [] }
   }
 
   const rows = new Map<string, ProviderScore>()
@@ -126,6 +172,20 @@ export function scoreFixture(
     const created: ProviderScore = { provider, hits: 0, misses: 0, extras: 0, notes: [] }
     rows.set(provider, created)
     return created
+  }
+
+  // --- providers: assert the roster before judging any output. A provider
+  // that produced nothing scores identically whether it abstained correctly
+  // or was never composed, so its presence in the pipeline is its own pin.
+  const wired = new Set([...result.providers.scan, ...result.providers.resolve, ...result.providers.validate])
+  for (const provider of expectations.providersMust ?? []) {
+    if (wired.has(provider)) {
+      row(provider).hits += 1
+      continue
+    }
+    const target = row(provider)
+    target.misses += 1
+    target.notes.push('provider was not wired into the pipeline')
   }
 
   // --- findings: the complete expected set, matched greedily by content ---
@@ -205,27 +265,85 @@ export function scoreFixture(
       const target = row(expected.provider)
       target.misses += 1
       target.notes.push(`missing observation: ${describeExpectedObservation(expected)}`)
-    } else {
-      claimedObservations.add(match)
-      row(expected.provider).hits += 1
+      continue
     }
+    claimedObservations.add(match)
+    // The citation is checked against the repository, not taken on trust: a
+    // matched observation whose pinned evidence line does not say what the
+    // pin requires is a miss, because a wrong citation is a wrong answer
+    // wearing a right one's ids.
+    const evidenceProblem =
+      expected.evidence === undefined
+        ? undefined
+        : checkEvidence(expected.evidence, match, options.repositoryRoot)
+    if (evidenceProblem !== undefined) {
+      const target = row(expected.provider)
+      target.misses += 1
+      target.notes.push(
+        `evidence check failed for ${describeExpectedObservation(expected)}: ${evidenceProblem}`,
+      )
+      continue
+    }
+    row(expected.provider).hits += 1
   }
-  // Named regressions, mirroring associations: a must-not observation that
-  // appears is an extra on its provider's row, under the fixture's label.
+  // Unclaimed output, mirroring associations: a must-not observation that
+  // appears is a named extra, and any OTHER unclaimed agent observation is an
+  // unnamed one — an agent scan that pads its reply must lose the row rather
+  // than pass quietly. Deterministic scanners legitimately enumerate files
+  // the expectations never name, so only agent providers are held to the
+  // complete set, and `openEnded: true` opts a fixture out where the ideal
+  // set genuinely cannot be written down.
   const observationsMustNot = expectations.observations?.mustNot ?? []
+  const openEnded = expectations.observations?.openEnded === true
   for (const observation of result.observations) {
     if (claimedObservations.has(observation)) continue
     const named = observationsMustNot.find((entry) => observationMatches(entry, observation))
-    if (named === undefined) continue
-    claimedObservations.add(observation)
+    if (named !== undefined) {
+      claimedObservations.add(observation)
+      const target = row(observation.provider)
+      target.extras += 1
+      target.notes.push(
+        `must-not observation appeared: ${named.label ?? describeExpectedObservation(named)}`,
+      )
+      continue
+    }
+    if (openEnded || !isAgentProvider(observation.provider)) continue
     const target = row(observation.provider)
     target.extras += 1
-    target.notes.push(
-      `must-not observation appeared: ${named.label ?? describeExpectedObservation(named)}`,
-    )
+    const summary = `${observation.kind}: ${observation.subject?.id ?? '?'}${observation.target !== undefined ? ` -> ${observation.target.id}` : ''}`
+    target.notes.push(`unexpected observation: ${summary}`)
   }
 
-  return { fixture, providers: [...rows.values()].sort((a, b) => a.provider.localeCompare(b.provider)) }
+  return { fixture, ...floor, providers: [...rows.values()].sort((a, b) => a.provider.localeCompare(b.provider)) }
+}
+
+/**
+ * Why a pinned citation does not hold, or undefined when it does. The check
+ * reads the cited file from the repository the pipeline actually ran on, so
+ * it needs `repositoryRoot`; a pin in a fixture that never passes one is a
+ * configuration mistake worth failing loudly.
+ */
+function checkEvidence(
+  expected: { path: string; lineIncludes: string },
+  observation: Observation,
+  repositoryRoot: string | undefined,
+): string | undefined {
+  if (repositoryRoot === undefined) return 'no repositoryRoot was passed to the scorer'
+  const entry = (observation.evidence ?? []).find((candidate) => candidate.path === expected.path)
+  if (entry === undefined) return `no evidence entry cites ${expected.path}`
+  if (entry.line === undefined) return `the ${expected.path} evidence entry carries no line number`
+  let content: string
+  try {
+    content = fs.readFileSync(path.join(repositoryRoot, expected.path), 'utf8')
+  } catch {
+    return `cited file ${expected.path} is unreadable under the repository root`
+  }
+  const line = content.split(/\r?\n/)[entry.line - 1]
+  if (line === undefined) return `cited line ${entry.line} is past the end of ${expected.path}`
+  if (!line.includes(expected.lineIncludes)) {
+    return `line ${entry.line} of ${expected.path} does not contain '${expected.lineIncludes}'`
+  }
+  return undefined
 }
 
 function findingMatches(expected: ExpectedFinding, finding: Finding): boolean {
@@ -299,7 +417,14 @@ export function renderScorecard(scores: FixtureScore[]): string {
 
   for (const score of scores) {
     if (score.error !== undefined) {
-      table.push([score.fixture, '(run failed)', '-', '-', '-', 'FAIL'])
+      table.push([score.fixture, '(run failed)', '-', '-', '-', score.floor === true ? 'floor(broken)' : 'FAIL'])
+      continue
+    }
+    // A fixture with no provider rows must still occupy a line: a row that
+    // scored nothing at all vanishing from the table is the empty-provider
+    // illusion, one layer up.
+    if (score.providers.length === 0) {
+      table.push([score.fixture, '(nothing scored)', '0', '0', '0', score.floor === true ? 'floor' : 'ok'])
       continue
     }
     for (const provider of score.providers) {
@@ -309,7 +434,13 @@ export function renderScorecard(scores: FixtureScore[]): string {
         String(provider.hits),
         String(provider.misses),
         String(provider.extras),
-        rowOk(provider) ? 'ok' : 'FAIL',
+        score.floor === true
+          ? rowOk(provider)
+            ? 'floor'
+            : 'floor(drift)'
+          : rowOk(provider)
+            ? 'ok'
+            : 'FAIL',
       ])
     }
   }

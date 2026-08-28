@@ -1,55 +1,287 @@
 [
   {
-    "when": { "promptIncludes": "Carry out the scan instructions" },
+    "when": {
+      "contextIncludes": "document which other services"
+    },
+    "reply": {
+      "observations": [
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "gateway"
+          },
+          "target": {
+            "kind": "service",
+            "id": "worker"
+          },
+          "description": "the gateway runbook drains held submissions into the worker queue",
+          "evidence": [
+            {
+              "path": "docs/runbooks/gateway/runbook.md",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "worker"
+          },
+          "target": {
+            "kind": "service",
+            "id": "store"
+          },
+          "description": "the worker runbook writes finished results into the store",
+          "evidence": [
+            {
+              "path": "docs/runbooks/worker/runbook.md",
+              "line": 9
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "worker"
+          },
+          "target": {
+            "kind": "service",
+            "id": "alerts"
+          },
+          "description": "the worker runbook pages through alerts on repeated failures",
+          "evidence": [
+            {
+              "path": "docs/runbooks/worker/runbook.md",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "alerts"
+          },
+          "target": {
+            "kind": "service",
+            "id": "store"
+          },
+          "description": "the alerts runbook falls back to querying the store directly",
+          "evidence": [
+            {
+              "path": "docs/runbooks/alerts/runbook.md",
+              "line": 9
+            }
+          ]
+        }
+      ],
+      "examined": [
+        "docs/runbooks/gateway/runbook.md",
+        "docs/runbooks/worker/runbook.md",
+        "docs/runbooks/store/runbook.md",
+        "docs/runbooks/alerts/runbook.md"
+      ]
+    }
+  },
+  {
+    "when": {
+      "contextIncludes": "Map the source code as a language-neutral dependency graph"
+    },
+    "reply": {
+      "observations": [
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docs/runbooks/gateway/runbook.md"
+          },
+          "evidence": [
+            {
+              "path": "docs/runbooks/gateway/runbook.md",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docs/runbooks/worker/runbook.md"
+          },
+          "evidence": [
+            {
+              "path": "docs/runbooks/worker/runbook.md",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docs/runbooks/store/runbook.md"
+          },
+          "evidence": [
+            {
+              "path": "docs/runbooks/store/runbook.md",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docs/runbooks/alerts/runbook.md"
+          },
+          "evidence": [
+            {
+              "path": "docs/runbooks/alerts/runbook.md",
+              "line": 1
+            }
+          ]
+        }
+      ],
+      "examined": [
+        "docs/runbooks/gateway/runbook.md",
+        "docs/runbooks/worker/runbook.md",
+        "docs/runbooks/store/runbook.md",
+        "docs/runbooks/alerts/runbook.md"
+      ]
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "Carry out the scan instructions"
+    },
     "reply": {
       "observations": [
         {
           "kind": "runbook",
-          "subject": { "kind": "runbook", "id": "gateway" },
-          "evidence": [{ "path": "docs/runbooks/gateway/runbook.md", "line": 1 }]
+          "subject": {
+            "kind": "runbook",
+            "id": "gateway"
+          },
+          "evidence": [
+            {
+              "path": "docs/runbooks/gateway/runbook.md",
+              "line": 1
+            }
+          ]
         },
         {
           "kind": "runbook",
-          "subject": { "kind": "runbook", "id": "worker" },
-          "evidence": [{ "path": "docs/runbooks/worker/runbook.md", "line": 1 }]
+          "subject": {
+            "kind": "runbook",
+            "id": "worker"
+          },
+          "evidence": [
+            {
+              "path": "docs/runbooks/worker/runbook.md",
+              "line": 1
+            }
+          ]
         },
         {
           "kind": "runbook",
-          "subject": { "kind": "runbook", "id": "store" },
-          "evidence": [{ "path": "docs/runbooks/store/runbook.md", "line": 1 }]
+          "subject": {
+            "kind": "runbook",
+            "id": "store"
+          },
+          "evidence": [
+            {
+              "path": "docs/runbooks/store/runbook.md",
+              "line": 1
+            }
+          ]
         },
         {
           "kind": "runbook",
-          "subject": { "kind": "runbook", "id": "alerts" },
-          "evidence": [{ "path": "docs/runbooks/alerts/runbook.md", "line": 1 }]
+          "subject": {
+            "kind": "runbook",
+            "id": "alerts"
+          },
+          "evidence": [
+            {
+              "path": "docs/runbooks/alerts/runbook.md",
+              "line": 1
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": { "kind": "file", "id": "docs/runbooks/gateway/runbook.md" },
-          "target": { "kind": "file", "id": "docs/runbooks/worker/runbook.md" },
+          "subject": {
+            "kind": "file",
+            "id": "docs/runbooks/gateway/runbook.md"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docs/runbooks/worker/runbook.md"
+          },
           "description": "the gateway runbook drains held submissions into the worker queue",
-          "evidence": [{ "path": "docs/runbooks/gateway/runbook.md", "line": 10 }]
+          "evidence": [
+            {
+              "path": "docs/runbooks/gateway/runbook.md",
+              "line": 10
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": { "kind": "file", "id": "docs/runbooks/worker/runbook.md" },
-          "target": { "kind": "file", "id": "docs/runbooks/store/runbook.md" },
+          "subject": {
+            "kind": "file",
+            "id": "docs/runbooks/worker/runbook.md"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docs/runbooks/store/runbook.md"
+          },
           "description": "the worker runbook writes finished results into the store",
-          "evidence": [{ "path": "docs/runbooks/worker/runbook.md", "line": 9 }]
+          "evidence": [
+            {
+              "path": "docs/runbooks/worker/runbook.md",
+              "line": 9
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": { "kind": "file", "id": "docs/runbooks/worker/runbook.md" },
-          "target": { "kind": "file", "id": "docs/runbooks/alerts/runbook.md" },
+          "subject": {
+            "kind": "file",
+            "id": "docs/runbooks/worker/runbook.md"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docs/runbooks/alerts/runbook.md"
+          },
           "description": "the worker runbook raises a page through alerts",
-          "evidence": [{ "path": "docs/runbooks/worker/runbook.md", "line": 10 }]
+          "evidence": [
+            {
+              "path": "docs/runbooks/worker/runbook.md",
+              "line": 10
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": { "kind": "file", "id": "docs/runbooks/alerts/runbook.md" },
-          "target": { "kind": "file", "id": "docs/runbooks/store/runbook.md" },
+          "subject": {
+            "kind": "file",
+            "id": "docs/runbooks/alerts/runbook.md"
+          },
+          "target": {
+            "kind": "file",
+            "id": "docs/runbooks/store/runbook.md"
+          },
           "description": "the alerts runbook queries the result store directly to re-page",
-          "evidence": [{ "path": "docs/runbooks/alerts/runbook.md", "line": 9 }]
+          "evidence": [
+            {
+              "path": "docs/runbooks/alerts/runbook.md",
+              "line": 9
+            }
+          ]
         }
       ],
       "examined": [

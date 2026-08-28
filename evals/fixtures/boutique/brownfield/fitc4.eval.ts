@@ -19,7 +19,7 @@ import { architectureRules, sourceRoot, type PipelineConfig } from '@arocnies/fi
 import type { AgentExec } from '@arocnies/fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
-import { boutiqueScan } from '../greenfield/fitc4.eval.ts'
+import { boutiqueScan, USER_HINT } from '../greenfield/fitc4.eval.ts'
 
 export default function boutiqueBrownfield(exec: AgentExec, root: string): PipelineConfig {
   const fixtureDir = path.dirname(root)
@@ -51,4 +51,19 @@ export default function boutiqueBrownfield(exec: AgentExec, root: string): Pipel
     resolve: [sourceRoot()],
     validate: [architectureRules()],
   }
+}
+
+/**
+ * The near-zero tier where it matters most: does the PLANTED violation
+ * surface from the two-sentence hint? The greenfield `user-hint` row proves
+ * the graph is reachable from near-zero words; this row proves the gate still
+ * closes there — the patched-in PAYMENT_SERVICE_ADDR must come back as a
+ * service-name edge and land as the same `missing-relationship` error the
+ * oracle row pins, or the near-zero tier is a reporting tool, not a gate.
+ */
+export const angles = {
+  'user-hint': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = boutiqueBrownfield(exec, root)
+    return { ...config, scan: [boutiqueScan(exec, USER_HINT)] }
+  },
 }

@@ -92,7 +92,8 @@ type ScanChoice = 'typescript' | 'import' | 'agent'
 
 const IMPORT_SCAN_LANGUAGES = 'Python, JS/TS, Go, Rust, Java, Kotlin, Ruby, C/C++'
 
-function configTemplate(agent: InitAgent | undefined, scan: ScanChoice): string {
+function configTemplate(agent: InitAgent | undefined, scan: ScanChoice, roots: string[]): string {
+  const rootsLiteral = `[${roots.map((root) => `'${root}'`).join(', ')}]`
   if (agent === undefined) {
     const coreImports =
       scan === 'typescript'
@@ -100,13 +101,14 @@ function configTemplate(agent: InitAgent | undefined, scan: ScanChoice): string 
         : 'architectureRules, defineConfig, importScan, sourceRoot'
     const scanSection =
       scan === 'typescript'
-        ? `  // Scan observes the code: every file and every import under roots.
-  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],`
+        ? `  // Scan observes the code: every file and every import under roots. The
+  // roots were detected at init time; edit them as the repository moves.
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ${rootsLiteral} })],`
         : `  // No tsconfig.json was here at init time, so the scan is importScan, the
   // built-in deterministic import crawler: every file and every import,
   // whatever the language it reads (${IMPORT_SCAN_LANGUAGES}).
-  // Bound it with importScan({ roots: [...] }).
-  scan: [importScan()],`
+  // The roots were detected at init time; edit them as the repository moves.
+  scan: [importScan({ roots: ${rootsLiteral} })],`
     return `import { ${coreImports} } from '@arocnies/fitc4'
 
 export default defineConfig({
@@ -144,23 +146,24 @@ ${scanSection}
   ]
   const scanSection =
     scan === 'typescript'
-      ? `  // Scan observes the code: every file and every import under roots. agentScan
-  // can join it for domains no parser covers; without instructions it runs
+      ? `  // Scan observes the code: every file and every import under roots (detected
+  // at init time). agentScan can join it for domains no parser covers;
+  // without instructions it runs
   // the general import scan: node_modules/@arocnies/fitc4/README.md#agent-providers
-  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ['src'] })],`
+  scan: [typescriptImports({ tsconfig: 'tsconfig.json', roots: ${rootsLiteral} })],`
       : scan === 'import'
         ? `  // No tsconfig.json was here at init time, so the scan is importScan, the
   // built-in deterministic import crawler, whatever the language it reads
   // (${IMPORT_SCAN_LANGUAGES}). agentScan can join it
   // for domains no parser covers: node_modules/@arocnies/fitc4/README.md#agent-providers
-  scan: [importScan()],`
+  scan: [importScan({ roots: ${rootsLiteral} })],`
         : `  // Nothing here at init time was in a language the built-in importScan
   // crawler reads, so the scan is agent-driven: your ${agent} CLI reads the
   // repository and reports every source file and import, whatever the
   // language. Fail-closed: a run without a login fails rather than passing on
-  // an absent scan. Bound it with roots, or steer it with your own
-  // instructions: node_modules/@arocnies/fitc4/README.md#agent-providers
-  scan: [agentScan({ exec })],`
+  // an absent scan. The roots were detected at init time; steer the scan with
+  // your own instructions: node_modules/@arocnies/fitc4/README.md#agent-providers
+  scan: [agentScan({ exec, roots: ${rootsLiteral} })],`
 
   return `import { ${coreImports} } from '@arocnies/fitc4'
 import {
@@ -231,6 +234,71 @@ function hasImportScanSource(target: string, depth = 4): boolean {
       if (walk(path.join(directory, entry.name), remaining - 1)) return true
     }
     return false
+  }
+  return walk(target, depth)
+}
+
+/**
+ * The conventional places source lives, in the order a reader would name
+ * them. `init` scaffolds `roots` from the ones that exist and hold source,
+ * so the first run walks the code rather than erroring on a layout this
+ * repository never had; a repository using none of them scans from the
+ * repository root, which every scanner treats as "everything minus the
+ * conventional skip list".
+ */
+const ROOT_CANDIDATES = [
+  'src',
+  'lib',
+  'app',
+  'apps',
+  'packages',
+  'services',
+  'server',
+  'client',
+  'cmd',
+  'internal',
+  'pkg',
+  'source',
+]
+
+/**
+ * The scaffolded scan roots: every conventional directory that exists and
+ * holds something scannable, else the repository root. `anyFile` widens
+ * "scannable" from "a language importScan reads" to "any file", because the
+ * agent scan reads anything and its scaffold should bound itself to the same
+ * directories a human would name.
+ */
+export function detectScanRoots(target: string, anyFile = false): string[] {
+  const detected = ROOT_CANDIDATES.filter((candidate) => {
+    const directory = path.join(target, candidate)
+    let stats: fs.Stats
+    try {
+      stats = fs.statSync(directory)
+    } catch {
+      return false
+    }
+    if (!stats.isDirectory()) return false
+    return anyFile ? hasAnyFile(directory) : hasImportScanSource(directory)
+  })
+  return detected.length > 0 ? detected : ['.']
+}
+
+function hasAnyFile(target: string, depth = 4): boolean {
+  const walk = (directory: string, remaining: number): boolean => {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(directory, { withFileTypes: true })
+    } catch {
+      return false
+    }
+    if (entries.some((entry) => !entry.name.startsWith('.') && entry.isFile())) return true
+    if (remaining === 0) return false
+    return entries.some(
+      (entry) =>
+        !entry.name.startsWith('.') &&
+        entry.isDirectory() &&
+        walk(path.join(directory, entry.name), remaining - 1),
+    )
   }
   return walk(target, depth)
 }
@@ -373,8 +441,9 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
     : options.agent !== undefined && !hasImportScanSource(target)
       ? 'agent'
       : 'import'
+  const roots = detectScanRoots(target, scanChoice === 'agent')
 
-  fs.writeFileSync(path.join(target, CONFIG_FILENAME), configTemplate(options.agent, scanChoice))
+  fs.writeFileSync(path.join(target, CONFIG_FILENAME), configTemplate(options.agent, scanChoice, roots))
   result.created.push(CONFIG_FILENAME)
   if (options.agent !== undefined) {
     result.notes.push(
@@ -422,10 +491,13 @@ export function init(directory: string, options: InitOptions = {}): InitResult {
         `the general import scan unless you write your own instructions`,
     )
   }
-  // The src note belongs to the TypeScript scaffold's roots: ['src']. The
-  // other scaffolds list from the repository root and need no src/.
-  if (scanChoice === 'typescript' && !fs.existsSync(path.join(target, 'src'))) {
-    result.notes.push(`the scaffolded scan roots are ['src'] but src/ does not exist. Create it or edit 'roots'`)
+  // Detection found no conventional source directory, so the scan walks the
+  // whole repository. Working, but worth a human glance on a large repo.
+  if (roots.length === 1 && roots[0] === '.') {
+    result.notes.push(
+      `no conventional source directory was found, so the scaffolded scan roots are ['.'], ` +
+        `the whole repository minus the standard skip list. Narrow 'roots' if that is too wide`,
+    )
   }
 
   // Commands, not copied files: .claude/ and the MCP registry are the user's

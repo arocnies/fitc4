@@ -1,0 +1,36 @@
+specification {
+  element system
+  element component
+}
+
+model {
+  fixture = system 'Fixture' {
+    a = component 'A' {
+      metadata {
+        sources 'src/a/**'
+      }
+    }
+
+    b = component 'B' {
+      metadata {
+        sources 'src/b/**'
+      }
+    }
+
+    c = component 'C' {
+      metadata {
+        sources 'src/c/**'
+      }
+    }
+  }
+
+  fixture.a -> fixture.b
+  fixture.b -> fixture.a
+  fixture.a -> fixture.c
+}
+
+views {
+  view index of fixture {
+    include *
+  }
+}

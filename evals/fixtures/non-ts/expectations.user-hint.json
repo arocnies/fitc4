@@ -1,0 +1,75 @@
+{
+  "providersMust": [
+    "agent-scan:compose",
+    "source-root",
+    "architecture-rules"
+  ],
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "subject": {
+        "kind": "element",
+        "id": "deploy.web"
+      },
+      "related": [
+        "deploy.db"
+      ],
+      "label": "the planted web -> db compose edge is forbidden by the model"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:compose",
+        "kind": "scan-root",
+        "subject": "docker-compose.yml",
+        "label": "the scan attests to having examined the compose file"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "web",
+        "target": "api",
+        "label": "web -> api, spoken as service names"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "web",
+        "target": "db",
+        "evidence": {
+          "path": "docker-compose.yml",
+          "lineIncludes": "db"
+        },
+        "label": "the planted web -> db edge, spoken as service names, citing the depends_on line"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "api",
+        "target": "db",
+        "label": "api -> db, spoken as service names"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "deploy.web",
+        "target": "deploy.api",
+        "declared": true,
+        "label": "the permitted web -> api edge resolves by element name onto the declared relationship"
+      },
+      {
+        "provider": "source-root",
+        "source": "deploy.api",
+        "target": "deploy.db",
+        "declared": true,
+        "label": "the permitted api -> db edge resolves by element name onto the declared relationship"
+      }
+    ]
+  }
+}

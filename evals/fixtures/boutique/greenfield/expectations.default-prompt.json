@@ -1,4 +1,10 @@
 {
+  "gate": false,
+  "providersMust": [
+    "agent-scan:manifests",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",

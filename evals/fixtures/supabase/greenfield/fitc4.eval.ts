@@ -57,7 +57,7 @@ export const SCAN_INSTRUCTIONS =
 /**
  * What a user whose model owns compose fragments would type on day one: where
  * the stack is declared, and the locator form their own elements already use.
- * Two sentences, 25 words. What counts as a dependency inside a compose file
+ * Two sentences, 21 words. What counts as a dependency inside a compose file
  * — depends_on, literal service-host URLs, not variable interpolations — is
  * deliberately absent: that is compose knowledge, not repository knowledge,
  * and the `user-hint` angle measures whether the tool supplies it.

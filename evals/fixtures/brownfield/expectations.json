@@ -1,53 +1,85 @@
 {
+  "providersMust": [
+    "typescript-imports",
+    "source-root",
+    "architecture-rules",
+    "agent-ownership-advisor",
+    "agent-semantic-review"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",
       "ruleId": "relationship-direction",
       "severity": "error",
-      "subject": { "kind": "element", "id": "mono.core" },
-      "related": ["mono.api"],
+      "subject": {
+        "kind": "element",
+        "id": "mono.core"
+      },
+      "related": [
+        "mono.api"
+      ],
       "label": "core imports the api client, but the model declares only api -> core"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "drift-relationship",
       "severity": "info",
-      "related": ["mono.api", "mono.legacy"],
+      "related": [
+        "mono.api",
+        "mono.legacy"
+      ],
       "label": "the api -> legacy drift edge is still exercised"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "drift-relationship",
       "severity": "info",
-      "related": ["mono.legacy", "mono.core"],
+      "related": [
+        "mono.legacy",
+        "mono.core"
+      ],
       "label": "the legacy -> core drift edge is still exercised"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unused-drift",
       "severity": "warning",
-      "related": ["mono.ui", "mono.legacy"],
+      "related": [
+        "mono.ui",
+        "mono.legacy"
+      ],
       "label": "the stale ui -> legacy drift edge must be deleted from the model"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "subject": { "kind": "file", "id": "src/render-helpers.ts" }
+      "subject": {
+        "kind": "file",
+        "id": "src/render-helpers.ts"
+      }
     },
     {
       "provider": "agent-ownership-advisor",
       "ruleId": "ownership-suggestion",
       "severity": "info",
-      "subject": { "kind": "file", "id": "src/render-helpers.ts" },
-      "related": ["mono.ui"],
+      "subject": {
+        "kind": "file",
+        "id": "src/render-helpers.ts"
+      },
+      "related": [
+        "mono.ui"
+      ],
       "label": "the advisor suggests mono.ui for the unowned render helpers"
     },
     {
       "provider": "agent-semantic-review",
       "ruleId": "description-drift",
       "severity": "warning",
-      "subject": { "kind": "element", "id": "mono.core" },
+      "subject": {
+        "kind": "element",
+        "id": "mono.core"
+      },
       "label": "the reviewer flags mono.core, whose code does I/O against a no-I/O description"
     }
   ],
@@ -55,7 +87,10 @@
     {
       "provider": "agent-semantic-review",
       "ruleId": "description-drift",
-      "subject": { "kind": "element", "id": "mono.ui" },
+      "subject": {
+        "kind": "element",
+        "id": "mono.ui"
+      },
       "label": "the semantic reviewer flagged the healthy element mono.ui"
     }
   ]

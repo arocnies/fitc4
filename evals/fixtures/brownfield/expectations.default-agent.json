@@ -1,4 +1,12 @@
 {
+  "providersMust": [
+    "typescript-imports",
+    "source-root",
+    "agent-resolve",
+    "architecture-rules",
+    "agent-ownership-advisor",
+    "agent-semantic-review"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",

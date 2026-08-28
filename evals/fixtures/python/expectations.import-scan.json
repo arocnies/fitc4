@@ -1,4 +1,9 @@
 {
+  "providersMust": [
+    "import-scan",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",

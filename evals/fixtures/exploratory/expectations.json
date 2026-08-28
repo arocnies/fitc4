@@ -1,11 +1,21 @@
 {
+  "providersMust": [
+    "agent-scan:runbooks",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",
       "ruleId": "missing-relationship",
       "severity": "error",
-      "subject": { "kind": "element", "id": "ops.alerts" },
-      "related": ["ops.store"],
+      "subject": {
+        "kind": "element",
+        "id": "ops.alerts"
+      },
+      "related": [
+        "ops.store"
+      ],
       "label": "the runbook-documented alerts -> store fallback is forbidden by the model"
     },
     {
@@ -18,6 +28,30 @@
   ],
   "observations": {
     "must": [
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "runbook",
+        "subject": "gateway",
+        "label": "the per-service runbook observation for gateway"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "runbook",
+        "subject": "worker",
+        "label": "the per-service runbook observation for worker"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "runbook",
+        "subject": "store",
+        "label": "the per-service runbook observation for store"
+      },
+      {
+        "provider": "agent-scan:runbooks",
+        "kind": "runbook",
+        "subject": "alerts",
+        "label": "the per-service runbook observation for alerts"
+      },
       {
         "provider": "agent-scan:runbooks",
         "kind": "scan-root",

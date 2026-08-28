@@ -1,11 +1,21 @@
 {
+  "providersMust": [
+    "agent-scan:metadata",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",
       "ruleId": "missing-relationship",
       "severity": "error",
-      "subject": {"kind": "element", "id": "ecommerce.orders"},
-      "related": ["ecommerce.payment"],
+      "subject": {
+        "kind": "element",
+        "id": "ecommerce.orders"
+      },
+      "related": [
+        "ecommerce.payment"
+      ],
       "label": "the pinned tree wires orders -> payment without declaring it; genuine upstream drift"
     }
   ],

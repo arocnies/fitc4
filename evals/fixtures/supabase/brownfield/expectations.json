@@ -1,4 +1,9 @@
 {
+  "providersMust": [
+    "agent-scan:compose",
+    "source-root",
+    "architecture-rules"
+  ],
   "findings": [
     {
       "provider": "architecture-rules",
@@ -120,7 +125,11 @@
         "kind": "dependency",
         "subject": "docker/docker-compose.yml#services.auth",
         "target": "docker/docker-compose.yml#services.functions",
-        "label": "the scan reports the planted auth -> functions edge honestly"
+        "label": "the scan reports the planted auth -> functions edge honestly",
+        "evidence": {
+          "path": "docker/docker-compose.yml",
+          "lineIncludes": "GOTRUE_HOOK_SEND_EMAIL_URI"
+        }
       }
     ]
   },

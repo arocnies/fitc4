@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url'
 import { afterAll, describe, expect, test } from 'vitest'
 
 import { CONFIG_FILENAME, resolveConfig, type ResolvedConfig } from '../src/config.ts'
-import { init, MODEL_PLACEHOLDER_MARKER } from '../src/init.ts'
+import { detectScanRoots, init, MODEL_PLACEHOLDER_MARKER } from '../src/init.ts'
 import { runPipeline } from '../src/pipeline.ts'
 
 const roots: string[] = []
@@ -169,6 +169,8 @@ describe('the scaffolded config', () => {
   test('every line is live: explicit phases, no commented-out configuration', () => {
     const root = scratch()
     fs.writeFileSync(path.join(root, 'tsconfig.json'), '{}')
+    fs.mkdirSync(path.join(root, 'src'))
+    fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'export {}\n')
     init(root, { agent: 'claude' })
 
     const config = fs.readFileSync(path.join(root, CONFIG_FILENAME), 'utf8')
@@ -297,7 +299,7 @@ describe('the scaffolded config', () => {
     const result = init(root, { agent: 'codex' })
 
     const config = fs.readFileSync(path.join(root, CONFIG_FILENAME), 'utf8')
-    expect(config).toContain('scan: [importScan()],')
+    expect(config).toContain(`scan: [importScan({ roots: ['app'] })],`)
     expect(config).not.toContain('agentScan({ exec })')
     // The agent providers still carry resolve and validate.
     expect(config).toContain('resolve: [sourceRoot(), agentResolve({ exec })],')
@@ -313,14 +315,14 @@ describe('the scaffolded config', () => {
     const result = init(root, { agent: 'claude' })
 
     const config = fs.readFileSync(path.join(root, CONFIG_FILENAME), 'utf8')
-    expect(config).toContain('scan: [agentScan({ exec })],')
+    expect(config).toContain(`scan: [agentScan({ exec, roots: ['.'] })],`)
     expect(config).not.toContain('typescriptImports')
     // The note names the swap and the default behind it.
     expect(result.notes.join('\n')).toContain('the scan phase is agentScan')
     expect(result.notes.join('\n')).toContain('general import scan')
-    // agentScan lists from the repository root, so the roots: ['src'] note
-    // belongs to the TypeScript scaffold only.
-    expect(result.notes.join('\n')).not.toContain("roots are ['src']")
+    // Nothing conventional was found, so the scaffold walks the repository
+    // root and says so.
+    expect(result.notes.join('\n')).toContain("roots are ['.']")
   })
 
   test('never overwrites: any existing config form still blocks init --agent', () => {
@@ -329,5 +331,42 @@ describe('the scaffolded config', () => {
 
     expect(() => init(root, { agent: 'claude' })).toThrow(/already configured/)
     expect(fs.existsSync(path.join(root, CONFIG_FILENAME))).toBe(false)
+  })
+})
+
+describe('detectScanRoots', () => {
+  test('a monorepo with no root src scaffolds its packages directory, not an error', () => {
+    const root = scratch()
+    fs.mkdirSync(path.join(root, 'packages', 'web', 'src'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'packages', 'web', 'src', 'index.ts'), 'export {}\n')
+    expect(detectScanRoots(root)).toEqual(['packages'])
+  })
+
+  test('several conventional directories are all detected', () => {
+    const root = scratch()
+    for (const dir of ['src', 'services']) {
+      fs.mkdirSync(path.join(root, dir))
+      fs.writeFileSync(path.join(root, dir, 'main.go'), 'package main\n')
+    }
+    expect(detectScanRoots(root)).toEqual(['src', 'services'])
+  })
+
+  test('a conventional directory with nothing scannable does not count', () => {
+    const root = scratch()
+    fs.mkdirSync(path.join(root, 'src'))
+    fs.writeFileSync(path.join(root, 'src', 'README.md'), 'docs only\n')
+    expect(detectScanRoots(root)).toEqual(['.'])
+  })
+
+  test('anyFile widens detection for the agent scaffold, which reads anything', () => {
+    const root = scratch()
+    fs.mkdirSync(path.join(root, 'services', 'web'), { recursive: true })
+    fs.writeFileSync(path.join(root, 'services', 'web', 'Dockerfile'), 'FROM scratch\n')
+    expect(detectScanRoots(root)).toEqual(['.'])
+    expect(detectScanRoots(root, true)).toEqual(['services'])
+  })
+
+  test('nothing conventional falls back to the repository root', () => {
+    expect(detectScanRoots(scratch())).toEqual(['.'])
   })
 })

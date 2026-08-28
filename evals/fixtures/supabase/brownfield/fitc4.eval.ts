@@ -23,7 +23,7 @@ import { architectureRules, sourceRoot, type PipelineConfig } from '@arocnies/fi
 import type { AgentExec } from '@arocnies/fitc4/agent'
 
 import { assembleWorkdir, ensureCheckout, externalManifest } from '../../../harness/external.ts'
-import { supabaseScan } from '../greenfield/fitc4.eval.ts'
+import { supabaseScan, USER_HINT } from '../greenfield/fitc4.eval.ts'
 
 export default function supabaseBrownfield(exec: AgentExec, root: string): PipelineConfig {
   const fixtureDir = path.dirname(root)
@@ -55,4 +55,18 @@ export default function supabaseBrownfield(exec: AgentExec, root: string): Pipel
     resolve: [sourceRoot()],
     validate: [architectureRules()],
   }
+}
+
+/**
+ * The near-zero tier under load: the hint teaches only the fragment locator
+ * form, so the ideal reply is the oracle row's reply verbatim — same
+ * vocabulary, same planted edge — and the angle shares the base expectations.
+ * What the 180-word oracle adds beyond the hint is compose literacy the model
+ * must supply itself, planted `GOTRUE_HOOK_SEND_EMAIL_URI` included.
+ */
+export const angles = {
+  'user-hint': (exec: AgentExec, root: string): PipelineConfig => {
+    const config = supabaseBrownfield(exec, root)
+    return { ...config, scan: [supabaseScan(exec, USER_HINT)] }
+  },
 }

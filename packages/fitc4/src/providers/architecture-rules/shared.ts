@@ -41,6 +41,7 @@ export const ARCHITECTURE_RULE_IDS = [
   'unused-drift',
   'unobserved-elements',
   'duplicate-relationship',
+  'circular-dependency',
   'unknown-observation-kind',
 ] as const
 

@@ -1,46 +1,198 @@
 [
   {
-    "when": { "promptIncludes": "Carry out the scan instructions" },
+    "when": {
+      "contextIncludes": "implemented under services/<name>"
+    },
+    "reply": {
+      "observations": [
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "web"
+          },
+          "target": {
+            "kind": "service",
+            "id": "api"
+          },
+          "description": "compose service web depends on api",
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "web"
+          },
+          "target": {
+            "kind": "service",
+            "id": "db"
+          },
+          "description": "compose service web depends on db",
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 6
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "api"
+          },
+          "target": {
+            "kind": "service",
+            "id": "db"
+          },
+          "description": "compose service api depends on db",
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 10
+            }
+          ]
+        }
+      ],
+      "examined": [
+        "docker-compose.yml"
+      ]
+    }
+  },
+  {
+    "when": {
+      "contextIncludes": "Map the source code as a language-neutral dependency graph"
+    },
+    "reply": {
+      "observations": [
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "docker-compose.yml"
+          },
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 1
+            }
+          ]
+        }
+      ],
+      "examined": [
+        "docker-compose.yml"
+      ]
+    }
+  },
+  {
+    "when": {
+      "promptIncludes": "Carry out the scan instructions"
+    },
     "reply": {
       "observations": [
         {
           "kind": "service",
-          "subject": { "kind": "service", "id": "web" },
-          "evidence": [{ "path": "docker-compose.yml", "line": 2 }]
+          "subject": {
+            "kind": "service",
+            "id": "web"
+          },
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 2
+            }
+          ]
         },
         {
           "kind": "service",
-          "subject": { "kind": "service", "id": "api" },
-          "evidence": [{ "path": "docker-compose.yml", "line": 7 }]
+          "subject": {
+            "kind": "service",
+            "id": "api"
+          },
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 7
+            }
+          ]
         },
         {
           "kind": "service",
-          "subject": { "kind": "service", "id": "db" },
-          "evidence": [{ "path": "docker-compose.yml", "line": 11 }]
+          "subject": {
+            "kind": "service",
+            "id": "db"
+          },
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 11
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": { "kind": "file", "id": "services/web/Dockerfile" },
-          "target": { "kind": "file", "id": "services/api/Dockerfile" },
+          "subject": {
+            "kind": "file",
+            "id": "services/web/Dockerfile"
+          },
+          "target": {
+            "kind": "file",
+            "id": "services/api/Dockerfile"
+          },
           "description": "compose service web depends on api",
-          "evidence": [{ "path": "docker-compose.yml", "line": 5 }]
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 5
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": { "kind": "file", "id": "services/web/Dockerfile" },
-          "target": { "kind": "file", "id": "services/db/Dockerfile" },
+          "subject": {
+            "kind": "file",
+            "id": "services/web/Dockerfile"
+          },
+          "target": {
+            "kind": "file",
+            "id": "services/db/Dockerfile"
+          },
           "description": "compose service web depends on db",
-          "evidence": [{ "path": "docker-compose.yml", "line": 6 }]
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 6
+            }
+          ]
         },
         {
           "kind": "dependency",
-          "subject": { "kind": "file", "id": "services/api/Dockerfile" },
-          "target": { "kind": "file", "id": "services/db/Dockerfile" },
+          "subject": {
+            "kind": "file",
+            "id": "services/api/Dockerfile"
+          },
+          "target": {
+            "kind": "file",
+            "id": "services/db/Dockerfile"
+          },
           "description": "compose service api depends on db",
-          "evidence": [{ "path": "docker-compose.yml", "line": 10 }]
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 10
+            }
+          ]
         }
       ],
-      "examined": ["docker-compose.yml"]
+      "examined": [
+        "docker-compose.yml"
+      ]
     }
   }
 ]
