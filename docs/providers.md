@@ -28,6 +28,8 @@ Standard observation kinds: `file` (a source file exists and is in scope for own
 
 Standard ref kinds: `element`, `relationship` (the model), `file`, `directory`, `module`, `symbol` (the repository), `observation`, `provider` (the pipeline). `symbol` is reserved. It is in the vocabulary so two providers that want it agree on its name, but nothing emits it yet.
 
+A ref's id is what resolves, not its kind, so a scan provider may name a conceptual endpoint in whatever vocabulary fits the domain it read without losing the edge. Kind still decides where a name match is allowed, and [`packages/fitc4/src/providers/source-root.ts`](../packages/fitc4/src/providers/source-root.ts) is the reference for that. An id no vocabulary maps raises `unmapped-reference` rather than disappearing — and when the failed name is a near miss for exactly one declared element (containment or a small edit distance, see `nearestElementName` in [`packages/fitc4/src/model.ts`](../packages/fitc4/src/model.ts)), the warning names it. Nothing resolves on a near miss: the suggestion is aimed at the modeler, never at the gate.
+
 Two pieces of model metadata change what the standard resolve and validate providers do with these kinds, and a provider author should know both:
 
 - **Package claims.** A `dependency` observation whose `target` is a `module` ref is not automatically outside the model. If an element claims that package via `packages` metadata, `source-root` resolves the association onto the claiming element, and the standard relationship rules judge it like any file-to-file crossing. A scan provider that emits `module` targets is therefore feeding the boundary check, not just the `unresolved-import` nudge.
