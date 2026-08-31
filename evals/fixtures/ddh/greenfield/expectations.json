@@ -44,7 +44,7 @@
         "ddh.user.database",
         "ddh.user.wiring"
       ],
-      "descriptionIncludes": "ddh.user.commands -> ddh.user.database -> ddh.user.wiring -> ddh.user.commands",
+      "descriptionIncludes": "ddh.user.commands -> ddh.user.wiring -> ddh.user.commands",
       "label": "the user module's commands/database/wiring cycle, declared and exercised"
     },
     {
@@ -60,7 +60,7 @@
         "ddh.wallet.database",
         "ddh.wallet.wiring"
       ],
-      "descriptionIncludes": "ddh.wallet.application -> ddh.wallet.database -> ddh.wallet.wiring -> ddh.wallet.application",
+      "descriptionIncludes": "ddh.wallet.application -> ddh.wallet.wiring -> ddh.wallet.application",
       "label": "the wallet module's application/database/wiring cycle, declared and exercised"
     }
   ],

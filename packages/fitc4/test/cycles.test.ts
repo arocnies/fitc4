@@ -64,6 +64,32 @@ describe('circularDependencyRules', () => {
   test('self-loops never count', () => {
     expect(circularDependencyRules([{ source: 'a', target: 'a' }], asDefault)).toEqual([])
   })
+
+  test('a witness never names an edge the component does not have', () => {
+    // The shape that broke the greedy witness on a real compose stack: from
+    // `a` the sorted-first walk runs a -> hub -> proxy and then into the
+    // spur `b`, whose only successor is the already-visited hub, and the old
+    // code closed the path with a fabricated b -> a. The real cycle goes
+    // through `f`.
+    const edges = [
+      { source: 'a', target: 'hub' },
+      { source: 'hub', target: 'proxy' },
+      { source: 'proxy', target: 'b' },
+      { source: 'proxy', target: 'f' },
+      { source: 'b', target: 'hub' },
+      { source: 'f', target: 'a' },
+    ]
+    const findings = circularDependencyRules(edges, asDefault)
+    expect(findings).toHaveLength(1)
+    expect(findings[0]?.description).toContain('a -> hub -> proxy -> f -> a')
+
+    // Every consecutive pair in the witness must be a declared edge.
+    const witness = findings[0]?.description.split(':')[0]?.split(' -> ') ?? []
+    const declared = new Set(edges.map((edge) => `${edge.source}->${edge.target}`))
+    for (let at = 0; at + 1 < witness.length; at += 1) {
+      expect(declared).toContain(`${witness[at]}->${witness[at + 1]}`)
+    }
+  })
 })
 
 describe('through the pipeline', () => {
