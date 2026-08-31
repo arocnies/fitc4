@@ -76,6 +76,7 @@ jobs:
           --fixture boutique/greenfield --fixture boutique/brownfield --fixture boutique/draft
           --fixture ecom/greenfield --fixture ecom/brownfield
           --fixture supabase/greenfield --fixture supabase/brownfield --fixture supabase/draft
+          --fixture otel/greenfield
       - run: npm run eval
 
   likec4-latest:

@@ -1,0 +1,2129 @@
+[
+  {
+    "when": {
+      "contextIncludes": [
+        "Map the source code as a language-neutral dependency graph",
+        "Focused files under ."
+      ]
+    },
+    "reply": {
+      "observations": [
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "compose.yaml"
+          },
+          "description": "compose.yaml is a Docker Compose file declaring services",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "file",
+          "subject": {
+            "kind": "file",
+            "id": "compose.full.yaml"
+          },
+          "description": "compose.full.yaml is a Docker Compose file declaring services",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "accounting"
+          },
+          "target": {
+            "kind": "service",
+            "id": "kafka"
+          },
+          "description": "accounting declares depends_on kafka",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 37
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "accounting"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "accounting declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 35
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "ad"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "ad declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 74
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "ad"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "ad declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 72
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "cart"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "cart declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 109
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "cart"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "cart declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 107
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "cart"
+          },
+          "target": {
+            "kind": "service",
+            "id": "valkey-cart"
+          },
+          "description": "cart declares depends_on valkey-cart",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 105
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "cart"
+          },
+          "description": "checkout declares depends_on cart",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 152
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "currency"
+          },
+          "description": "checkout declares depends_on currency",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 154
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "email"
+          },
+          "description": "checkout declares depends_on email",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 156
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "checkout declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 166
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "kafka"
+          },
+          "description": "checkout declares depends_on kafka",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 132
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "checkout declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 164
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "payment"
+          },
+          "description": "checkout declares depends_on payment",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 158
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "description": "checkout declares depends_on product-catalog",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 160
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "shipping"
+          },
+          "description": "checkout declares depends_on shipping",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 162
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "currency"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "currency declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 206
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "email"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "email declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 242
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "flagd-ui"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "flagd-ui declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 735
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "flagd-ui"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "flagd-ui declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 733
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "fraud-detection"
+          },
+          "target": {
+            "kind": "service",
+            "id": "kafka"
+          },
+          "description": "fraud-detection declares depends_on kafka",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 78
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "fraud-detection"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "fraud-detection declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 76
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "ad"
+          },
+          "description": "frontend declares depends_on ad",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 289
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "cart"
+          },
+          "description": "frontend declares depends_on cart",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 291
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "description": "frontend declares depends_on checkout",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 293
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "currency"
+          },
+          "description": "frontend declares depends_on currency",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 295
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "frontend declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 309
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "image-provider"
+          },
+          "description": "frontend declares depends_on image-provider",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 307
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "frontend declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 305
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "description": "frontend declares depends_on product-catalog",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 297
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "quote"
+          },
+          "description": "frontend declares depends_on quote",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 299
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "recommendation"
+          },
+          "description": "frontend declares depends_on recommendation",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 301
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "shipping"
+          },
+          "description": "frontend declares depends_on shipping",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 303
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd-ui"
+          },
+          "description": "frontend-proxy declares depends_on flagd-ui",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 369
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "target": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "description": "frontend-proxy declares depends_on frontend",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 367
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "target": {
+            "kind": "service",
+            "id": "telemetry-docs"
+          },
+          "description": "frontend-proxy declares depends_on telemetry-docs",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 371
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "image-provider"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "image-provider declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 404
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "load-generator"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "load-generator declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 449
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "load-generator"
+          },
+          "target": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "description": "load-generator declares depends_on frontend",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 445
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "load-generator"
+          },
+          "target": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "description": "load-generator declares depends_on frontend-proxy",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 447
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "payment"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "payment declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 498
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "payment"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "payment declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 496
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "target": {
+            "kind": "service",
+            "id": "astronomy-db"
+          },
+          "description": "product-catalog declares depends_on astronomy-db",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 541
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "product-catalog declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 539
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "product-catalog declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 537
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "quote"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "quote declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 582
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "recommendation"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "recommendation declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 624
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "recommendation"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "recommendation declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 622
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "recommendation"
+          },
+          "target": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "description": "recommendation declares depends_on product-catalog",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 620
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "shipping"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "shipping declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 664
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "shipping"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "shipping declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 662
+            }
+          ]
+        }
+      ],
+      "examined": [
+        "compose.yaml",
+        "compose.full.yaml"
+      ]
+    }
+  },
+  {
+    "when": {
+      "contextIncludes": "_ADDR or _HOST name the service"
+    },
+    "reply": {
+      "observations": [
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "accounting"
+          },
+          "target": {
+            "kind": "service",
+            "id": "kafka"
+          },
+          "description": "accounting declares depends_on kafka",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 37
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "accounting"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "accounting declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 35
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "ad"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "ad declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 74
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "ad"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "ad declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 72
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "cart"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "cart declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 109
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "cart"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "cart declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 107
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "cart"
+          },
+          "target": {
+            "kind": "service",
+            "id": "valkey-cart"
+          },
+          "description": "cart declares depends_on valkey-cart",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 105
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "cart"
+          },
+          "description": "checkout declares depends_on cart",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 152
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "currency"
+          },
+          "description": "checkout declares depends_on currency",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 154
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "email"
+          },
+          "description": "checkout declares depends_on email",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 156
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "checkout declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 166
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "kafka"
+          },
+          "description": "checkout declares depends_on kafka",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 132
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "checkout declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 164
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "payment"
+          },
+          "description": "checkout declares depends_on payment",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 158
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "description": "checkout declares depends_on product-catalog",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 160
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "target": {
+            "kind": "service",
+            "id": "shipping"
+          },
+          "description": "checkout declares depends_on shipping",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 162
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "currency"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "currency declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 206
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "email"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "email declares FLAGD_HOST, which names flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 229
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "email"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "email declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 242
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "flagd references ${OTEL_COLLECTOR_HOST}, which names otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 685
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "flagd-ui"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "flagd-ui declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 735
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "flagd-ui"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "flagd-ui declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 733
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "fraud-detection"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "fraud-detection declares FLAGD_HOST, which names flagd",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 62
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "fraud-detection"
+          },
+          "target": {
+            "kind": "service",
+            "id": "kafka"
+          },
+          "description": "fraud-detection declares depends_on kafka",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 78
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "fraud-detection"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "fraud-detection declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 76
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "ad"
+          },
+          "description": "frontend declares depends_on ad",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 289
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "cart"
+          },
+          "description": "frontend declares depends_on cart",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 291
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "checkout"
+          },
+          "description": "frontend declares depends_on checkout",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 293
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "currency"
+          },
+          "description": "frontend declares depends_on currency",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 295
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "frontend declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 309
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "image-provider"
+          },
+          "description": "frontend declares depends_on image-provider",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 307
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "frontend declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 305
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "description": "frontend declares depends_on product-catalog",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 297
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "quote"
+          },
+          "description": "frontend declares depends_on quote",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 299
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "recommendation"
+          },
+          "description": "frontend declares depends_on recommendation",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 301
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "service",
+            "id": "shipping"
+          },
+          "description": "frontend declares depends_on shipping",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 303
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "frontend-proxy declares FLAGD_HOST, which names flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 352
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd-ui"
+          },
+          "description": "frontend-proxy declares depends_on flagd-ui",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 369
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "target": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "description": "frontend-proxy declares depends_on frontend",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 367
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "target": {
+            "kind": "service",
+            "id": "image-provider"
+          },
+          "description": "frontend-proxy declares IMAGE_PROVIDER_HOST, which names image-provider",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 340
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "frontend-proxy declares OTEL_COLLECTOR_HOST, which names otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 339
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "target": {
+            "kind": "service",
+            "id": "telemetry-docs"
+          },
+          "description": "frontend-proxy declares depends_on telemetry-docs",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 371
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "image-provider"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "image-provider declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 404
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "kafka"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "kafka references ${OTEL_COLLECTOR_HOST}, which names otel-collector",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 106
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "load-generator"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "load-generator declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 449
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "load-generator"
+          },
+          "target": {
+            "kind": "service",
+            "id": "frontend"
+          },
+          "description": "load-generator declares depends_on frontend",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 445
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "load-generator"
+          },
+          "target": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "description": "load-generator declares depends_on frontend-proxy",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 447
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "load-generator"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "load-generator references ${OTEL_COLLECTOR_HOST}, which names otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 425
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "target": {
+            "kind": "service",
+            "id": "frontend-proxy"
+          },
+          "description": "otel-collector declares FRONTEND_PROXY_ADDR, which names frontend-proxy",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 844
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "target": {
+            "kind": "service",
+            "id": "image-provider"
+          },
+          "description": "otel-collector declares IMAGE_PROVIDER_HOST, which names image-provider",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 846
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "target": {
+            "kind": "service",
+            "id": "kafka"
+          },
+          "description": "otel-collector declares KAFKA_ADDR, which names kafka",
+          "evidence": [
+            {
+              "path": "compose.full.yaml",
+              "line": 147
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "payment"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "payment declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 498
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "payment"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "payment declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 496
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "target": {
+            "kind": "service",
+            "id": "astronomy-db"
+          },
+          "description": "product-catalog declares depends_on astronomy-db",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 541
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "product-catalog declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 539
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "product-catalog declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 537
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "quote"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "quote declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 582
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "recommendation"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "recommendation declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 624
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "recommendation"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "recommendation declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 622
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "recommendation"
+          },
+          "target": {
+            "kind": "service",
+            "id": "product-catalog"
+          },
+          "description": "recommendation declares depends_on product-catalog",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 620
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "shipping"
+          },
+          "target": {
+            "kind": "service",
+            "id": "flagd"
+          },
+          "description": "shipping declares depends_on flagd",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 664
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "shipping"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "shipping declares depends_on otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 662
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "shipping"
+          },
+          "target": {
+            "kind": "service",
+            "id": "quote"
+          },
+          "description": "shipping declares QUOTE_ADDR, which names quote",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 647
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "telemetry-docs"
+          },
+          "target": {
+            "kind": "service",
+            "id": "otel-collector"
+          },
+          "description": "telemetry-docs declares OTEL_COLLECTOR_HOST, which names otel-collector",
+          "evidence": [
+            {
+              "path": "compose.yaml",
+              "line": 758
+            }
+          ]
+        }
+      ],
+      "examined": [
+        "compose.yaml",
+        "compose.full.yaml"
+      ]
+    }
+  }
+]

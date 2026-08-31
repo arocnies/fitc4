@@ -1,0 +1,683 @@
+{
+  "gate": false,
+  "providersMust": [
+    "agent-scan:compose",
+    "source-root",
+    "architecture-rules"
+  ],
+  "findings": [
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "compose.yaml"
+      },
+      "label": "compose.yaml is reported and owned by nothing; the services, not the file, carry the edges"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-source",
+      "severity": "warning",
+      "subject": {
+        "kind": "file",
+        "id": "compose.full.yaml"
+      },
+      "label": "compose.full.yaml is reported and owned by nothing; the services, not the file, carry the edges"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unobserved-elements",
+      "severity": "info",
+      "related": [
+        "otel.valkeyCart"
+      ],
+      "label": "the description-only valkey-cart element is reported as unobserved"
+    }
+  ],
+  "observations": {
+    "must": [
+      {
+        "provider": "agent-scan:compose",
+        "kind": "scan-root",
+        "subject": "compose.yaml",
+        "label": "the scan attests to having examined compose.yaml"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "scan-root",
+        "subject": "compose.full.yaml",
+        "label": "the scan attests to having examined compose.full.yaml"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "file",
+        "subject": "compose.yaml",
+        "label": "the declaration scan reports compose.yaml itself alongside its services"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "file",
+        "subject": "compose.full.yaml",
+        "label": "the declaration scan reports compose.full.yaml itself alongside its services"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "accounting",
+        "target": "kafka"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "accounting",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "ad",
+        "target": "flagd"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "ad",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "cart",
+        "target": "flagd"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "cart",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "cart",
+        "target": "valkey-cart"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "checkout",
+        "target": "cart"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "checkout",
+        "target": "currency"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "checkout",
+        "target": "email"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "checkout",
+        "target": "flagd"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "checkout",
+        "target": "kafka"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "checkout",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "checkout",
+        "target": "payment"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "checkout",
+        "target": "product-catalog"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "checkout",
+        "target": "shipping"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "currency",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "email",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "flagd-ui",
+        "target": "flagd"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "flagd-ui",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "fraud-detection",
+        "target": "kafka"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "fraud-detection",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "ad"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "cart"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "checkout"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "currency"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "flagd"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "image-provider"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "product-catalog"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "quote"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "recommendation"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "shipping"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend-proxy",
+        "target": "flagd-ui"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend-proxy",
+        "target": "frontend"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "frontend-proxy",
+        "target": "telemetry-docs"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "image-provider",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "load-generator",
+        "target": "flagd"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "load-generator",
+        "target": "frontend"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "load-generator",
+        "target": "frontend-proxy"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "payment",
+        "target": "flagd"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "payment",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "product-catalog",
+        "target": "astronomy-db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "product-catalog",
+        "target": "flagd"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "product-catalog",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "quote",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "recommendation",
+        "target": "flagd"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "recommendation",
+        "target": "otel-collector"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "recommendation",
+        "target": "product-catalog"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "shipping",
+        "target": "flagd"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "shipping",
+        "target": "otel-collector"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "otel.accounting",
+        "target": "otel.kafka",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.accounting",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.ad",
+        "target": "otel.flagd",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.ad",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.cart",
+        "target": "otel.flagd",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.cart",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.cart",
+        "target": "otel.valkeyCart",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.checkout",
+        "target": "otel.cart",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.checkout",
+        "target": "otel.currency",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.checkout",
+        "target": "otel.email",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.checkout",
+        "target": "otel.flagd",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.checkout",
+        "target": "otel.kafka",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.checkout",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.checkout",
+        "target": "otel.payment",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.checkout",
+        "target": "otel.productCatalog",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.checkout",
+        "target": "otel.shipping",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.currency",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.email",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.flagdUi",
+        "target": "otel.flagd",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.flagdUi",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.fraudDetection",
+        "target": "otel.kafka",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.fraudDetection",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.ad",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.cart",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.checkout",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.currency",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.flagd",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.imageProvider",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.productCatalog",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.quote",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.recommendation",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontend",
+        "target": "otel.shipping",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontendProxy",
+        "target": "otel.flagdUi",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontendProxy",
+        "target": "otel.frontend",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.frontendProxy",
+        "target": "otel.telemetryDocs",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.imageProvider",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.loadGenerator",
+        "target": "otel.flagd",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.loadGenerator",
+        "target": "otel.frontend",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.loadGenerator",
+        "target": "otel.frontendProxy",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.payment",
+        "target": "otel.flagd",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.payment",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.productCatalog",
+        "target": "otel.astronomyDb",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.productCatalog",
+        "target": "otel.flagd",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.productCatalog",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.quote",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.recommendation",
+        "target": "otel.flagd",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.recommendation",
+        "target": "otel.otelCollector",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.recommendation",
+        "target": "otel.productCatalog",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.shipping",
+        "target": "otel.flagd",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "otel.shipping",
+        "target": "otel.otelCollector",
+        "declared": true
+      }
+    ]
+  }
+}
