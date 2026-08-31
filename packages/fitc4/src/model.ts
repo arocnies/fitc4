@@ -8,6 +8,7 @@
  */
 
 import { LikeC4 } from 'likec4'
+import { editDistance } from './errors.ts'
 import { relationshipId } from './ids.ts'
 
 /** The native model type, inferred from the installed LikeC4 API. */
@@ -422,6 +423,42 @@ export function elementsByName(model: LikeC4Model): ElementNameIndex {
     }
   }
   return { exact, normalized }
+}
+
+/**
+ * The one element a failed name is probably meant to address, or undefined.
+ *
+ * Powers the actionable half of `unmapped-reference` and `unresolved-import`:
+ * the refusal to guess a binding stands (nothing here resolves anything), but
+ * a warning that names the near miss turns "cannot be checked" into a diff
+ * the modeler can act on — measured on the boutique floor, where manifests
+ * say `redis-cart` and the model says `redis`, and the bare warning left the
+ * reader to find that gap alone.
+ *
+ * Deliberately conservative, because a wrong suggestion is worse than none:
+ * a match is either containment (one normalized name inside the other, the
+ * shorter at least 4 characters, so `db` cannot claim half the model) or an
+ * edit distance of at most 2 that is also under a third of the name's
+ * length. Every matching name must agree on a single element; any tie or
+ * ambiguity returns undefined.
+ */
+export function nearestElementName(name: string, index: ElementNameIndex): string | undefined {
+  const query = normalizeElementName(name)
+  if (query === '' || index.normalized.has(query)) return undefined
+
+  const matches = new Set<string>()
+  for (const [candidate, ids] of index.normalized) {
+    const shorter = Math.min(candidate.length, query.length)
+    const contained =
+      shorter >= 4 && (candidate.includes(query) || query.includes(candidate))
+    const distance = contained ? 0 : editDistance(query, candidate)
+    if (contained || (distance <= 2 && distance * 3 < query.length)) {
+      for (const id of ids) matches.add(id)
+      if (matches.size > 1) return undefined
+    }
+  }
+  const [only] = matches
+  return matches.size === 1 ? only : undefined
 }
 
 /** True when `ancestor` contains `descendant` in the LikeC4 hierarchy. */

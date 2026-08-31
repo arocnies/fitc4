@@ -20,7 +20,7 @@
  */
 
 import { closestName } from '../errors.ts'
-import { declaredRelationships } from '../model.ts'
+import { declaredRelationships, elementsByName } from '../model.ts'
 import {
   isSeverity,
   SEVERITIES,
@@ -86,6 +86,7 @@ export function architectureRules(
   const run: ValidateProvider = async (context: ValidateContext): Promise<Finding[]> => {
     const observations = new Map(context.observations.map((item) => [item.id, item]))
     const declared = declaredRelationships(context.model)
+    const names = elementsByName(context.model)
     const drift = new DriftLedger(declared.byId.values(), driftTag)
     const collector = new FindingCollector()
 
@@ -126,7 +127,7 @@ export function architectureRules(
         // A dependency the resolver could not place is a crossing the gate
         // never judged; saying so is the difference between an advisory miss
         // and a silent one.
-        collector.add(unmappedReferenceRule(association, observation, severityOf))
+        collector.add(unmappedReferenceRule(association, observation, severityOf, names))
         // Ignored means not counted anywhere: under 'ignore' a type-only
         // dependency must not keep a drift edge alive either.
         if (typeOnlyPolicy !== 'ignore' || !isTypeOnlyDependency(observation)) {
@@ -158,7 +159,7 @@ export function architectureRules(
             drift.record(association, observation)
           }
         } else {
-          collector.add(unresolvedImportRule(association, observation, severityOf))
+          collector.add(unresolvedImportRule(association, observation, severityOf, names))
         }
       }
     }

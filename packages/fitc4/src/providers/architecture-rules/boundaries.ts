@@ -6,8 +6,14 @@
  */
 
 import { findingId } from '../../ids.ts'
-import { hasRelationship, isSameOrNested, type declaredRelationships } from '../../model.ts'
-import type { Association, Observation } from '../../types.ts'
+import {
+  hasRelationship,
+  isSameOrNested,
+  nearestElementName,
+  type declaredRelationships,
+  type ElementNameIndex,
+} from '../../model.ts'
+import type { Association, Observation, Ref } from '../../types.ts'
 import { PROVIDER_ID, type Finding, type SeverityOf, type TypeOnlyImportsPolicy } from './shared.ts'
 
 export function dependencyRule(
@@ -93,6 +99,7 @@ export function unmappedReferenceRule(
   association: Association,
   observation: Observation,
   severityOf: SeverityOf,
+  names?: ElementNameIndex,
 ): Finding | undefined {
   if (association.status !== 'unresolved' && association.status !== 'ambiguous') return undefined
   if (observation.target === undefined || observation.target.kind === 'module') return undefined
@@ -110,12 +117,16 @@ export function unmappedReferenceRule(
     association.status === 'ambiguous'
       ? `an endpoint is claimed by ${candidates.map((ref) => ref.id).join(' and ')}`
       : 'the edge does not map onto two model elements'
+  const hint =
+    association.status === 'unresolved' && names !== undefined
+      ? nearMissHint([observation.subject, observation.target], names)
+      : ''
 
   return {
     id: findingId(PROVIDER_ID, 'unmapped-reference', `${fromId}->${toId}`),
     ruleId: 'unmapped-reference',
     severity: severityOf('unmapped-reference', 'warning'),
-    description: `${fromId} depends on ${toId}, but ${why}, so the dependency cannot be checked.`,
+    description: `${fromId} depends on ${toId}, but ${why}, so the dependency cannot be checked.${hint}`,
     subject: observation.subject ?? { kind: 'file', id: fromId },
     ...(candidates.length > 0 ? { related: candidates } : {}),
     evidence: observation.evidence,
@@ -134,19 +145,45 @@ export function unresolvedImportRule(
   association: Association,
   observation: Observation,
   severityOf: SeverityOf,
+  names?: ElementNameIndex,
 ): Finding | undefined {
   if (observation.target === undefined) return undefined
   const fromPath = observation.subject?.id ?? association.observationId
+  const hint = names === undefined ? '' : nearMissHint([observation.target], names)
 
   return {
     id: findingId(PROVIDER_ID, 'unresolved-import', `${fromPath}->${observation.target.id}`),
     ruleId: 'unresolved-import',
     severity: severityOf('unresolved-import', 'warning'),
-    description: `${fromPath} imports ${observation.target.id}, which does not resolve; the dependency cannot be checked.`,
+    description: `${fromPath} imports ${observation.target.id}, which does not resolve; the dependency cannot be checked.${hint}`,
     subject: { kind: 'file', id: fromPath },
     evidence: observation.evidence,
     provider: PROVIDER_ID,
   }
+}
+
+/**
+ * The actionable half of a refusal: name the near miss without resolving it.
+ *
+ * For each name-speaking endpoint that maps onto nothing, `nearestElementName`
+ * proposes the single element the name is probably meant to address, and the
+ * hint spells the gap out — the check still does not happen, but the warning
+ * now reads as a diff (rename one side, or claim the name) instead of a dead
+ * end. Path- and package-shaped refs stay out: a near miss on a path is a
+ * coincidence of spelling, not an address.
+ */
+function nearMissHint(refs: Array<Ref | undefined>, names: ElementNameIndex): string {
+  const hints: string[] = []
+  for (const ref of refs) {
+    if (ref === undefined) continue
+    if (ref.kind === 'file' || ref.kind === 'directory' || ref.kind === 'module') continue
+    if (ref.id.includes('/') || ref.id.includes('\\') || ref.id.includes('#')) continue
+    const nearest = nearestElementName(ref.id, names)
+    if (nearest !== undefined && !hints.some((line) => line.includes(`'${ref.id}'`))) {
+      hints.push(` No element is named '${ref.id}'; the nearest declared name is ${nearest}.`)
+    }
+  }
+  return hints.join('')
 }
 
 /** Whether a dependency observation records a compile-time-only import. */

@@ -146,6 +146,19 @@ describe('vocabulary that maps onto nothing', () => {
     expect(finding?.severity).toBe('warning')
     expect(finding?.subject?.id).toBe('web')
     expect(finding?.description).toContain('cannot be checked')
+    // 'cache' is near nothing in this model; a hint here would be a guess.
+    expect(finding?.description).not.toContain('nearest declared name')
+  })
+
+  test('a near-miss name is spelled out in the warning, unresolved either way', async () => {
+    const result = await run([edge({ kind: 'service', id: 'web' }, { kind: 'service', id: 'webb' })])
+
+    const finding = findingFor(result.findings, 'unmapped-reference')
+    expect(finding?.description).toContain(
+      "No element is named 'webb'; the nearest declared name is fixture.web.",
+    )
+    // The hint never resolves anything: the edge still maps onto no element.
+    expect(result.associations.filter((item) => item.status === 'resolved')).toEqual([])
   })
 
   test('is promotable to a gate failure like any other rule', async () => {
