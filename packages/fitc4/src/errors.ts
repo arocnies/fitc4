@@ -21,7 +21,8 @@ export function closestName(key: string, candidates: string[]): string | undefin
   return best?.name
 }
 
-function editDistance(a: string, b: string): number {
+/** Levenshtein distance; also feeds `nearestElementName` in model.ts. */
+export function editDistance(a: string, b: string): number {
   const row = Array.from({ length: b.length + 1 }, (_, index) => index)
   for (let i = 1; i <= a.length; i += 1) {
     let previous = row[0] ?? 0

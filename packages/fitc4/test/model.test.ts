@@ -14,6 +14,7 @@ import {
   packageNameOf,
   toPackageName,
   toPrefix,
+  nearestElementName,
 } from '../src/model.ts'
 import { ownerOf } from '../src/providers/source-root.ts'
 import { fixturePath } from './helpers.ts'
@@ -367,5 +368,46 @@ describe('source files stay searchable', () => {
     walk(root)
 
     expect(offenders).toEqual([])
+  })
+})
+
+describe('nearestElementName', () => {
+  const index = {
+    exact: new Map<string, string[]>(),
+    normalized: new Map([
+      ['redis', ['boutique.redis']],
+      ['boutiqueredis', ['boutique.redis']],
+      ['cartservice', ['boutique.cartservice']],
+      ['boutiquecartservice', ['boutique.cartservice']],
+      ['db', ['fixture.db']],
+    ]),
+  }
+
+  test('containment finds the element inside a longer real-world name', () => {
+    expect(nearestElementName('redis-cart', index)).toBe('boutique.redis')
+  })
+
+  test('a small typo finds the element by edit distance', () => {
+    expect(nearestElementName('cartservise', index)).toBe('boutique.cartservice')
+  })
+
+  test('a name that already maps is not a near miss', () => {
+    expect(nearestElementName('redis', index)).toBeUndefined()
+  })
+
+  test('a short name cannot claim containment: db-config is not db', () => {
+    expect(nearestElementName('db-config', index)).toBeUndefined()
+  })
+
+  test('two elements matching equally is silence, not a coin flip', () => {
+    const ambiguous = {
+      exact: new Map<string, string[]>(),
+      normalized: new Map([
+        ['apigateway', ['shop.apiGateway']],
+        ['edgegateway', ['shop.edgeGateway']],
+      ]),
+    }
+    // 'gateway' sits inside both names; naming either would be a guess.
+    expect(nearestElementName('gateway', ambiguous)).toBeUndefined()
   })
 })
