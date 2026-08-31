@@ -74,6 +74,15 @@ export interface Expectations {
   findings: ExpectedFinding[]
   /** Named regressions: matches are extras reported under this label. */
   findingsMustNot?: ExpectedFinding[]
+  /**
+   * Tolerated findings, mirroring `observations.may`: a finding that follows
+   * deterministically from a may-tolerated observation (the
+   * `unresolved-import` warning behind a tolerated abstention) must be
+   * tolerated with it, or the observation's `may` entry is a trap — the model
+   * exercises a permission upstream and loses the row downstream. Matches are
+   * claimed silently: no hit, no extra.
+   */
+  findingsMay?: ExpectedFinding[]
   associations?: { must?: ExpectedAssociation[]; mustNot?: ExpectedAssociation[] }
   observations?: {
     must?: ExpectedObservation[]
@@ -214,6 +223,10 @@ export function scoreFixture(
   }
   for (const finding of result.findings) {
     if (claimed.has(finding)) continue
+    if (expectations.findingsMay?.some((entry) => findingMatches(entry, finding))) {
+      claimed.add(finding)
+      continue
+    }
     const named = expectations.findingsMustNot?.find((entry) => findingMatches(entry, finding))
     const target = row(finding.provider)
     target.extras += 1

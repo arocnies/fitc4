@@ -1,0 +1,289 @@
+// OpenTelemetry Demo (open-telemetry/opentelemetry-demo, Apache-2.0), pinned
+// at release 3.0.0 (1755859a9de8). The relationships transcribe the explicit
+// architecture the two compose files state for themselves: every key of a
+// service's depends_on block, plus every service-naming environment
+// reference -- a variable KEY ending in _ADDR or _HOST, or a ${...}
+// reference to such a variable inside a value -- whose stem names another
+// service declared in these files, the repository's own address-variable
+// convention (CART_ADDR names cart, FLAGD_HOST names flagd; VALKEY_ADDR
+// names valkey-cart, the one service its stem matches by prefix). Where the
+// name appears makes no difference: ${OTEL_COLLECTOR_HOST} inside flagd's
+// exporter endpoint names the collector as surely as frontend's
+// OTEL_COLLECTOR_HOST key does, and the first live pass measured exactly
+// that reading. What states nothing is a stem naming no declared service:
+// GRAFANA_HOST and JAEGER_HOST point at services of overlay files outside
+// this two-file world, ENVOY_ADDR names no service at all, and
+// ${POSTGRES_HOST} resolves to astronomy-db only through .env -- which is
+// invisible to the scan (the focused listing skips hidden files), so
+// asserting that binding would transcribe a value the text never shows. A
+// self-reference (frontend's own FRONTEND_ADDR) is an address, not an edge.
+// The transcription is verified mechanically at authoring time; see the
+// fixture README for the oracle.
+//
+// The graph is the union of compose.yaml and the compose.full.yaml overlay,
+// which adds the Kafka pipeline: checkout produces the order stream, and the
+// accounting and fraud-detection consumers plus the broker itself exist only
+// in the overlay. Thirteen edges are stated by the naming convention alone
+// and by no depends_on: among them shipping -> quote, the collector's two
+// scrape targets, the three FLAGD_HOST carriers that never declare a startup
+// dependency on flagd (email, frontend-proxy, fraud-detection), and the
+// three telemetry exports stated only as ${OTEL_COLLECTOR_HOST} references
+// inside endpoint values (flagd, kafka, load-generator).
+//
+// Each service owns the src/<name>/ directory the repository itself binds to
+// it (the *_DOCKERFILE variables in .env; src/postgresql for astronomy-db,
+// and the mounted config directories for flagd and the collector).
+// valkey-cart runs a stock image with no directory at this pin, so it stays
+// a description-only element and is expected to surface as unobserved.
+specification {
+  element system
+  element service
+}
+
+model {
+  otel = system 'OpenTelemetry Demo' {
+    accounting = service 'Accounting' {
+      description 'Consumes the order stream from Kafka and totals it'
+      metadata {
+        sources 'src/accounting/**'
+      }
+    }
+
+    ad = service 'Ad service' {
+      description 'Serves contextual ads for the store'
+      metadata {
+        sources 'src/ad/**'
+      }
+    }
+
+    astronomyDb = service 'Astronomy DB' {
+      description 'PostgreSQL database backing the product catalog; compose service astronomy-db, sources under src/postgresql'
+      metadata {
+        sources 'src/postgresql/**'
+      }
+    }
+
+    cart = service 'Cart service' {
+      description 'Stores shopping carts in the valkey-cart cache'
+      metadata {
+        sources 'src/cart/**'
+      }
+    }
+
+    checkout = service 'Checkout' {
+      description 'Orchestrates an order: cart, payment, shipping, email, and the order stream to Kafka'
+      metadata {
+        sources 'src/checkout/**'
+      }
+    }
+
+    currency = service 'Currency service' {
+      description 'Currency conversion for the store'
+      metadata {
+        sources 'src/currency/**'
+      }
+    }
+
+    email = service 'Email service' {
+      description 'Sends order confirmation emails'
+      metadata {
+        sources 'src/email/**'
+      }
+    }
+
+    flagd = service 'flagd' {
+      description 'Feature-flag daemon evaluating the demo scenario flags most services consult'
+      metadata {
+        sources 'src/flagd/**'
+      }
+    }
+
+    flagdUi = service 'flagd UI' {
+      description 'Web UI for editing the flagd feature flags'
+      metadata {
+        sources 'src/flagd-ui/**'
+      }
+    }
+
+    fraudDetection = service 'Fraud detection' {
+      description 'Consumes the order stream from Kafka and screens it'
+      metadata {
+        sources 'src/fraud-detection/**'
+      }
+    }
+
+    frontend = service 'Frontend' {
+      description 'The web store; fans out to most other services'
+      metadata {
+        sources 'src/frontend/**'
+      }
+    }
+
+    frontendProxy = service 'Front proxy' {
+      description 'Envoy, the single entry point routing to the web surfaces'
+      metadata {
+        sources 'src/frontend-proxy/**'
+      }
+    }
+
+    imageProvider = service 'Image provider' {
+      description 'nginx serving the product images'
+      metadata {
+        sources 'src/image-provider/**'
+      }
+    }
+
+    kafka = service 'Kafka' {
+      description 'The broker carrying the orders topic between checkout and its consumers'
+      metadata {
+        sources 'src/kafka/**'
+      }
+    }
+
+    loadGenerator = service 'Load generator' {
+      description 'k6 scenarios driving the store through the front proxy'
+      metadata {
+        sources 'src/load-generator/**'
+      }
+    }
+
+    otelCollector = service 'OTel Collector' {
+      description 'The collector every service exports telemetry to'
+      metadata {
+        sources 'src/otel-collector/**'
+      }
+    }
+
+    payment = service 'Payment service' {
+      description 'Charges the payment method at checkout'
+      metadata {
+        sources 'src/payment/**'
+      }
+    }
+
+    productCatalog = service 'Product catalog' {
+      description 'The product catalog, backed by the astronomy database'
+      metadata {
+        sources 'src/product-catalog/**'
+      }
+    }
+
+    quote = service 'Quote service' {
+      description 'Computes shipping quotes for the shipping service'
+      metadata {
+        sources 'src/quote/**'
+      }
+    }
+
+    recommendation = service 'Recommendation' {
+      description 'Recommends products from the catalog'
+      metadata {
+        sources 'src/recommendation/**'
+      }
+    }
+
+    shipping = service 'Shipping service' {
+      description 'Shipping cost and tracking; asks quote for prices'
+      metadata {
+        sources 'src/shipping/**'
+      }
+    }
+
+    telemetryDocs = service 'Telemetry docs' {
+      description 'The demo documentation site served behind the proxy'
+      metadata {
+        sources 'src/telemetry-docs/**'
+      }
+    }
+
+    valkeyCart = service 'Valkey cart cache' {
+      description 'Valkey, the in-memory store the cart service keeps carts in; a stock image with no source directory at this pin'
+    }
+
+    // The 64 transcribed relationships, grouped by declaring service.
+    accounting -> kafka // depends_on, KAFKA_ADDR
+    accounting -> otelCollector // depends_on, ${OTEL_COLLECTOR_HOST}
+
+    ad -> flagd // depends_on, FLAGD_HOST
+    ad -> otelCollector // depends_on, ${OTEL_COLLECTOR_HOST}
+
+    cart -> flagd // depends_on, FLAGD_HOST
+    cart -> otelCollector // depends_on
+    cart -> valkeyCart // depends_on, VALKEY_ADDR
+
+    checkout -> cart // depends_on, CART_ADDR
+    checkout -> currency // depends_on, CURRENCY_ADDR
+    checkout -> email // depends_on, EMAIL_ADDR
+    checkout -> flagd // depends_on, FLAGD_HOST
+    checkout -> kafka // depends_on, KAFKA_ADDR
+    checkout -> otelCollector // depends_on, ${OTEL_COLLECTOR_HOST}
+    checkout -> payment // depends_on, PAYMENT_ADDR
+    checkout -> productCatalog // depends_on, PRODUCT_CATALOG_ADDR
+    checkout -> shipping // depends_on, SHIPPING_ADDR
+
+    currency -> otelCollector // depends_on
+
+    email -> flagd // FLAGD_HOST
+    email -> otelCollector // depends_on, ${OTEL_COLLECTOR_HOST}
+
+    flagd -> otelCollector // ${OTEL_COLLECTOR_HOST}
+
+    flagdUi -> flagd // depends_on
+    flagdUi -> otelCollector // depends_on, ${OTEL_COLLECTOR_HOST}
+
+    fraudDetection -> flagd // FLAGD_HOST
+    fraudDetection -> kafka // depends_on, KAFKA_ADDR
+    fraudDetection -> otelCollector // depends_on, ${OTEL_COLLECTOR_HOST}
+
+    frontend -> ad // depends_on, AD_ADDR
+    frontend -> cart // depends_on, CART_ADDR
+    frontend -> checkout // depends_on, CHECKOUT_ADDR
+    frontend -> currency // depends_on, CURRENCY_ADDR
+    frontend -> flagd // depends_on, FLAGD_HOST
+    frontend -> imageProvider // depends_on
+    frontend -> otelCollector // depends_on, OTEL_COLLECTOR_HOST
+    frontend -> productCatalog // depends_on, PRODUCT_CATALOG_ADDR
+    frontend -> quote // depends_on
+    frontend -> recommendation // depends_on, RECOMMENDATION_ADDR
+    frontend -> shipping // depends_on, SHIPPING_ADDR
+
+    frontendProxy -> flagd // FLAGD_HOST
+    frontendProxy -> flagdUi // depends_on, FLAGD_UI_HOST
+    frontendProxy -> frontend // depends_on, FRONTEND_HOST
+    frontendProxy -> imageProvider // IMAGE_PROVIDER_HOST
+    frontendProxy -> otelCollector // OTEL_COLLECTOR_HOST
+    frontendProxy -> telemetryDocs // depends_on, TELEMETRY_DOCS_HOST
+
+    imageProvider -> otelCollector // depends_on, OTEL_COLLECTOR_HOST
+
+    kafka -> otelCollector // ${OTEL_COLLECTOR_HOST}
+
+    loadGenerator -> flagd // depends_on, FLAGD_HOST
+    loadGenerator -> frontend // depends_on
+    loadGenerator -> frontendProxy // depends_on
+    loadGenerator -> otelCollector // ${OTEL_COLLECTOR_HOST}
+
+    otelCollector -> frontendProxy // FRONTEND_PROXY_ADDR
+    otelCollector -> imageProvider // IMAGE_PROVIDER_HOST
+    otelCollector -> kafka // KAFKA_ADDR
+
+    payment -> flagd // depends_on, FLAGD_HOST
+    payment -> otelCollector // depends_on
+
+    productCatalog -> astronomyDb // depends_on
+    productCatalog -> flagd // depends_on, FLAGD_HOST
+    productCatalog -> otelCollector // depends_on
+
+    quote -> otelCollector // depends_on, ${OTEL_COLLECTOR_HOST}
+
+    recommendation -> flagd // depends_on, FLAGD_HOST
+    recommendation -> otelCollector // depends_on
+    recommendation -> productCatalog // depends_on, PRODUCT_CATALOG_ADDR
+
+    shipping -> flagd // depends_on, FLAGD_HOST
+    shipping -> otelCollector // depends_on, ${OTEL_COLLECTOR_HOST}
+    shipping -> quote // QUOTE_ADDR
+
+    telemetryDocs -> otelCollector // OTEL_COLLECTOR_HOST
+  }
+}
