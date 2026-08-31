@@ -235,6 +235,214 @@
         "kind": "file",
         "subject": "warehouse/template.yaml",
         "label": "the shipped import scan reports the file and finds no imports in it"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "delivery",
+        "target": "orders"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "delivery",
+        "target": "platform"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api",
+        "target": "delivery"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api",
+        "target": "delivery-pricing"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api",
+        "target": "orders"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api",
+        "target": "products"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api",
+        "target": "users"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "frontend-api",
+        "target": "warehouse"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders",
+        "target": "delivery-pricing"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders",
+        "target": "platform"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "orders",
+        "target": "products"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "payment",
+        "target": "payment-3p"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "payment",
+        "target": "platform"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "products",
+        "target": "platform"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "users",
+        "target": "platform"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "warehouse",
+        "target": "platform"
+      },
+      {
+        "provider": "agent-scan:metadata",
+        "kind": "dependency",
+        "subject": "warehouse",
+        "target": "users"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "ecommerce.delivery",
+        "target": "ecommerce.orders",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.delivery",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.delivery",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.deliveryPricing",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.orders",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.products",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.users",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.frontendApi",
+        "target": "ecommerce.warehouse",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.orders",
+        "target": "ecommerce.deliveryPricing",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.orders",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.orders",
+        "target": "ecommerce.products",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.payment",
+        "target": "ecommerce.payment3p",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.payment",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.products",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.users",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.warehouse",
+        "target": "ecommerce.platform",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "ecommerce.warehouse",
+        "target": "ecommerce.users",
+        "declared": true
       }
     ]
   }

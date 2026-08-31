@@ -14,11 +14,227 @@
             "kind": "file",
             "id": "docker/docker-compose.yml"
           },
-          "description": "A Docker Compose file; it declares services, not imports",
+          "description": "docker/docker-compose.yml is a Docker Compose file declaring services",
           "evidence": [
             {
               "path": "docker/docker-compose.yml",
               "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "api-gw"
+          },
+          "target": {
+            "kind": "service",
+            "id": "studio"
+          },
+          "description": "api-gw declares depends_on studio",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 88
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "auth"
+          },
+          "target": {
+            "kind": "service",
+            "id": "db"
+          },
+          "description": "auth declares depends_on db",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 127
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "functions"
+          },
+          "target": {
+            "kind": "service",
+            "id": "api-gw"
+          },
+          "description": "functions declares depends_on api-gw",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 443
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "meta"
+          },
+          "target": {
+            "kind": "service",
+            "id": "db"
+          },
+          "description": "meta declares depends_on db",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 423
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "realtime"
+          },
+          "target": {
+            "kind": "service",
+            "id": "db"
+          },
+          "description": "realtime declares depends_on db",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 291
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "rest"
+          },
+          "target": {
+            "kind": "service",
+            "id": "db"
+          },
+          "description": "rest declares depends_on db",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 254
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "storage"
+          },
+          "target": {
+            "kind": "service",
+            "id": "db"
+          },
+          "description": "storage declares depends_on db",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 337
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "storage"
+          },
+          "target": {
+            "kind": "service",
+            "id": "imgproxy"
+          },
+          "description": "storage declares depends_on imgproxy",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 342
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "storage"
+          },
+          "target": {
+            "kind": "service",
+            "id": "rest"
+          },
+          "description": "storage declares depends_on rest",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 340
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "studio"
+          },
+          "target": {
+            "kind": "service",
+            "id": "api-gw"
+          },
+          "description": "studio declares SUPABASE_URL=http://api-gw:8000, a literal api-gw address",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 51
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "studio"
+          },
+          "target": {
+            "kind": "service",
+            "id": "meta"
+          },
+          "description": "studio declares STUDIO_PG_META_URL=http://meta:8080, a literal meta address",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 33
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "supavisor"
+          },
+          "target": {
+            "kind": "service",
+            "id": "db"
+          },
+          "description": "supavisor declares depends_on db",
+          "evidence": [
+            {
+              "path": "docker/docker-compose.yml",
+              "line": 557
             }
           ]
         }

@@ -14,7 +14,14 @@
         "kind": "file",
         "id": "docker-compose.yml"
       },
-      "label": "the compose file is reported but owned by nothing, and no edge is seen"
+      "label": "the compose file is reported and owned by nothing; the services, not the file, carry the edges"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "missing-relationship",
+      "severity": "error",
+      "descriptionIncludes": "deploy.web depends on deploy.db",
+      "label": "the planted web -> db edge is caught at zero authored words"
     }
   ],
   "observations": {
@@ -29,7 +36,48 @@
         "provider": "agent-scan:compose",
         "kind": "file",
         "subject": "docker-compose.yml",
-        "label": "the shipped import scan reports the file and finds no imports in it"
+        "label": "the declaration scan reports the file itself alongside its services"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "web",
+        "target": "api"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "web",
+        "target": "db"
+      },
+      {
+        "provider": "agent-scan:compose",
+        "kind": "dependency",
+        "subject": "api",
+        "target": "db"
+      }
+    ]
+  },
+  "associations": {
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "deploy.web",
+        "target": "deploy.api",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "deploy.web",
+        "target": "deploy.db",
+        "declared": false,
+        "label": "the planted edge resolves with no declared relationship behind it"
+      },
+      {
+        "provider": "source-root",
+        "source": "deploy.api",
+        "target": "deploy.db",
+        "declared": true
       }
     ]
   }

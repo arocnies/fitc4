@@ -74,8 +74,14 @@ const FOCUS_LABEL = 'Agent scan focus'
  * words (and at their own model's quality), so the tool ships it: files as
  * `file` observations, imports as `dependency` observations with `file`
  * targets inside the repository and `module` targets outside it, standard
- * library and generated code skipped. Exported so a config can extend it
- * rather than restate it.
+ * library and generated code skipped. One branch exists for files that are
+ * not importers: a declaration file (a compose file, a deployment manifest)
+ * defines many components at once, and reading it under the import contract
+ * collapses its whole topology into edges from one file that no element
+ * owns — measured on the otel floor, where a model volunteered the entire
+ * 64-edge graph at zero authored words and every edge died unanchored. The
+ * subject rule below is what makes those edges land. Exported so a config
+ * can extend it rather than restate it.
  */
 export const DEFAULT_INSTRUCTIONS =
   'Map the source code as a language-neutral dependency graph, whatever the language. ' +
@@ -84,12 +90,19 @@ export const DEFAULT_INSTRUCTIONS =
   "subject is the importing file; target is { kind: 'file' } with the imported file's " +
   'repository-relative path when the import stays inside this repository, or ' +
   "{ kind: 'module' } with the package name as written when it names an external package. " +
+  'A file that DECLARES named components rather than importing code — a compose file ' +
+  'declaring services, a deployment manifest declaring resources — states dependencies ' +
+  'between its components, not its own: there the subject is the declaring component and ' +
+  'the target the component it depends on, each as { kind: whatever the file calls them, ' +
+  'id: the name as declared }, never the declaring file. Only a file whose entries are ' +
+  'named component definitions qualifies; ordinary code keeps the importing file as ' +
+  'subject. ' +
   'When a repository-local import points at a file you cannot find, emit ' +
   "'unresolved-dependency' with the specifier as written in a { kind: 'module' } target " +
   "instead of guessing a path. Skip imports of the language's own standard library: they " +
   'are part of the runtime, not of this architecture. Skip generated code, vendored ' +
   'dependencies, lockfiles, and build output entirely. ' +
-  'Cite the file and line of each import as evidence.'
+  'Cite the file and line of each dependency as evidence.'
 
 export interface AgentScanOptions {
   exec: AgentExec

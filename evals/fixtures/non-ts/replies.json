@@ -77,10 +77,65 @@
             "kind": "file",
             "id": "docker-compose.yml"
           },
+          "description": "docker-compose.yml is a Docker Compose file declaring services",
           "evidence": [
             {
               "path": "docker-compose.yml",
               "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "web"
+          },
+          "target": {
+            "kind": "service",
+            "id": "api"
+          },
+          "description": "web declares depends_on api",
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "web"
+          },
+          "target": {
+            "kind": "service",
+            "id": "db"
+          },
+          "description": "web declares depends_on db",
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 6
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "api"
+          },
+          "target": {
+            "kind": "service",
+            "id": "db"
+          },
+          "description": "api declares depends_on db",
+          "evidence": [
+            {
+              "path": "docker-compose.yml",
+              "line": 10
             }
           ]
         }

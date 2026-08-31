@@ -11,7 +11,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/adservice.yaml"
           },
-          "description": "kubernetes-manifests/adservice.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/adservice.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/adservice.yaml",
@@ -25,7 +25,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/cartservice.yaml"
           },
-          "description": "kubernetes-manifests/cartservice.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/cartservice.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/cartservice.yaml",
@@ -39,7 +39,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/checkoutservice.yaml"
           },
-          "description": "kubernetes-manifests/checkoutservice.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/checkoutservice.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/checkoutservice.yaml",
@@ -53,7 +53,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/currencyservice.yaml"
           },
-          "description": "kubernetes-manifests/currencyservice.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/currencyservice.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/currencyservice.yaml",
@@ -67,7 +67,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/emailservice.yaml"
           },
-          "description": "kubernetes-manifests/emailservice.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/emailservice.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/emailservice.yaml",
@@ -81,7 +81,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/frontend.yaml"
           },
-          "description": "kubernetes-manifests/frontend.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/frontend.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/frontend.yaml",
@@ -95,7 +95,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/kustomization.yaml"
           },
-          "description": "kubernetes-manifests/kustomization.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/kustomization.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/kustomization.yaml",
@@ -109,7 +109,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/loadgenerator.yaml"
           },
-          "description": "kubernetes-manifests/loadgenerator.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/loadgenerator.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/loadgenerator.yaml",
@@ -123,7 +123,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/paymentservice.yaml"
           },
-          "description": "kubernetes-manifests/paymentservice.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/paymentservice.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/paymentservice.yaml",
@@ -137,7 +137,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/productcatalogservice.yaml"
           },
-          "description": "kubernetes-manifests/productcatalogservice.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/productcatalogservice.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/productcatalogservice.yaml",
@@ -151,7 +151,7 @@
             "kind": "file",
             "id": "kubernetes-manifests/recommendationservice.yaml"
           },
-          "description": "kubernetes-manifests/recommendationservice.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/recommendationservice.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/recommendationservice.yaml",
@@ -165,11 +165,497 @@
             "kind": "file",
             "id": "kubernetes-manifests/shippingservice.yaml"
           },
-          "description": "kubernetes-manifests/shippingservice.yaml is a Kubernetes manifest; it declares no imports",
+          "description": "kubernetes-manifests/shippingservice.yaml is a Kubernetes manifest declaring components",
           "evidence": [
             {
               "path": "kubernetes-manifests/shippingservice.yaml",
               "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "cartservice"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "redis-cart"
+          },
+          "description": "cartservice declares a literal redis-cart address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/cartservice.yaml",
+              "line": 51
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "checkoutservice"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "productcatalogservice"
+          },
+          "description": "checkoutservice declares a literal productcatalogservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/checkoutservice.yaml",
+              "line": 58
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "checkoutservice"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "shippingservice"
+          },
+          "description": "checkoutservice declares a literal shippingservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/checkoutservice.yaml",
+              "line": 60
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "checkoutservice"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "paymentservice"
+          },
+          "description": "checkoutservice declares a literal paymentservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/checkoutservice.yaml",
+              "line": 62
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "checkoutservice"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "emailservice"
+          },
+          "description": "checkoutservice declares a literal emailservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/checkoutservice.yaml",
+              "line": 64
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "checkoutservice"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "currencyservice"
+          },
+          "description": "checkoutservice declares a literal currencyservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/checkoutservice.yaml",
+              "line": 66
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "checkoutservice"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "cartservice"
+          },
+          "description": "checkoutservice declares a literal cartservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/checkoutservice.yaml",
+              "line": 68
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "productcatalogservice"
+          },
+          "description": "frontend declares a literal productcatalogservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/frontend.yaml",
+              "line": 70
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "currencyservice"
+          },
+          "description": "frontend declares a literal currencyservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/frontend.yaml",
+              "line": 72
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "cartservice"
+          },
+          "description": "frontend declares a literal cartservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/frontend.yaml",
+              "line": 74
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "recommendationservice"
+          },
+          "description": "frontend declares a literal recommendationservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/frontend.yaml",
+              "line": 76
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "shippingservice"
+          },
+          "description": "frontend declares a literal shippingservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/frontend.yaml",
+              "line": 78
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "checkoutservice"
+          },
+          "description": "frontend declares a literal checkoutservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/frontend.yaml",
+              "line": 80
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "adservice"
+          },
+          "description": "frontend declares a literal adservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/frontend.yaml",
+              "line": 82
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "loadgenerator"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "frontend"
+          },
+          "description": "loadgenerator declares a literal frontend address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/loadgenerator.yaml",
+              "line": 70
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "recommendationservice"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "productcatalogservice"
+          },
+          "description": "recommendationservice declares a literal productcatalogservice address in its env",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/recommendationservice.yaml",
+              "line": 61
+            }
+          ]
+        },
+        {
+          "kind": "unresolved-dependency",
+          "subject": {
+            "kind": "deployment",
+            "id": "frontend"
+          },
+          "target": {
+            "kind": "deployment",
+            "id": "shoppingassistantservice"
+          },
+          "description": "frontend declares a literal shoppingassistantservice:80 address, but no manifest here deploys it",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/frontend.yaml",
+              "line": 84
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "file",
+            "id": "kubernetes-manifests/kustomization.yaml"
+          },
+          "target": {
+            "kind": "file",
+            "id": "kubernetes-manifests/adservice.yaml"
+          },
+          "description": "kustomization.yaml lists adservice.yaml as a resource",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/kustomization.yaml",
+              "line": 18
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "file",
+            "id": "kubernetes-manifests/kustomization.yaml"
+          },
+          "target": {
+            "kind": "file",
+            "id": "kubernetes-manifests/cartservice.yaml"
+          },
+          "description": "kustomization.yaml lists cartservice.yaml as a resource",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/kustomization.yaml",
+              "line": 19
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "file",
+            "id": "kubernetes-manifests/kustomization.yaml"
+          },
+          "target": {
+            "kind": "file",
+            "id": "kubernetes-manifests/checkoutservice.yaml"
+          },
+          "description": "kustomization.yaml lists checkoutservice.yaml as a resource",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/kustomization.yaml",
+              "line": 20
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "file",
+            "id": "kubernetes-manifests/kustomization.yaml"
+          },
+          "target": {
+            "kind": "file",
+            "id": "kubernetes-manifests/currencyservice.yaml"
+          },
+          "description": "kustomization.yaml lists currencyservice.yaml as a resource",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/kustomization.yaml",
+              "line": 21
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "file",
+            "id": "kubernetes-manifests/kustomization.yaml"
+          },
+          "target": {
+            "kind": "file",
+            "id": "kubernetes-manifests/emailservice.yaml"
+          },
+          "description": "kustomization.yaml lists emailservice.yaml as a resource",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/kustomization.yaml",
+              "line": 22
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "file",
+            "id": "kubernetes-manifests/kustomization.yaml"
+          },
+          "target": {
+            "kind": "file",
+            "id": "kubernetes-manifests/frontend.yaml"
+          },
+          "description": "kustomization.yaml lists frontend.yaml as a resource",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/kustomization.yaml",
+              "line": 23
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "file",
+            "id": "kubernetes-manifests/kustomization.yaml"
+          },
+          "target": {
+            "kind": "file",
+            "id": "kubernetes-manifests/paymentservice.yaml"
+          },
+          "description": "kustomization.yaml lists paymentservice.yaml as a resource",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/kustomization.yaml",
+              "line": 25
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "file",
+            "id": "kubernetes-manifests/kustomization.yaml"
+          },
+          "target": {
+            "kind": "file",
+            "id": "kubernetes-manifests/productcatalogservice.yaml"
+          },
+          "description": "kustomization.yaml lists productcatalogservice.yaml as a resource",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/kustomization.yaml",
+              "line": 26
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "file",
+            "id": "kubernetes-manifests/kustomization.yaml"
+          },
+          "target": {
+            "kind": "file",
+            "id": "kubernetes-manifests/recommendationservice.yaml"
+          },
+          "description": "kustomization.yaml lists recommendationservice.yaml as a resource",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/kustomization.yaml",
+              "line": 27
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "file",
+            "id": "kubernetes-manifests/kustomization.yaml"
+          },
+          "target": {
+            "kind": "file",
+            "id": "kubernetes-manifests/shippingservice.yaml"
+          },
+          "description": "kustomization.yaml lists shippingservice.yaml as a resource",
+          "evidence": [
+            {
+              "path": "kubernetes-manifests/kustomization.yaml",
+              "line": 28
             }
           ]
         }
