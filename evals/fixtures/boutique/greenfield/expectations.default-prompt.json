@@ -10,121 +10,121 @@
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/adservice.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/adservice.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/adservice.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/cartservice.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/cartservice.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/cartservice.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/checkoutservice.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/checkoutservice.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/checkoutservice.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/currencyservice.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/currencyservice.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/currencyservice.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/emailservice.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/emailservice.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/emailservice.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/frontend.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/frontend.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/frontend.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/kustomization.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/kustomization.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/kustomization.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/loadgenerator.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/loadgenerator.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/loadgenerator.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/paymentservice.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/paymentservice.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/paymentservice.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/productcatalogservice.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/productcatalogservice.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/productcatalogservice.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/recommendationservice.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/recommendationservice.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/recommendationservice.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
       "ruleId": "unmapped-source",
       "severity": "warning",
-      "label": "kubernetes-manifests/shippingservice.yaml is not owned by any model element",
       "subject": {
         "kind": "file",
         "id": "kubernetes-manifests/shippingservice.yaml"
-      }
+      },
+      "label": "kubernetes-manifests/shippingservice.yaml is reported and owned by nothing; the deployments, not the files, carry the edges"
     },
     {
       "provider": "architecture-rules",
@@ -134,6 +134,13 @@
         "boutique.redis"
       ],
       "label": "the description-only redis element is reported as unobserved"
+    },
+    {
+      "provider": "architecture-rules",
+      "ruleId": "unmapped-reference",
+      "severity": "warning",
+      "descriptionIncludes": "No element is named 'redis-cart'; the nearest declared name is boutique.redis.",
+      "label": "the manifests call the cache redis-cart, the model calls it redis; the warning names the near miss instead of guessing"
     }
   ],
   "observations": {
@@ -146,21 +153,9 @@
       },
       {
         "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/adservice.yaml",
-        "label": "kubernetes-manifests/adservice.yaml reported as a source file with no imports"
-      },
-      {
-        "provider": "agent-scan:manifests",
         "kind": "scan-root",
         "subject": "kubernetes-manifests/cartservice.yaml",
         "label": "the scan attests to having examined kubernetes-manifests/cartservice.yaml"
-      },
-      {
-        "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/cartservice.yaml",
-        "label": "kubernetes-manifests/cartservice.yaml reported as a source file with no imports"
       },
       {
         "provider": "agent-scan:manifests",
@@ -170,21 +165,9 @@
       },
       {
         "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/checkoutservice.yaml",
-        "label": "kubernetes-manifests/checkoutservice.yaml reported as a source file with no imports"
-      },
-      {
-        "provider": "agent-scan:manifests",
         "kind": "scan-root",
         "subject": "kubernetes-manifests/currencyservice.yaml",
         "label": "the scan attests to having examined kubernetes-manifests/currencyservice.yaml"
-      },
-      {
-        "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/currencyservice.yaml",
-        "label": "kubernetes-manifests/currencyservice.yaml reported as a source file with no imports"
       },
       {
         "provider": "agent-scan:manifests",
@@ -194,21 +177,9 @@
       },
       {
         "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/emailservice.yaml",
-        "label": "kubernetes-manifests/emailservice.yaml reported as a source file with no imports"
-      },
-      {
-        "provider": "agent-scan:manifests",
         "kind": "scan-root",
         "subject": "kubernetes-manifests/frontend.yaml",
         "label": "the scan attests to having examined kubernetes-manifests/frontend.yaml"
-      },
-      {
-        "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/frontend.yaml",
-        "label": "kubernetes-manifests/frontend.yaml reported as a source file with no imports"
       },
       {
         "provider": "agent-scan:manifests",
@@ -218,21 +189,9 @@
       },
       {
         "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/kustomization.yaml",
-        "label": "kubernetes-manifests/kustomization.yaml reported as a source file with no imports"
-      },
-      {
-        "provider": "agent-scan:manifests",
         "kind": "scan-root",
         "subject": "kubernetes-manifests/loadgenerator.yaml",
         "label": "the scan attests to having examined kubernetes-manifests/loadgenerator.yaml"
-      },
-      {
-        "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/loadgenerator.yaml",
-        "label": "kubernetes-manifests/loadgenerator.yaml reported as a source file with no imports"
       },
       {
         "provider": "agent-scan:manifests",
@@ -242,33 +201,15 @@
       },
       {
         "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/paymentservice.yaml",
-        "label": "kubernetes-manifests/paymentservice.yaml reported as a source file with no imports"
-      },
-      {
-        "provider": "agent-scan:manifests",
         "kind": "scan-root",
         "subject": "kubernetes-manifests/productcatalogservice.yaml",
         "label": "the scan attests to having examined kubernetes-manifests/productcatalogservice.yaml"
       },
       {
         "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/productcatalogservice.yaml",
-        "label": "kubernetes-manifests/productcatalogservice.yaml reported as a source file with no imports"
-      },
-      {
-        "provider": "agent-scan:manifests",
         "kind": "scan-root",
         "subject": "kubernetes-manifests/recommendationservice.yaml",
         "label": "the scan attests to having examined kubernetes-manifests/recommendationservice.yaml"
-      },
-      {
-        "provider": "agent-scan:manifests",
-        "kind": "file",
-        "subject": "kubernetes-manifests/recommendationservice.yaml",
-        "label": "kubernetes-manifests/recommendationservice.yaml reported as a source file with no imports"
       },
       {
         "provider": "agent-scan:manifests",
@@ -279,12 +220,354 @@
       {
         "provider": "agent-scan:manifests",
         "kind": "file",
+        "subject": "kubernetes-manifests/adservice.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/adservice.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
+        "subject": "kubernetes-manifests/cartservice.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/cartservice.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
+        "subject": "kubernetes-manifests/checkoutservice.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/checkoutservice.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
+        "subject": "kubernetes-manifests/currencyservice.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/currencyservice.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
+        "subject": "kubernetes-manifests/emailservice.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/emailservice.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
+        "subject": "kubernetes-manifests/frontend.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/frontend.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/kustomization.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
+        "subject": "kubernetes-manifests/loadgenerator.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/loadgenerator.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
+        "subject": "kubernetes-manifests/paymentservice.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/paymentservice.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
+        "subject": "kubernetes-manifests/productcatalogservice.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/productcatalogservice.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
+        "subject": "kubernetes-manifests/recommendationservice.yaml",
+        "label": "the declaration scan reports kubernetes-manifests/recommendationservice.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "file",
         "subject": "kubernetes-manifests/shippingservice.yaml",
-        "label": "kubernetes-manifests/shippingservice.yaml reported as a source file with no imports"
+        "label": "the declaration scan reports kubernetes-manifests/shippingservice.yaml itself alongside its deployments"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "cartservice",
+        "target": "redis-cart"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "productcatalogservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "shippingservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "paymentservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "emailservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "currencyservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "checkoutservice",
+        "target": "cartservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "productcatalogservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "currencyservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "cartservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "recommendationservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "shippingservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "checkoutservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "adservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "loadgenerator",
+        "target": "frontend"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "recommendationservice",
+        "target": "productcatalogservice"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "target": "kubernetes-manifests/adservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "target": "kubernetes-manifests/cartservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "target": "kubernetes-manifests/checkoutservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "target": "kubernetes-manifests/currencyservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "target": "kubernetes-manifests/emailservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "target": "kubernetes-manifests/frontend.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "target": "kubernetes-manifests/paymentservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "target": "kubernetes-manifests/productcatalogservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "target": "kubernetes-manifests/recommendationservice.yaml"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "kubernetes-manifests/kustomization.yaml",
+        "target": "kubernetes-manifests/shippingservice.yaml"
+      }
+    ],
+    "may": [
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "frontend",
+        "target": "shoppingassistantservice",
+        "label": "the literal shoppingassistantservice address asserted as a dependency; the association pin carries the fact"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "unresolved-dependency",
+        "subject": "frontend",
+        "target": "shoppingassistantservice",
+        "label": "the same address reported as the abstention; either observation form is contract-permitted"
+      },
+      {
+        "provider": "agent-scan:manifests",
+        "kind": "dependency",
+        "subject": "loadgenerator",
+        "target": "frontend",
+        "label": "the manifest states FRONTEND_ADDR in both the init and main containers; a second report of the second statement is tolerated"
       }
     ]
   },
   "associations": {
-    "must": []
+    "must": [
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.productcatalogservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.shippingservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.paymentservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.emailservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.currencyservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.checkoutservice",
+        "target": "boutique.cartservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.productcatalogservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.currencyservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.cartservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.recommendationservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.shippingservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.checkoutservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.adservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.loadgenerator",
+        "target": "boutique.frontend",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.recommendationservice",
+        "target": "boutique.productcatalogservice",
+        "declared": true
+      },
+      {
+        "provider": "source-root",
+        "source": "boutique.frontend",
+        "target": "boutique.shoppingassistantservice",
+        "declared": true
+      }
+    ]
   }
 }

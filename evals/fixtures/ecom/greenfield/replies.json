@@ -605,6 +605,312 @@
               "line": 1
             }
           ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "delivery"
+          },
+          "target": {
+            "kind": "service",
+            "id": "orders"
+          },
+          "description": "delivery's metadata.yaml lists orders under dependencies",
+          "evidence": [
+            {
+              "path": "delivery/metadata.yaml",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "delivery"
+          },
+          "target": {
+            "kind": "service",
+            "id": "platform"
+          },
+          "description": "delivery's metadata.yaml lists platform under dependencies",
+          "evidence": [
+            {
+              "path": "delivery/metadata.yaml",
+              "line": 4
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-api"
+          },
+          "target": {
+            "kind": "service",
+            "id": "delivery"
+          },
+          "description": "frontend-api's metadata.yaml lists delivery under dependencies",
+          "evidence": [
+            {
+              "path": "frontend-api/metadata.yaml",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-api"
+          },
+          "target": {
+            "kind": "service",
+            "id": "delivery-pricing"
+          },
+          "description": "frontend-api's metadata.yaml lists delivery-pricing under dependencies",
+          "evidence": [
+            {
+              "path": "frontend-api/metadata.yaml",
+              "line": 4
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-api"
+          },
+          "target": {
+            "kind": "service",
+            "id": "orders"
+          },
+          "description": "frontend-api's metadata.yaml lists orders under dependencies",
+          "evidence": [
+            {
+              "path": "frontend-api/metadata.yaml",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-api"
+          },
+          "target": {
+            "kind": "service",
+            "id": "products"
+          },
+          "description": "frontend-api's metadata.yaml lists products under dependencies",
+          "evidence": [
+            {
+              "path": "frontend-api/metadata.yaml",
+              "line": 6
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-api"
+          },
+          "target": {
+            "kind": "service",
+            "id": "users"
+          },
+          "description": "frontend-api's metadata.yaml lists users under dependencies",
+          "evidence": [
+            {
+              "path": "frontend-api/metadata.yaml",
+              "line": 7
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "frontend-api"
+          },
+          "target": {
+            "kind": "service",
+            "id": "warehouse"
+          },
+          "description": "frontend-api's metadata.yaml lists warehouse under dependencies",
+          "evidence": [
+            {
+              "path": "frontend-api/metadata.yaml",
+              "line": 8
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "orders"
+          },
+          "target": {
+            "kind": "service",
+            "id": "delivery-pricing"
+          },
+          "description": "orders's metadata.yaml lists delivery-pricing under dependencies",
+          "evidence": [
+            {
+              "path": "orders/metadata.yaml",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "orders"
+          },
+          "target": {
+            "kind": "service",
+            "id": "platform"
+          },
+          "description": "orders's metadata.yaml lists platform under dependencies",
+          "evidence": [
+            {
+              "path": "orders/metadata.yaml",
+              "line": 4
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "orders"
+          },
+          "target": {
+            "kind": "service",
+            "id": "products"
+          },
+          "description": "orders's metadata.yaml lists products under dependencies",
+          "evidence": [
+            {
+              "path": "orders/metadata.yaml",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "payment"
+          },
+          "target": {
+            "kind": "service",
+            "id": "payment-3p"
+          },
+          "description": "payment's metadata.yaml lists payment-3p under dependencies",
+          "evidence": [
+            {
+              "path": "payment/metadata.yaml",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "payment"
+          },
+          "target": {
+            "kind": "service",
+            "id": "platform"
+          },
+          "description": "payment's metadata.yaml lists platform under dependencies",
+          "evidence": [
+            {
+              "path": "payment/metadata.yaml",
+              "line": 4
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "products"
+          },
+          "target": {
+            "kind": "service",
+            "id": "platform"
+          },
+          "description": "products's metadata.yaml lists platform under dependencies",
+          "evidence": [
+            {
+              "path": "products/metadata.yaml",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "users"
+          },
+          "target": {
+            "kind": "service",
+            "id": "platform"
+          },
+          "description": "users's metadata.yaml lists platform under dependencies",
+          "evidence": [
+            {
+              "path": "users/metadata.yaml",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "warehouse"
+          },
+          "target": {
+            "kind": "service",
+            "id": "platform"
+          },
+          "description": "warehouse's metadata.yaml lists platform under dependencies",
+          "evidence": [
+            {
+              "path": "warehouse/metadata.yaml",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "dependency",
+          "subject": {
+            "kind": "service",
+            "id": "warehouse"
+          },
+          "target": {
+            "kind": "service",
+            "id": "users"
+          },
+          "description": "warehouse's metadata.yaml lists users under dependencies",
+          "evidence": [
+            {
+              "path": "warehouse/metadata.yaml",
+              "line": 4
+            }
+          ]
         }
       ],
       "examined": [
