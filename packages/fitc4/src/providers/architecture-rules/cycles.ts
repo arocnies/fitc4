@@ -129,23 +129,50 @@ function stronglyConnected(graph: Map<string, Set<string>>): string[][] {
 /**
  * One concrete cycle inside the component, starting from its alphabetically
  * first member so the description is stable across runs: `a -> b -> a`.
+ *
+ * A shortest path back to the start, by BFS over the component's own edges
+ * with successors expanded in sorted order, so the witness is deterministic
+ * AND every edge it names is real. The first cut greedily walked
+ * sorted-first successors and closed the path wherever it dead-ended, which
+ * fabricated the closing edge on any component where the walk could strand
+ * itself — first hit on a fifteen-service compose stack whose walk entered a
+ * spur (`flagd-ui`) that only led back to already-visited members. A witness
+ * naming an edge the model never declared is worse than no witness: it sends
+ * the reader hunting for a dependency that does not exist.
  */
 function witnessCycle(graph: Map<string, Set<string>>, members: Set<string>): string[] {
   const start = [...members].sort()[0] ?? ''
-  const path = [start]
-  const visited = new Set([start])
-  let current = start
-  for (;;) {
-    const successor = [...(graph.get(current) ?? [])]
-      .filter((node) => members.has(node))
-      .sort()
-      .find((node) => node === start || !visited.has(node))
-    if (successor === undefined || successor === start) {
-      path.push(start)
-      return path
-    }
-    visited.add(successor)
-    path.push(successor)
-    current = successor
+  const successorsOf = (node: string): string[] =>
+    [...(graph.get(node) ?? [])].filter((candidate) => members.has(candidate)).sort()
+
+  const parent = new Map<string, string>()
+  const queue: string[] = []
+  const enqueue = (node: string, from: string): void => {
+    if (node === start || parent.has(node)) return
+    parent.set(node, from)
+    queue.push(node)
   }
+  for (const successor of successorsOf(start)) enqueue(successor, start)
+
+  for (let at = 0; at < queue.length; at += 1) {
+    const node = queue[at]
+    if (node === undefined) break
+    for (const successor of successorsOf(node)) {
+      if (successor === start) {
+        const path = [node]
+        let current = node
+        while (current !== start) {
+          current = parent.get(current) ?? start
+          path.push(current)
+        }
+        path.reverse()
+        path.push(start)
+        return path
+      }
+      enqueue(successor, node)
+    }
+  }
+  // Unreachable: a strongly connected component of two or more members always
+  // holds a cycle through each member. Stay total anyway.
+  return [start, start]
 }
